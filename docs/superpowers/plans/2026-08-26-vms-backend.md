@@ -61,6 +61,8 @@ backend/
         rateLimit.test.ts
         sendEmail.ts
         sendEmail.test.ts
+        verifyVolunteerAuth.ts
+        verifyVolunteerAuth.test.ts
       register-volunteer/
         handler.ts
         handler.test.ts
@@ -3318,6 +3320,328 @@ Expected: PASS on all tests.
 ```bash
 git add backend/supabase/functions/_shared/sendEmail.ts backend/supabase/functions/_shared/sendEmail.test.ts backend/supabase/functions/decide-application/ backend/supabase/functions/verify-hours/
 git commit -m "feat(backend): send status-change emails via Resend on decision and hours verification"
+```
+
+---
+
+### Task 23: Close volunteer-identity IDOR gaps
+
+**Files:**
+- Create: `backend/supabase/functions/_shared/verifyVolunteerAuth.ts`
+- Create: `backend/supabase/functions/_shared/verifyVolunteerAuth.test.ts`
+- Modify: `backend/supabase/functions/register-volunteer/index.ts`
+- Modify: `backend/supabase/functions/apply-to-opportunity/index.ts`
+- Modify: `backend/supabase/functions/submit-hours/index.ts`
+- Modify: `backend/supabase/functions/update-sensitive-field/index.ts`
+- Modify: `backend/supabase/functions/upload-cnic-document/index.ts`
+
+**Interfaces:**
+- Produces: `verifyVolunteerAuthUser(supabase, authHeader): Promise<{ authUserId: string }>` and `verifyVolunteerToken(supabase, authHeader): Promise<{ volunteerId: string; authUserId: string }>`.
+- Consumed by: every wrapper listed above, plus (in Plan 2) `frontend/lib/edgeFunctions.ts` — the frontend sends the volunteer's own Supabase session token and never sends `volunteerId`/`authUserId` in the request body, because these wrappers now ignore any client-supplied value for those fields and derive identity from the verified token instead.
+
+Tasks 14, 15, 17, 19, and 20 as originally written accept `volunteerId`/`authUserId` straight from the parsed JSON body in their `index.ts` wrappers, and Task 19's "read" action has no auth check at all. That lets any caller act as an arbitrary volunteer or fetch any CNIC document. This task closes that gap without touching any `handler.ts` or its tests — only the HTTP wrappers change, since they're the trust boundary.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `backend/supabase/functions/_shared/verifyVolunteerAuth.test.ts`:
+
+```typescript
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { verifyVolunteerAuthUser, verifyVolunteerToken } from "./verifyVolunteerAuth.ts";
+
+function fakeSupabase(options: { user?: { id: string } | null; volunteer?: { id: string } | null }) {
+  return {
+    auth: {
+      async getUser(_token: string) {
+        return options.user
+          ? { data: { user: options.user }, error: null }
+          : { data: { user: null }, error: new Error("invalid token") };
+      },
+    },
+    from(_table: string) {
+      return {
+        select(_columns: string) {
+          return {
+            eq(_column: string, _value: string) {
+              return {
+                async single() {
+                  return options.volunteer
+                    ? { data: options.volunteer, error: null }
+                    : { data: null, error: new Error("not found") };
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+Deno.test("verifyVolunteerAuthUser returns the auth user id for a valid token", async () => {
+  const supabase = fakeSupabase({ user: { id: "user-1" } });
+  const result = await verifyVolunteerAuthUser(supabase as never, "Bearer good-token");
+  assertEquals(result.authUserId, "user-1");
+});
+
+Deno.test("verifyVolunteerAuthUser rejects a missing header", async () => {
+  const supabase = fakeSupabase({ user: null });
+  await assertRejects(() => verifyVolunteerAuthUser(supabase as never, null), Error, "unauthorized");
+});
+
+Deno.test("verifyVolunteerToken resolves the volunteer row for the authenticated user", async () => {
+  const supabase = fakeSupabase({ user: { id: "user-1" }, volunteer: { id: "vol-1" } });
+  const result = await verifyVolunteerToken(supabase as never, "Bearer good-token");
+  assertEquals(result.volunteerId, "vol-1");
+  assertEquals(result.authUserId, "user-1");
+});
+
+Deno.test("verifyVolunteerToken rejects when no volunteer row exists yet for this auth user", async () => {
+  const supabase = fakeSupabase({ user: { id: "user-1" }, volunteer: null });
+  await assertRejects(() => verifyVolunteerToken(supabase as never, "Bearer good-token"), Error, "unauthorized");
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/verifyVolunteerAuth.test.ts`
+Expected: FAIL — module does not exist.
+
+- [ ] **Step 3: Write the implementation**
+
+Create `backend/supabase/functions/_shared/verifyVolunteerAuth.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+
+export async function verifyVolunteerAuthUser(
+  supabase: SupabaseClient,
+  authHeader: string | null,
+): Promise<{ authUserId: string }> {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    throw new Error("unauthorized");
+  }
+  const token = authHeader.slice("Bearer ".length);
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) {
+    throw new Error("unauthorized");
+  }
+  return { authUserId: data.user.id };
+}
+
+export async function verifyVolunteerToken(
+  supabase: SupabaseClient,
+  authHeader: string | null,
+): Promise<{ volunteerId: string; authUserId: string }> {
+  const { authUserId } = await verifyVolunteerAuthUser(supabase, authHeader);
+  const { data: volunteer, error } = await supabase
+    .from("volunteers")
+    .select("id")
+    .eq("auth_user_id", authUserId)
+    .single();
+  if (error || !volunteer) {
+    throw new Error("unauthorized");
+  }
+  return { volunteerId: volunteer.id, authUserId };
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/verifyVolunteerAuth.test.ts`
+Expected: PASS on all 4 tests.
+
+- [ ] **Step 5: Fix `register-volunteer/index.ts`**
+
+Replace the file's contents with:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { checkRateLimit } from "../_shared/rateLimit.ts";
+import { verifyVolunteerAuthUser } from "../_shared/verifyVolunteerAuth.ts";
+import { registerVolunteer } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  const supabase = getAdminClient();
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+
+  const allowed = await checkRateLimit(supabase, `register:${ip}`, 5, 3600);
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429 });
+  }
+
+  try {
+    const { authUserId } = await verifyVolunteerAuthUser(supabase, req.headers.get("Authorization"));
+    const input = await req.json();
+    const result = await registerVolunteer(supabase, { ...input, authUserId });
+    return new Response(JSON.stringify(result), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : message === "minor_consent_required" ? 422 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+The caller must sign up via Supabase Auth first (creating the session) and pass that session's access token — `register-volunteer` then creates the profile row for that exact authenticated user, never for an `authUserId` the client claims.
+
+- [ ] **Step 6: Fix `apply-to-opportunity/index.ts`**
+
+Replace the file's contents with:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { checkRateLimit } from "../_shared/rateLimit.ts";
+import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
+import { applyToOpportunity } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  const supabase = getAdminClient();
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+
+  const allowed = await checkRateLimit(supabase, `apply:${ip}`, 20, 3600);
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429 });
+  }
+
+  try {
+    const { volunteerId } = await verifyVolunteerToken(supabase, req.headers.get("Authorization"));
+    const input = await req.json();
+    const result = await applyToOpportunity(supabase, { ...input, volunteerId });
+    return new Response(JSON.stringify(result), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+- [ ] **Step 7: Fix `submit-hours/index.ts`**
+
+Replace the file's contents with:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
+import { submitHours } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const supabase = getAdminClient();
+    const { volunteerId } = await verifyVolunteerToken(supabase, req.headers.get("Authorization"));
+    const input = await req.json();
+    const result = await submitHours(supabase, { ...input, volunteerId });
+    return new Response(JSON.stringify(result), { status: 201, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+- [ ] **Step 8: Fix `update-sensitive-field/index.ts`**
+
+Replace the file's contents with:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
+import { updateSensitiveField } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const supabase = getAdminClient();
+    const { volunteerId } = await verifyVolunteerToken(supabase, req.headers.get("Authorization"));
+    const input = await req.json();
+    const result = await updateSensitiveField(supabase, { ...input, volunteerId });
+    return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+- [ ] **Step 9: Fix `upload-cnic-document/index.ts`**
+
+Replace the file's contents with:
+
+```typescript
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { createCnicUploadUrl, getCnicReadUrl, R2Client } from "./handler.ts";
+
+function buildR2Client(): R2Client {
+  const client = new AwsClient({
+    accessKeyId: Deno.env.get("R2_ACCESS_KEY_ID")!,
+    secretAccessKey: Deno.env.get("R2_SECRET_ACCESS_KEY")!,
+  });
+  const bucketUrl = Deno.env.get("R2_BUCKET_URL")!;
+
+  return {
+    async putSignedUrl(key, expiresInSeconds = 900) {
+      const url = new URL(`${bucketUrl}/${key}`);
+      url.searchParams.set("X-Amz-Expires", String(expiresInSeconds));
+      const signed = await client.sign(new Request(url, { method: "PUT" }), { aws: { signQuery: true } });
+      return signed.url;
+    },
+    async getSignedUrl(key, expiresInSeconds = 300) {
+      const url = new URL(`${bucketUrl}/${key}`);
+      url.searchParams.set("X-Amz-Expires", String(expiresInSeconds));
+      const signed = await client.sign(new Request(url, { method: "GET" }), { aws: { signQuery: true } });
+      return signed.url;
+    },
+  };
+}
+
+Deno.serve(async (req) => {
+  try {
+    const { action, objectKey } = await req.json();
+    const supabase = getAdminClient();
+    const r2Client = buildR2Client();
+
+    if (action === "upload") {
+      const { volunteerId } = await verifyVolunteerToken(supabase, req.headers.get("Authorization"));
+      const result = await createCnicUploadUrl(r2Client, volunteerId);
+      return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (action === "read") {
+      await verifyStaffToken(req.headers.get("Authorization"));
+      const result = await getCnicReadUrl(r2Client, objectKey);
+      return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ error: "unknown_action" }), { status: 400 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+`action: "upload"` now requires the calling volunteer's own session and always issues a key scoped to their own `volunteerId`; `action: "read"` now requires a valid staff token, matching the spec's "read access is admin-only" requirement (spec §4).
+
+- [ ] **Step 10: Re-run every affected test suite**
+
+Run: `npx supabase db reset && cd backend/supabase && deno task test`
+Expected: PASS across all Edge Function tests — none of the `handler.test.ts` files changed, so they should be unaffected; this confirms the wrapper changes didn't break the pure-function contracts.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add backend/supabase/functions/_shared/verifyVolunteerAuth.ts backend/supabase/functions/_shared/verifyVolunteerAuth.test.ts backend/supabase/functions/register-volunteer/index.ts backend/supabase/functions/apply-to-opportunity/index.ts backend/supabase/functions/submit-hours/index.ts backend/supabase/functions/update-sensitive-field/index.ts backend/supabase/functions/upload-cnic-document/index.ts
+git commit -m "fix(backend): derive volunteer identity from session token, not client input"
 ```
 
 ---
