@@ -14,8 +14,9 @@ out/
 .deno/
 
 # Supabase local dev artifacts (irrelevant once running against a hosted project, harmless either way)
-supabase/.temp/
-supabase/.branches/
+# vms nests this under backend/, so match at any depth, not just repo root.
+**/supabase/.temp/
+**/supabase/.branches/
 
 # OS
 .DS_Store
