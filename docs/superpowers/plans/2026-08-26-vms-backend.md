@@ -13,13 +13,14 @@
 ## Global Constraints
 
 - `volunteers` has no `organization_id` column — org visibility is always via `org_volunteer_index`, never a flat column match (spec §2, §4).
-- Every state-changing operation goes through an Edge Function; no table is ever written to directly by a frontend client (spec §2).
+- Every state-changing operation goes through an Edge Function; no table is ever written to directly by a frontend client (spec §2). This covers opportunities and chapters too — `create-opportunity`/`update-opportunity` (Task 26) and `create-chapter`/`update-chapter` (Task 27) exist specifically so `platform`'s admin hub never has to write those tables via a raw PostgREST call. Task 11's RLS write policies (`staff_has_permission()`-gated, not just org-membership) are the backstop for this constraint, not a substitute for it — a client that skipped the Edge Function and wrote via PostgREST directly would still be permission-checked, but wouldn't produce an `admin_action_log` entry, which is why the Edge Function path is the one actually documented and expected.
 - `actor_type` is an open string, not a fixed enum (spec §2).
 - Minors (computed from `dob`, under 18) cannot complete registration without `guardian_name`, `guardian_contact`, and `guardian_consent_at` all set (spec §2, §3).
 - CNIC documents are stored via signed URLs only; the storage bucket is never public (spec §3, §4).
 - `profile_field_changes` logs only these fields: `dob`, `cnic_number`, `phone`, `emergency_contact`, `guardian_name`, `guardian_contact` (spec §3).
 - No hard deletes outside append-only logs; use `deactivated_at` (spec §3).
 - Rejected `activity_hours` rows are retained with a reason, never deleted (spec §4).
+- **Never change the request/response shape of an Edge Function or the columns exposed via PostgREST that `platform` (the `tmp-partner-admin` repo's admin hub) depends on.** `platform` is a separately deployed consumer with its own hand-written client (`lib/modules/vms/client.ts`), verified against this repo via an automated contract/integration test in `platform`'s CI (mechanism detailed in the `platform`/`tmp-partner-admin` spec; may start as a local-stack integration suite and later move to consumer-driven contract testing — the rule holds either way). A breaking change must ship as a new, additively-versioned endpoint (e.g. `decide-application-v2`) alongside the old one — the old one is only removed after `platform` has migrated off it and its contract test targets the new shape. This applies to any task below that touches an existing Edge Function's request/response shape or an existing table's RLS-visible columns.
 
 ---
 
@@ -96,6 +97,34 @@ backend/
         handler.test.ts
         index.ts
       export-csv/
+        handler.ts
+        handler.test.ts
+        index.ts
+      sync-organization/
+        handler.ts
+        handler.test.ts
+        index.ts
+      update-participation-status/
+        handler.ts
+        handler.test.ts
+        index.ts
+      create-opportunity/
+        handler.ts
+        handler.test.ts
+        index.ts
+      update-opportunity/
+        handler.ts
+        handler.test.ts
+        index.ts
+      create-chapter/
+        handler.ts
+        handler.test.ts
+        index.ts
+      update-chapter/
+        handler.ts
+        handler.test.ts
+        index.ts
+      enroll-participant/
         handler.ts
         handler.test.ts
         index.ts
@@ -513,7 +542,7 @@ git commit -m "feat(backend): add opportunities table with computed status"
 
 **Interfaces:**
 - Consumes: `volunteers(id)` (Task 2), `opportunities(id)` (Task 4).
-- Produces: table `applications` with statuses `submitted | under_review | selected | rejected | withdrawn`. Consumed by Task 6 (`participation`) and `apply-to-opportunity`/`decide-application` handlers.
+- Produces: table `applications` with statuses `submitted | under_review | selected | waitlisted | rejected | withdrawn`. `waitlisted` supports manual admin promotion to `selected` when a spot opens (requirements doc §5D) — promotion is just another `decideApplication()` call, no separate mechanism needed. Consumed by Task 6 (`participation`) and `apply-to-opportunity`/`decide-application` handlers.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -521,7 +550,7 @@ Create `backend/supabase/tests/database/applications_test.sql`:
 
 ```sql
 begin;
-select plan(4);
+select plan(5);
 
 select has_table('public', 'applications', 'applications exists');
 
@@ -552,6 +581,9 @@ select throws_ok(
   'invalid status is rejected'
 );
 
+update applications set status = 'waitlisted' where volunteer_id = :'vol_id';
+select is((select status from applications where volunteer_id = :'vol_id'), 'waitlisted', 'waitlisted is a valid status for manual admin promotion later');
+
 select * from finish();
 rollback;
 ```
@@ -573,7 +605,7 @@ create table applications (
   organization_id uuid not null,
   motivation_statement text,
   status text not null default 'submitted'
-    check (status in ('submitted', 'under_review', 'selected', 'rejected', 'withdrawn')),
+    check (status in ('submitted', 'under_review', 'selected', 'waitlisted', 'rejected', 'withdrawn')),
   applied_at timestamptz not null default now(),
   decided_at timestamptz,
   decided_by uuid,
@@ -607,7 +639,7 @@ git commit -m "feat(backend): add applications table"
 
 **Interfaces:**
 - Consumes: `applications(id)` (Task 5, nullable FK), `volunteers(id)`, `opportunities(id)`.
-- Produces: table `participation`, statuses `active | completed | withdrawn`. Consumed by Task 7 (`activity_hours`) and `decide-application`/`submit-hours` handlers.
+- Produces: table `participation`, statuses `selected | participating | completed | no_show | withdrawn` — matching the requirements doc's own two-phase participation lifecycle (`Selected → Participating → Completed/No-show/Withdrawn`, §5D). Rows default to `selected` whether auto-created by `decideApplication()` or created directly by an admin without a prior application; the `selected → participating → {completed|no_show|withdrawn}` transitions are admin-driven via `update-participation-status` (Task 25). A partial unique index on `application_id` (non-null only) enforces at most one participation row per application — a DB-level backstop for `decideApplication()`'s own idempotency check (Task 16), so re-selecting an already-selected application can never silently double the volunteer's participation/hours history even if the application-code check is ever bypassed or raced. Consumed by Task 7 (`activity_hours`) and `decide-application`/`submit-hours` handlers.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -615,7 +647,7 @@ Create `backend/supabase/tests/database/participation_test.sql`:
 
 ```sql
 begin;
-select plan(3);
+select plan(4);
 
 select has_table('public', 'participation', 'participation exists');
 select has_column('public', 'participation', 'application_id', 'application_id present');
@@ -631,7 +663,21 @@ returning id as opp_id \gset
 insert into participation (volunteer_id, opportunity_id, organization_id)
 values (:'vol_id', :'opp_id', '11111111-1111-1111-1111-111111111111');
 
-select is((select status from participation where volunteer_id = :'vol_id'), 'active', 'defaults to active, admin-enrolled without an application');
+select is((select status from participation where volunteer_id = :'vol_id'), 'selected', 'defaults to selected, admin-enrolled without an application');
+
+insert into applications (volunteer_id, opportunity_id, organization_id)
+values (:'vol_id', :'opp_id', '11111111-1111-1111-1111-111111111111')
+returning id as app_id \gset
+
+insert into participation (application_id, volunteer_id, opportunity_id, organization_id)
+values (:'app_id', :'vol_id', :'opp_id', '11111111-1111-1111-1111-111111111111');
+
+select throws_ok(
+  format($$ insert into participation (application_id, volunteer_id, opportunity_id, organization_id) values ('%s', '%s', '%s', '11111111-1111-1111-1111-111111111111') $$, :'app_id', :'vol_id', :'opp_id'),
+  '23505',
+  null,
+  'a second participation row for the same application_id is rejected — regression test for decideApplication double-selection creating duplicates'
+);
 
 select * from finish();
 rollback;
@@ -653,14 +699,20 @@ create table participation (
   volunteer_id uuid not null references volunteers(id) on delete cascade,
   opportunity_id uuid not null references opportunities(id) on delete cascade,
   organization_id uuid not null,
-  status text not null default 'active'
-    check (status in ('active', 'completed', 'withdrawn')),
+  status text not null default 'selected'
+    check (status in ('selected', 'participating', 'completed', 'no_show', 'withdrawn')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index participation_org_idx on participation (organization_id);
 create index participation_volunteer_idx on participation (volunteer_id);
+
+-- An application can auto-create at most one participation row (decide-application,
+-- Task 16). admin-direct enrollment (Task 28) always has a null application_id, so
+-- this is a partial index — it must not constrain that path.
+create unique index participation_application_id_key on participation (application_id)
+  where application_id is not null;
 ```
 
 - [ ] **Step 4: Apply and run tests**
@@ -967,18 +1019,24 @@ git commit -m "feat(backend): add admin_action_log and profile_field_changes tab
 
 **Interfaces:**
 - Consumes: `volunteers`, `org_volunteer_index` (Tasks 2–3).
-- Produces: functions `is_platform_owner() returns boolean`, `staff_org_ids() returns uuid[]`, `staff_has_org_role(p_org_id uuid, p_roles text[]) returns boolean` — used by every RLS policy in Task 11 and by Edge Function handlers that need to check staff authority server-side.
+- Produces: functions `is_platform_owner() returns boolean`, `staff_org_ids() returns uuid[]`, `staff_has_org_role(p_org_id uuid) returns boolean` (org *visibility* only — no role-name filtering, see below), `staff_has_permission(p_org_id uuid, p_module text, p_permission text) returns boolean` (fine-grained *authorization* for a specific action) — used by every RLS policy in Task 11 and by Edge Function handlers that need to check staff authority server-side.
 
-The staff JWT (issued by `platform`, verified here because both Supabase projects share the same JWT secret) carries this claim shape:
+The staff JWT (issued by `platform`, verified here because both Supabase projects share the same JWT secret) carries this claim shape (per the `platform`/`tmp-partner-admin` spec §4):
 
 ```json
 {
   "actor_type": "staff",
   "platform_owner": false,
-  "org_roles": [{ "organization_id": "uuid", "role": "org_admin" }],
-  "modules": ["vms"]
+  "org_roles": [{ "organization_id": "uuid" }],
+  "module_access": [
+    { "organization_id": "uuid", "module": "vms", "permissions": ["applications:read", "applications:update"] }
+  ]
 }
 ```
+
+`org_roles` carries only `organization_id` — `platform`'s own org-management tiers (`org_admin`/`org_super_admin`) are a `platform`-internal concept and never travel here (this superseded an earlier draft of this claim shape that included a `role` field; nothing in this repo ever shipped against that draft). `staff_has_org_role()` is therefore a pure "is this staff affiliated with this org" check, used for RLS *visibility* only (e.g. "can this staff see this volunteer's row"). Whether a specific *write* is allowed is a `staff_has_permission()` check against `module_access[].permissions`, resolved by `platform`'s `mintStaffToken()` at token-mint time — an `org_super_admin` gets every permission for every module their org has enabled resolved directly into the token, so this function never needs to know about `platform`'s org tiers.
+
+`volunteers` gets a self-select policy only, no self-update policy. A volunteer's own row can only be written by `registerVolunteer()` (create) and `updateSensitiveField()` (update) — both service-role Edge Functions. This was not the case originally: a `volunteers_self_update` policy with no `with check` clause let a volunteer `PATCH` their own row directly via PostgREST and edit `dob`, `cnic_number`, `phone`, `emergency_contact`, `guardian_name`, and `guardian_contact` — exactly the fields `updateSensitiveField()` exists to gate and log to `profile_field_changes` (spec §3, §4). Postgres RLS can't restrict *which columns* an `update` policy allows (only which *rows*), so there is no safe middle ground here: since the frontend plan never has a legitimate reason to write any field on `volunteers` directly (every self-edit already routes through `updateSensitiveField()`, and there is currently no frontend flow for editing any other field), the correct fix is no self-update RLS policy at all, not a narrower one.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -986,7 +1044,7 @@ Create `backend/supabase/tests/database/rls_volunteers_test.sql`:
 
 ```sql
 begin;
-select plan(5);
+select plan(9);
 
 insert into volunteers (auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program)
 values (gen_random_uuid(), 'RLS Test', 'rls-test@example.com', '0300-7777777', '1999-01-01', 'male', 'Lahore', 'Punjab', 'Pakistan', 'Test Uni', 'BSCS')
@@ -994,16 +1052,32 @@ returning id as vol_id \gset
 
 select touch_org_volunteer_index('22222222-2222-2222-2222-222222222222', :'vol_id');
 
+select set_config('request.jwt.claims', format('{"sub": "%s"}', (select auth_user_id from volunteers where id = :'vol_id')), true);
+select set_config('role', 'authenticated', true);
+update volunteers set cnic_number = '00000000000' where id = :'vol_id';
+select is(
+  (select cnic_number from volunteers where id = :'vol_id'),
+  null,
+  'a volunteer cannot update their own row directly via RLS — with no self-update policy, the UPDATE silently matches zero rows (RLS filters rows for UPDATE, it does not raise); only updateSensitiveField() and registerVolunteer() (service-role Edge Functions) may write volunteers'
+);
+
 select set_config('request.jwt.claims', '{"platform_owner": true}', true);
 select is(is_platform_owner(), true, 'platform_owner claim recognized');
 
-select set_config('request.jwt.claims', '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222", "role": "org_admin"}]}', true);
+select set_config('request.jwt.claims', '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}]}', true);
 select ok('22222222-2222-2222-2222-222222222222'::uuid = any(staff_org_ids()), 'staff_org_ids extracts org uuids from claim');
-select is(staff_has_org_role('22222222-2222-2222-2222-222222222222'::uuid, null), true, 'staff_has_org_role true for a matching org');
-select is(staff_has_org_role('33333333-3333-3333-3333-333333333333'::uuid, null), false, 'staff_has_org_role false for a non-matching org');
+select is(staff_has_org_role('22222222-2222-2222-2222-222222222222'::uuid), true, 'staff_has_org_role true for a matching org');
+select is(staff_has_org_role('33333333-3333-3333-3333-333333333333'::uuid), false, 'staff_has_org_role false for a non-matching org');
 
 select set_config('request.jwt.claims', '{}', true);
-select is(staff_has_org_role('22222222-2222-2222-2222-222222222222'::uuid, null), false, 'no claim means no access');
+select is(staff_has_org_role('22222222-2222-2222-2222-222222222222'::uuid), false, 'no claim means no access');
+
+select set_config('request.jwt.claims', '{"module_access": [{"organization_id": "22222222-2222-2222-2222-222222222222", "module": "vms", "permissions": ["applications:update"]}]}', true);
+select is(staff_has_permission('22222222-2222-2222-2222-222222222222'::uuid, 'vms', 'applications:update'), true, 'staff_has_permission true for a granted permission');
+select is(staff_has_permission('22222222-2222-2222-2222-222222222222'::uuid, 'vms', 'applications:write'), false, 'staff_has_permission false for an ungranted permission');
+
+select set_config('request.jwt.claims', '{"platform_owner": true}', true);
+select is(staff_has_permission('44444444-4444-4444-4444-444444444444'::uuid, 'vms', 'applications:write'), true, 'platform_owner bypasses permission checks entirely');
 
 select * from finish();
 rollback;
@@ -1028,11 +1102,19 @@ create or replace function staff_org_ids() returns uuid[] as $$
   from jsonb_array_elements(coalesce(auth.jwt() -> 'org_roles', '[]'::jsonb)) r;
 $$ language sql stable;
 
-create or replace function staff_has_org_role(p_org_id uuid, p_roles text[]) returns boolean as $$
+create or replace function staff_has_org_role(p_org_id uuid) returns boolean as $$
   select is_platform_owner() or exists (
     select 1 from jsonb_array_elements(coalesce(auth.jwt() -> 'org_roles', '[]'::jsonb)) r
     where (r ->> 'organization_id')::uuid = p_org_id
-      and (p_roles is null or (r ->> 'role') = any(p_roles))
+  );
+$$ language sql stable;
+
+create or replace function staff_has_permission(p_org_id uuid, p_module text, p_permission text) returns boolean as $$
+  select is_platform_owner() or exists (
+    select 1 from jsonb_array_elements(coalesce(auth.jwt() -> 'module_access', '[]'::jsonb)) m
+    where (m ->> 'organization_id')::uuid = p_org_id
+      and (m ->> 'module') = p_module
+      and (m -> 'permissions') ? p_permission
   );
 $$ language sql stable;
 
@@ -1041,8 +1123,11 @@ alter table volunteers enable row level security;
 create policy volunteers_self_select on volunteers
   for select using (auth_user_id = auth.uid());
 
-create policy volunteers_self_update on volunteers
-  for update using (auth_user_id = auth.uid());
+-- Deliberately no self-update policy: a volunteer's own row is written only by
+-- registerVolunteer() and updateSensitiveField() (both service-role Edge
+-- Functions). RLS update policies filter which rows an UPDATE can touch, not
+-- which columns, so there is no safe narrower policy here that still lets a
+-- volunteer bypass updateSensitiveField()'s profile_field_changes audit log.
 
 create policy volunteers_staff_select on volunteers
   for select using (
@@ -1078,7 +1163,9 @@ git commit -m "feat(backend): add RLS on volunteers with join-based staff visibi
 - Test: `backend/supabase/tests/database/rls_org_scoped_test.sql`
 
 **Interfaces:**
-- Consumes: `staff_has_org_role()`, `is_platform_owner()` (Task 10); all org-scoped tables (Tasks 4–9).
+- Consumes: `staff_has_org_role()`, `staff_has_permission()`, `is_platform_owner()` (Task 10); all org-scoped tables (Tasks 3–9), including `org_volunteer_index` (Task 3) which was previously left without RLS entirely. Staff *select* policies stay org-visibility-only (`staff_has_org_role()`), matching platform's admin hub reading a module backend's PostgREST directly with the staff JWT (`platform`/`tmp-partner-admin` spec §7) — reads for a staff member's own org are always fine to show, and the fine-grained model is about gating actions, not visibility. Staff *write* policies (insert/update/delete) now call `staff_has_permission()` for the specific resource:action instead of the coarse org-membership-only check they used before. This matters because the admin hub's browser client attaches the staff JWT and calls PostgREST directly, not exclusively through Edge Functions (platform spec §7, "direct client calls, no proxy") — so RLS, not "every write already goes through a service-role Edge Function," is the real backstop for any table a caller can reach with nothing but a valid staff token. A staff member holding only a read-only role must not be able to write by skipping the UI and calling PostgREST directly; the previous `staff_has_org_role(organization_id)`-only write policies allowed exactly that for every org-scoped table.
+
+`applications` and `activity_hours` also drop their volunteer-side self-insert policies entirely, for the same reason `volunteers` drops its self-update policy (Task 10): every legitimate volunteer write to these tables already goes through `apply-to-opportunity()` and `submit-hours()` (both service-role Edge Functions), so a direct-insert RLS policy only exists to be bypassed. It previously was one — `applications_self_insert` let a volunteer insert an application directly, skipping `apply-to-opportunity()`'s `cnic_required` gate entirely, and `activity_hours_self_insert` let a volunteer submit hours against *any* `participation_id` system-wide, since the policy only checked that `volunteer_id` matched the caller and never verified the referenced participation actually belonged to them. `applications_self_select`/`activity_hours_self_select` are unaffected — volunteers still need to read their own rows for the My Applications and Portfolio pages.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1086,7 +1173,7 @@ Create `backend/supabase/tests/database/rls_org_scoped_test.sql`:
 
 ```sql
 begin;
-select plan(4);
+select plan(10);
 
 insert into opportunities (organization_id, name, type)
 values ('22222222-2222-2222-2222-222222222222', 'Public Op', 'event')
@@ -1096,7 +1183,7 @@ select set_config('request.jwt.claims', '{}', true);
 select set_config('role', 'authenticated', true);
 select is((select count(*) from opportunities where id = :'opp_id'), 1::bigint, 'anyone can read a non-deactivated opportunity');
 
-select set_config('request.jwt.claims', '{"org_roles": [{"organization_id": "33333333-3333-3333-3333-333333333333", "role": "org_admin"}]}', true);
+select set_config('request.jwt.claims', '{"org_roles": [{"organization_id": "33333333-3333-3333-3333-333333333333"}]}', true);
 select throws_ok(
   format($$ update opportunities set name = 'hijacked' where id = '%s' $$, :'opp_id'),
   null,
@@ -1104,12 +1191,74 @@ select throws_ok(
   'staff from a different org cannot write to this opportunity'
 );
 
-select set_config('request.jwt.claims', '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222", "role": "org_admin"}]}', true);
+select set_config(
+  'request.jwt.claims',
+  '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}], "module_access": [{"organization_id": "22222222-2222-2222-2222-222222222222", "module": "vms", "permissions": ["opportunities:read"]}]}',
+  true
+);
+select throws_ok(
+  format($$ update opportunities set name = 'read-only hijack' where id = '%s' $$, :'opp_id'),
+  null,
+  null,
+  'staff from the owning org with only opportunities:read cannot write to this opportunity — org membership alone is not enough'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}], "module_access": [{"organization_id": "22222222-2222-2222-2222-222222222222", "module": "vms", "permissions": ["opportunities:update"]}]}',
+  true
+);
 update opportunities set name = 'updated by owning org staff' where id = :'opp_id';
-select is((select name from opportunities where id = :'opp_id'), 'updated by owning org staff', 'staff from the owning org can write');
+select is((select name from opportunities where id = :'opp_id'), 'updated by owning org staff', 'staff from the owning org with opportunities:update can write');
 
 select set_config('request.jwt.claims', '{}', true);
 select is((select count(*) from applications), 0::bigint, 'no applications visible with no volunteer session and no staff claim');
+
+select touch_org_volunteer_index('22222222-2222-2222-2222-222222222222', gen_random_uuid());
+
+select set_config('request.jwt.claims', '{}', true);
+select is((select count(*) from org_volunteer_index), 0::bigint, 'org_volunteer_index is not readable with no staff claim — regression test for the table having no RLS at all');
+
+select set_config('request.jwt.claims', '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}]}', true);
+select is((select count(*) from org_volunteer_index where organization_id = '22222222-2222-2222-2222-222222222222'), 1::bigint, 'staff affiliated with the org can read its org_volunteer_index rows');
+
+select throws_ok(
+  $$ insert into org_volunteer_index (organization_id, volunteer_id) values ('22222222-2222-2222-2222-222222222222', gen_random_uuid()) $$,
+  null,
+  null,
+  'no insert policy exists for org_volunteer_index — even an owning-org staff member cannot write it directly, only touch_org_volunteer_index() via the service-role client can'
+);
+
+insert into volunteers (auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program)
+values (gen_random_uuid(), 'Direct Insert Test', 'direct-insert-test@example.com', '0300-8888888', '1999-01-01', 'male', 'Lahore', 'Punjab', 'Pakistan', 'Test Uni', 'BSCS')
+returning id, auth_user_id \gset direct_insert_
+
+insert into participation (volunteer_id, opportunity_id, organization_id)
+values (:'direct_insert_id', :'opp_id', '22222222-2222-2222-2222-222222222222')
+returning id as direct_insert_participation_id \gset
+
+select set_config('request.jwt.claims', format('{"sub": "%s"}', :'direct_insert_auth_user_id'), true);
+select set_config('role', 'authenticated', true);
+
+-- Unlike UPDATE (Task 10's volunteers_self_update test), a missing INSERT
+-- policy makes Postgres evaluate an implicit `with check (false)` — the insert
+-- itself raises an RLS violation rather than silently affecting zero rows.
+select throws_ok(
+  format($$ insert into applications (volunteer_id, opportunity_id, organization_id) values ('%s', '%s', '22222222-2222-2222-2222-222222222222') $$, :'direct_insert_id', :'opp_id'),
+  null,
+  null,
+  'a volunteer cannot insert into applications directly via RLS — no self-insert policy exists; only apply-to-opportunity() (service-role, enforces cnic_required) may write it'
+);
+
+select throws_ok(
+  format(
+    $$ insert into activity_hours (participation_id, volunteer_id, opportunity_id, organization_id, activity_date, hours_submitted) values ('%s', '%s', '%s', '22222222-2222-2222-2222-222222222222', current_date, 3) $$,
+    :'direct_insert_participation_id', :'direct_insert_id', :'opp_id'
+  ),
+  null,
+  null,
+  'a volunteer cannot insert into activity_hours directly via RLS — no self-insert policy exists; only submit-hours() (service-role) may write it'
+);
 
 select * from finish();
 rollback;
@@ -1118,7 +1267,7 @@ rollback;
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npx supabase test db`
-Expected: FAIL — RLS not yet enabled, so the "different org cannot write" assertion fails (write succeeds when it shouldn't).
+Expected: FAIL — RLS not yet enabled/tightened, so the "read-only cannot write," "org_volunteer_index not readable with no claim," and "no insert policy" assertions fail.
 
 - [ ] **Step 3: Write the migration**
 
@@ -1130,67 +1279,100 @@ alter table opportunities enable row level security;
 create policy opportunities_public_select on opportunities
   for select using (deactivated_at is null);
 
-create policy opportunities_staff_all on opportunities
-  for all using (staff_has_org_role(organization_id, null))
-  with check (staff_has_org_role(organization_id, null));
+create policy opportunities_staff_select on opportunities
+  for select using (staff_has_org_role(organization_id));
+
+create policy opportunities_staff_insert on opportunities
+  for insert with check (staff_has_permission(organization_id, 'vms', 'opportunities:write'));
+
+create policy opportunities_staff_update on opportunities
+  for update using (staff_has_permission(organization_id, 'vms', 'opportunities:update'));
+
+create policy opportunities_staff_delete on opportunities
+  for delete using (staff_has_permission(organization_id, 'vms', 'opportunities:delete'));
 
 alter table applications enable row level security;
 
 create policy applications_self_select on applications
   for select using (volunteer_id in (select id from volunteers where auth_user_id = auth.uid()));
 
-create policy applications_self_insert on applications
-  for insert with check (volunteer_id in (select id from volunteers where auth_user_id = auth.uid()));
+-- Deliberately no self-insert policy: apply-to-opportunity() (service-role)
+-- enforces cnic_required before writing; a direct insert would bypass that.
 
 create policy applications_staff_select on applications
-  for select using (staff_has_org_role(organization_id, null));
+  for select using (staff_has_org_role(organization_id));
 
 create policy applications_staff_update on applications
-  for update using (staff_has_org_role(organization_id, null));
+  for update using (staff_has_permission(organization_id, 'vms', 'applications:update'));
 
 alter table participation enable row level security;
 
 create policy participation_self_select on participation
   for select using (volunteer_id in (select id from volunteers where auth_user_id = auth.uid()));
 
-create policy participation_staff_all on participation
-  for all using (staff_has_org_role(organization_id, null))
-  with check (staff_has_org_role(organization_id, null));
+create policy participation_staff_select on participation
+  for select using (staff_has_org_role(organization_id));
+
+create policy participation_staff_insert on participation
+  for insert with check (staff_has_permission(organization_id, 'vms', 'participation:write'));
+
+create policy participation_staff_update on participation
+  for update using (staff_has_permission(organization_id, 'vms', 'participation:update'));
 
 alter table activity_hours enable row level security;
 
 create policy activity_hours_self_select on activity_hours
   for select using (volunteer_id in (select id from volunteers where auth_user_id = auth.uid()));
 
-create policy activity_hours_self_insert on activity_hours
-  for insert with check (volunteer_id in (select id from volunteers where auth_user_id = auth.uid()));
+-- Deliberately no self-insert policy: submit-hours() (service-role) is the
+-- only write path — a direct insert here previously only checked that
+-- volunteer_id matched the caller, never that the participation_id they
+-- supplied actually belonged to them.
 
-create policy activity_hours_staff_all on activity_hours
-  for all using (staff_has_org_role(organization_id, null))
-  with check (staff_has_org_role(organization_id, null));
+create policy activity_hours_staff_select on activity_hours
+  for select using (staff_has_org_role(organization_id));
+
+create policy activity_hours_staff_insert on activity_hours
+  for insert with check (staff_has_permission(organization_id, 'vms', 'hours:write'));
+
+create policy activity_hours_staff_update on activity_hours
+  for update using (staff_has_permission(organization_id, 'vms', 'hours:update'));
 
 alter table chapters enable row level security;
 
 create policy chapters_public_select on chapters
   for select using (status = 'active');
 
-create policy chapters_staff_all on chapters
-  for all using (staff_has_org_role(organization_id, null))
-  with check (staff_has_org_role(organization_id, null));
+create policy chapters_staff_select on chapters
+  for select using (staff_has_org_role(organization_id));
+
+create policy chapters_staff_insert on chapters
+  for insert with check (staff_has_permission(organization_id, 'vms', 'chapters:write'));
+
+create policy chapters_staff_update on chapters
+  for update using (staff_has_permission(organization_id, 'vms', 'chapters:update'));
+
+create policy chapters_staff_delete on chapters
+  for delete using (staff_has_permission(organization_id, 'vms', 'chapters:delete'));
 
 alter table volunteer_chapter_link enable row level security;
 
 create policy volunteer_chapter_link_self_select on volunteer_chapter_link
   for select using (volunteer_id in (select id from volunteers where auth_user_id = auth.uid()));
 
-create policy volunteer_chapter_link_staff_all on volunteer_chapter_link
-  for all using (staff_has_org_role(organization_id, null))
-  with check (staff_has_org_role(organization_id, null));
+create policy volunteer_chapter_link_staff_select on volunteer_chapter_link
+  for select using (staff_has_org_role(organization_id));
+
+create policy volunteer_chapter_link_staff_insert on volunteer_chapter_link
+  for insert with check (staff_has_permission(organization_id, 'vms', 'chapters:write'));
+
+create policy volunteer_chapter_link_staff_delete on volunteer_chapter_link
+  for delete using (staff_has_permission(organization_id, 'vms', 'chapters:update'));
 
 alter table admin_action_log enable row level security;
 
 create policy admin_action_log_staff_select on admin_action_log
-  for select using (organization_id is null or staff_has_org_role(organization_id, null));
+  for select using (organization_id is null or staff_has_org_role(organization_id));
 
 alter table profile_field_changes enable row level security;
 
@@ -1203,20 +1385,27 @@ create policy profile_field_changes_staff_select on profile_field_changes
         and ovi.organization_id = any(staff_org_ids())
     )
   );
+
+alter table org_volunteer_index enable row level security;
+
+create policy org_volunteer_index_staff_select on org_volunteer_index
+  for select using (staff_has_org_role(organization_id));
 ```
 
-No insert/delete policies are defined for `admin_action_log` or `profile_field_changes` — both are written only by Edge Functions using the service-role key, which bypasses RLS entirely, matching the spec's "never a direct frontend-to-DB write" constraint.
+`volunteer_chapter_link` has no dedicated permission resource in the catalog (platform spec §3's `permissions` seed list only defines `chapters:*`) since a chapter-membership link is treated as part of chapter management: linking a volunteer to a chapter requires `chapters:write`, unlinking requires `chapters:update`.
+
+No insert/update/delete policies are defined for `admin_action_log`, `profile_field_changes`, or **`org_volunteer_index`** — all three are written only by Edge Functions using the service-role key, which bypasses RLS entirely, matching the spec's "never a direct frontend-to-DB write" constraint. `org_volunteer_index` previously had RLS disabled altogether (no `alter table ... enable row level security` statement anywhere in this plan), which meant every row — the entire platform-wide graph of which volunteers have contacted which organizations — was readable by any authenticated caller by default, and, far more seriously, writable: anyone could `insert` an `(organization_id, volunteer_id)` row directly, and since `volunteers_staff_select` (Task 10) and `upload-cnic-document`'s "read" action (Task 23) both grant visibility based on an `org_volunteer_index` link existing, a forged row was a way to self-grant visibility into any volunteer's PII or CNIC document. Enabling RLS with a select-only policy and no write policy closes this — `touch_org_volunteer_index()` remains the only write path, and since it's `language sql` (invoker-rights by default, no `security definer`), its internal `insert ... on conflict` is itself subject to this same RLS when called directly via `supabase.rpc()` outside a service-role Edge Function, so no separate `revoke execute` is needed.
 
 - [ ] **Step 4: Apply and run tests**
 
 Run: `npx supabase db reset && npx supabase test db`
-Expected: PASS.
+Expected: PASS on all 10 assertions.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0010_rls_org_scoped.sql backend/supabase/tests/database/rls_org_scoped_test.sql
-git commit -m "feat(backend): add RLS on all org-scoped tables"
+git commit -m "fix(backend): enable RLS on org_volunteer_index, require fine-grained permissions for staff writes, close volunteer self-insert bypasses"
 ```
 
 ---
@@ -1228,7 +1417,7 @@ git commit -m "feat(backend): add RLS on all org-scoped tables"
 - Create: `backend/supabase/functions/_shared/verifyStaffToken.test.ts`
 
 **Interfaces:**
-- Produces: `verifyStaffToken(authHeader: string | null): StaffClaims` — throws `Error("unauthorized")` on any failure. `StaffClaims = { actorType: string; platformOwner: boolean; orgRoles: { organizationId: string; role: string }[]; modules: string[] }`. Used by every Edge Function handler that needs to check staff authority in application code (Tasks 13–20).
+- Produces: `verifyStaffToken(authHeader: string | null): StaffClaims` — throws `Error("unauthorized")` on any failure. `StaffClaims = { actorType: string; staffId: string; platformOwner: boolean; orgRoles: { organizationId: string }[]; moduleAccess: { organizationId: string; module: string; permissions: string[] }[] }`; `staffHasPermission(claims: StaffClaims, organizationId: string, module: string, permission: string): boolean`. Used by every Edge Function handler that needs to check staff authority in application code (Tasks 16–21, 25–28). `staffId` is parsed from the token's `staff_id` claim (minted by `platform`'s `mintStaffToken()`, `tmp-partner-admin` plan Task 12) — this is the durable identifier every state-changing handler now uses for `admin_action_log.staff_id`/`applications.decided_by`/`activity_hours.verified_by`, instead of a client-supplied `staffId` field in the request body. Before this claim existed, every staff-driven Edge Function trusted whatever `staffId` a caller put in its own JSON body, letting any staff member with valid write permission forge the audit trail by attributing their action to an arbitrary `staff_id`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1236,7 +1425,7 @@ Create `backend/supabase/functions/_shared/verifyStaffToken.test.ts`:
 
 ```typescript
 import { assertEquals, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { verifyStaffToken } from "./verifyStaffToken.ts";
+import { verifyStaffToken, staffHasPermission, type StaffClaims } from "./verifyStaffToken.ts";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 const secret = "test-shared-secret-32-characters!";
@@ -1256,13 +1445,16 @@ Deno.test("verifyStaffToken accepts a well-formed staff token", async () => {
   Deno.env.set("STAFF_JWT_SECRET", secret);
   const token = await signStaffToken({
     actor_type: "staff",
+    staff_id: "staff-1",
     platform_owner: false,
-    org_roles: [{ organization_id: "org-1", role: "org_admin" }],
-    modules: ["vms"],
+    org_roles: [{ organization_id: "org-1" }],
+    module_access: [{ organization_id: "org-1", module: "vms", permissions: ["applications:read"] }],
   });
   const claims = await verifyStaffToken(`Bearer ${token}`);
   assertEquals(claims.actorType, "staff");
+  assertEquals(claims.staffId, "staff-1");
   assertEquals(claims.orgRoles[0].organizationId, "org-1");
+  assertEquals(claims.moduleAccess[0].permissions, ["applications:read"]);
 });
 
 Deno.test("verifyStaffToken rejects a missing header", async () => {
@@ -1282,6 +1474,42 @@ Deno.test("verifyStaffToken rejects a token signed with the wrong secret", async
   const token = await create({ alg: "HS256", typ: "JWT" }, { exp: getNumericDate(60), actor_type: "staff" }, badKey);
   await assertThrows(() => verifyStaffToken(`Bearer ${token}`), Error, "unauthorized");
 });
+
+Deno.test("verifyStaffToken rejects a well-signed token with no staff_id claim", async () => {
+  Deno.env.set("STAFF_JWT_SECRET", secret);
+  const token = await signStaffToken({
+    actor_type: "staff",
+    platform_owner: false,
+    org_roles: [{ organization_id: "org-1" }],
+    module_access: [],
+  });
+  await assertThrows(() => verifyStaffToken(`Bearer ${token}`), Error, "unauthorized");
+});
+
+const baseClaims = (overrides: Partial<StaffClaims> = {}): StaffClaims => ({
+  actorType: "staff",
+  staffId: "staff-1",
+  platformOwner: false,
+  orgRoles: [{ organizationId: "org-1" }],
+  moduleAccess: [{ organizationId: "org-1", module: "vms", permissions: ["applications:read"] }],
+  ...overrides,
+});
+
+Deno.test("staffHasPermission is true when the permission is granted for that org and module", () => {
+  assertEquals(staffHasPermission(baseClaims(), "org-1", "vms", "applications:read"), true);
+});
+
+Deno.test("staffHasPermission is false when the permission isn't granted", () => {
+  assertEquals(staffHasPermission(baseClaims(), "org-1", "vms", "applications:write"), false);
+});
+
+Deno.test("staffHasPermission is false for a different organization", () => {
+  assertEquals(staffHasPermission(baseClaims(), "org-2", "vms", "applications:read"), false);
+});
+
+Deno.test("staffHasPermission bypasses everything for platform_owner", () => {
+  assertEquals(staffHasPermission(baseClaims({ platformOwner: true, moduleAccess: [] }), "org-9", "vms", "applications:write"), true);
+});
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1296,11 +1524,18 @@ Create `backend/supabase/functions/_shared/verifyStaffToken.ts`:
 ```typescript
 import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
+export interface ModuleAccessEntry {
+  organizationId: string;
+  module: string;
+  permissions: string[];
+}
+
 export interface StaffClaims {
   actorType: string;
+  staffId: string;
   platformOwner: boolean;
-  orgRoles: { organizationId: string; role: string }[];
-  modules: string[];
+  orgRoles: { organizationId: string }[];
+  moduleAccess: ModuleAccessEntry[];
 }
 
 export async function verifyStaffToken(authHeader: string | null): Promise<StaffClaims> {
@@ -1321,33 +1556,58 @@ export async function verifyStaffToken(authHeader: string | null): Promise<Staff
       ["verify"],
     );
     const payload = await verify(token, key);
+    if (!payload.staff_id || typeof payload.staff_id !== "string") {
+      // A token with no staff_id can't be attributed to anyone — reject it
+      // outright rather than falling back to an empty string, which would
+      // otherwise reach admin_action_log.staff_id (a uuid column) and fail
+      // as an opaque DB error instead of a clean 401.
+      throw new Error("unauthorized");
+    }
     return {
       actorType: String(payload.actor_type ?? "staff"),
+      staffId: payload.staff_id,
       platformOwner: Boolean(payload.platform_owner),
       orgRoles: Array.isArray(payload.org_roles)
         ? (payload.org_roles as Array<Record<string, unknown>>).map((r) => ({
           organizationId: String(r.organization_id),
-          role: String(r.role),
         }))
         : [],
-      modules: Array.isArray(payload.modules) ? payload.modules.map(String) : [],
+      moduleAccess: Array.isArray(payload.module_access)
+        ? (payload.module_access as Array<Record<string, unknown>>).map((m) => ({
+          organizationId: String(m.organization_id),
+          module: String(m.module),
+          permissions: Array.isArray(m.permissions) ? m.permissions.map(String) : [],
+        }))
+        : [],
     };
   } catch {
     throw new Error("unauthorized");
   }
+}
+
+export function staffHasPermission(
+  claims: StaffClaims,
+  organizationId: string,
+  module: string,
+  permission: string,
+): boolean {
+  if (claims.platformOwner) return true;
+  return claims.moduleAccess.some(
+    (m) => m.organizationId === organizationId && m.module === module && m.permissions.includes(permission),
+  );
 }
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/verifyStaffToken.test.ts`
-Expected: PASS on all 3 tests.
+Expected: PASS on all 8 tests.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/functions/_shared/verifyStaffToken.ts backend/supabase/functions/_shared/verifyStaffToken.test.ts
-git commit -m "feat(backend): add verifyStaffToken shared JWT verification module"
+git commit -m "feat(backend): add verifyStaffToken shared JWT verification with fine-grained permission checks"
 ```
 
 ---
@@ -1412,7 +1672,11 @@ create table rate_limit_hits (
 );
 
 create index rate_limit_hits_key_idx on rate_limit_hits (rate_key, created_at);
+
+alter table rate_limit_hits enable row level security;
 ```
+
+No policy of any kind is defined — this is a purely internal bookkeeping table, read and written only via `checkRateLimit()` using the service-role admin client, which bypasses RLS entirely. Enabling RLS with zero policies makes it default-deny for every other role, so a caller can no longer `DELETE`/forge rows via PostgREST directly to reset or manipulate their own rate limit and bypass the abuse protection Task 13 exists to provide (this table previously shipped with RLS disabled, same class of gap as `org_volunteer_index` in Task 11).
 
 - [ ] **Step 4: Write the implementation**
 
@@ -1466,7 +1730,7 @@ git commit -m "feat(backend): add rate limiting helper for public write endpoint
 
 **Interfaces:**
 - Consumes: `getAdminClient()` (Task 1), `checkRateLimit()` (Task 13), `volunteer_is_minor()` (Task 2).
-- Produces: `registerVolunteer(supabase: SupabaseClient, input: RegisterVolunteerInput): Promise<RegisterVolunteerResult>`. `RegisterVolunteerInput` includes `authUserId`, all mandatory `volunteers` fields, and optional `guardianName`/`guardianContact`/`guardianConsent: boolean`. `RegisterVolunteerResult = { volunteerId: string; volunteerCode: string }`. Throws `Error("minor_consent_required")` when DOB implies a minor and consent fields are incomplete.
+- Produces: `registerVolunteer(supabase: SupabaseClient, input: RegisterVolunteerInput): Promise<RegisterVolunteerResult>`. `RegisterVolunteerInput` includes `authUserId`, all mandatory `volunteers` fields, and optional `guardianName`/`guardianContact`/`guardianConsent: boolean`. `RegisterVolunteerResult = { volunteerId: string; volunteerCode: string }`. Throws `Error("minor_consent_required")` when DOB implies a minor and consent fields are incomplete. Runs near-duplicate detection (same `full_name` + `city`, different `email`) after a successful insert and, on a match, writes an `admin_action_log` row with `actor_type: 'system'`, `action: 'duplicate_flagged'` rather than blocking registration — this lives here, not in `applyToOpportunity()`, matching the requirements doc's own placement under registration (§5A): "On a near-duplicate match ... flag the registration for administrator review."
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1538,6 +1802,37 @@ Deno.test("registerVolunteer accepts a minor with complete guardian consent", as
   });
   assertEquals(typeof result.volunteerId, "string");
 });
+
+Deno.test("registerVolunteer flags a near-duplicate without blocking registration", async () => {
+  const supabase = testClient();
+  await registerVolunteer(supabase, {
+    authUserId: crypto.randomUUID(),
+    ...baseInput,
+    fullName: "Duplicate Person",
+    city: "Multan",
+    email: baseInput.email(),
+    phone: baseInput.phone(),
+    dob: "1999-01-01",
+  });
+
+  const result = await registerVolunteer(supabase, {
+    authUserId: crypto.randomUUID(),
+    ...baseInput,
+    fullName: "Duplicate Person",
+    city: "Multan",
+    email: baseInput.email(),
+    phone: baseInput.phone(),
+    dob: "1999-01-01",
+  });
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("*")
+    .eq("action", "duplicate_flagged")
+    .eq("target_id", result.volunteerId);
+
+  assertEquals(logRows?.length, 1);
+});
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -1572,6 +1867,32 @@ export interface RegisterVolunteerInput {
 export interface RegisterVolunteerResult {
   volunteerId: string;
   volunteerCode: string;
+}
+
+async function flagNearDuplicatesIfAny(
+  supabase: SupabaseClient,
+  volunteerId: string,
+  fullName: string,
+  city: string,
+  email: string,
+) {
+  const { data: matches } = await supabase
+    .from("volunteers")
+    .select("id, email")
+    .eq("full_name", fullName)
+    .eq("city", city)
+    .neq("id", volunteerId);
+
+  const realMatches = (matches ?? []).filter((m) => m.email !== email);
+  if (realMatches.length > 0) {
+    await supabase.from("admin_action_log").insert({
+      actor_type: "system",
+      action: "duplicate_flagged",
+      target_type: "volunteer",
+      target_id: volunteerId,
+      metadata: { matched_volunteer_ids: realMatches.map((m) => m.id) },
+    });
+  }
 }
 
 export async function registerVolunteer(
@@ -1612,6 +1933,8 @@ export async function registerVolunteer(
 
   if (error) throw error;
 
+  await flagNearDuplicatesIfAny(supabase, data.id, input.fullName, input.city, input.email);
+
   return { volunteerId: data.id, volunteerCode: data.volunteer_code };
 }
 ```
@@ -1619,7 +1942,7 @@ export async function registerVolunteer(
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/register-volunteer/handler.test.ts`
-Expected: PASS on all 3 tests.
+Expected: PASS on all 4 tests.
 
 - [ ] **Step 5: Write the HTTP wrapper**
 
@@ -1658,7 +1981,7 @@ Deno.serve(async (req) => {
 
 ```bash
 git add backend/supabase/functions/register-volunteer/
-git commit -m "feat(backend): add register-volunteer Edge Function with minor consent gating"
+git commit -m "feat(backend): add register-volunteer Edge Function with minor consent gating and duplicate flagging"
 ```
 
 ---
@@ -1672,14 +1995,14 @@ git commit -m "feat(backend): add register-volunteer Edge Function with minor co
 
 **Interfaces:**
 - Consumes: `getAdminClient()`, `checkRateLimit()`.
-- Produces: `applyToOpportunity(supabase, input: { volunteerId: string; opportunityId: string; organizationId: string; motivationStatement?: string }): Promise<{ applicationId: string }>`. Runs near-duplicate detection (same `full_name` + `city`, different `email`) and, on a match, writes an `admin_action_log` row with `actor_type: 'system'`, `action: 'duplicate_flagged'` rather than blocking the application.
+- Produces: `applyToOpportunity(supabase, input: { volunteerId: string; opportunityId: string; organizationId: string; motivationStatement?: string }): Promise<{ applicationId: string }>`. Throws `Error("cnic_required")` if the volunteer has no `cnic_number` on file — registration itself doesn't require CNIC (spec §3: "mandatory eventually; not blocking at registration"), but this is the enforcement point that makes CNIC-based duplicate uniqueness actually meaningful across the volunteers who go on to participate, without adding friction for volunteers who only browse. (Near-duplicate detection itself lives in `registerVolunteer()`, Task 14 — not here.)
 
 - [ ] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/apply-to-opportunity/handler.test.ts`:
 
 ```typescript
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createClient } from "@supabase/supabase-js";
 import { applyToOpportunity } from "./handler.ts";
 
@@ -1703,6 +2026,7 @@ async function makeVolunteer(supabase: ReturnType<typeof testClient>, overrides:
     country: "Pakistan",
     institution: "Test Uni",
     degree_program: "BSCS",
+    cnic_number: `${Math.floor(Math.random() * 100000000000)}`,
     ...overrides,
   }).select("id").single();
   return data!.id as string;
@@ -1732,28 +2056,17 @@ Deno.test("applyToOpportunity creates an application", async () => {
   assertEquals(typeof result.applicationId, "string");
 });
 
-Deno.test("applyToOpportunity flags a near-duplicate without blocking the application", async () => {
+Deno.test("applyToOpportunity rejects when the volunteer has no cnic_number on file", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
-  await makeVolunteer(supabase, { full_name: "Duplicate Person", city: "Multan" });
-  const secondVolunteerId = await makeVolunteer(supabase, { full_name: "Duplicate Person", city: "Multan" });
+  const volunteerId = await makeVolunteer(supabase, { cnic_number: null });
   const opportunityId = await makeOpportunity(supabase, orgId);
 
-  const result = await applyToOpportunity(supabase, {
-    volunteerId: secondVolunteerId,
-    opportunityId,
-    organizationId: orgId,
-  });
-
-  assertEquals(typeof result.applicationId, "string");
-
-  const { data: logRows } = await supabase
-    .from("admin_action_log")
-    .select("*")
-    .eq("action", "duplicate_flagged")
-    .eq("target_id", secondVolunteerId);
-
-  assertEquals(logRows?.length, 1);
+  await assertRejects(
+    () => applyToOpportunity(supabase, { volunteerId, opportunityId, organizationId: orgId }),
+    Error,
+    "cnic_required",
+  );
 });
 ```
 
@@ -1780,38 +2093,19 @@ export interface ApplyToOpportunityResult {
   applicationId: string;
 }
 
-async function flagNearDuplicatesIfAny(supabase: SupabaseClient, volunteerId: string) {
-  const { data: volunteer, error } = await supabase
-    .from("volunteers")
-    .select("full_name, city, email")
-    .eq("id", volunteerId)
-    .single();
-  if (error) throw error;
-
-  const { data: matches } = await supabase
-    .from("volunteers")
-    .select("id, email")
-    .eq("full_name", volunteer.full_name)
-    .eq("city", volunteer.city)
-    .neq("id", volunteerId);
-
-  const realMatches = (matches ?? []).filter((m) => m.email !== volunteer.email);
-  if (realMatches.length > 0) {
-    await supabase.from("admin_action_log").insert({
-      actor_type: "system",
-      action: "duplicate_flagged",
-      target_type: "volunteer",
-      target_id: volunteerId,
-      metadata: { matched_volunteer_ids: realMatches.map((m) => m.id) },
-    });
-  }
-}
-
 export async function applyToOpportunity(
   supabase: SupabaseClient,
   input: ApplyToOpportunityInput,
 ): Promise<ApplyToOpportunityResult> {
-  await flagNearDuplicatesIfAny(supabase, input.volunteerId);
+  const { data: volunteer, error: volunteerError } = await supabase
+    .from("volunteers")
+    .select("cnic_number")
+    .eq("id", input.volunteerId)
+    .single();
+  if (volunteerError) throw volunteerError;
+  if (!volunteer.cnic_number) {
+    throw new Error("cnic_required");
+  }
 
   const { data, error } = await supabase
     .from("applications")
@@ -1876,7 +2170,7 @@ Deno.serve(async (req) => {
 
 ```bash
 git add backend/supabase/functions/apply-to-opportunity/
-git commit -m "feat(backend): add apply-to-opportunity Edge Function with duplicate flagging"
+git commit -m "feat(backend): add apply-to-opportunity Edge Function, requiring cnic_number on file"
 ```
 
 ---
@@ -1889,8 +2183,10 @@ git commit -m "feat(backend): add apply-to-opportunity Edge Function with duplic
 - Create: `backend/supabase/functions/decide-application/index.ts`
 
 **Interfaces:**
-- Consumes: `verifyStaffToken()` (Task 12), `staff_has_org_role` via RLS (staff writes go through the admin client but the handler still checks the claim to return a clean 403 rather than a raw Postgres error).
-- Produces: `decideApplication(supabase, staffClaims: StaffClaims, input: { applicationId: string; decision: "selected" | "rejected" | "under_review"; staffId: string }): Promise<{ applicationId: string; participationId: string | null }>`.
+- Consumes: `verifyStaffToken()`, `staffHasPermission()` (Task 12) — the handler checks `applications:update` in application code, since the write itself goes through the admin client (bypassing RLS) and needs a clean 403 rather than a raw Postgres error.
+- Produces: `decideApplication(supabase, staffClaims: StaffClaims, input: { applicationId: string; decision: "selected" | "waitlisted" | "rejected" | "under_review" }): Promise<{ applicationId: string; participationId: string | null }>`. Requires `applications:update` for the application's org — deciding an application is a status change on an existing row, mapping onto the `update` action per the `platform` spec's four-verb permission model (§3). Manual waitlist promotion (requirements doc §5D) is just a later call with `decision: "selected"` on a `waitlisted` application — no separate function. Throws `Error("emergency_contact_required")` if `decision === "selected"` and the volunteer has no `emergency_contact` on file, matching the requirements doc's "Required for safety once a volunteer is selected for an in-person activity" (§5A) — this is why `emergency_contact` stays nullable in the schema (Task 2) rather than `not null`: it must be collectible any time before selection, not forced at registration. Idempotent on repeated `"selected"` decisions: checks for an existing `participation` row by `application_id` before inserting, so a double-click or client retry reuses the existing `participationId` instead of creating a second one — the `participation.application_id` partial unique index (Task 6) is the DB-level backstop for the same invariant. `applications.decided_by` and `admin_action_log.staff_id` are both set from `staffClaims.staffId` (Task 12), never from `input` — `input` has no `staffId` field at all, so there is nothing for a caller to spoof.
+
+The original version of this function took `staffId` as an `input` field, trusting whatever the client's own request body said — any staff member with `applications:update` could attribute a decision to an arbitrary `staff_id`, forging `decided_by` and the audit log. Fixed by deriving it from the verified JWT's `staffId` claim instead.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1909,7 +2205,11 @@ function testClient() {
   );
 }
 
-async function makeApplication(supabase: ReturnType<typeof testClient>, organizationId: string) {
+async function makeApplication(
+  supabase: ReturnType<typeof testClient>,
+  organizationId: string,
+  volunteerOverrides: Record<string, unknown> = {},
+) {
   const { data: volunteer } = await supabase.from("volunteers").insert({
     auth_user_id: crypto.randomUUID(),
     full_name: "Decide Test",
@@ -1922,6 +2222,8 @@ async function makeApplication(supabase: ReturnType<typeof testClient>, organiza
     country: "Pakistan",
     institution: "Test Uni",
     degree_program: "BSCS",
+    emergency_contact: { name: "Parent", phone: "0300-0000000", relation: "parent" },
+    ...volunteerOverrides,
   }).select("id").single();
 
   const { data: opportunity } = await supabase.from("opportunities").insert({
@@ -1939,11 +2241,12 @@ async function makeApplication(supabase: ReturnType<typeof testClient>, organiza
   return { applicationId: application!.id as string, volunteerId: volunteer!.id as string, opportunityId: opportunity!.id as string };
 }
 
-const staffClaims = (orgId: string): StaffClaims => ({
+const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims => ({
   actorType: "staff",
+  staffId,
   platformOwner: false,
-  orgRoles: [{ organizationId: orgId, role: "org_admin" }],
-  modules: ["vms"],
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["applications:update"] }],
 });
 
 Deno.test("decideApplication selecting an applicant auto-creates participation", async () => {
@@ -1954,7 +2257,6 @@ Deno.test("decideApplication selecting an applicant auto-creates participation",
   const result = await decideApplication(supabase, staffClaims(orgId), {
     applicationId,
     decision: "selected",
-    staffId: crypto.randomUUID(),
   });
 
   assertEquals(result.participationId !== null, true);
@@ -1963,7 +2265,59 @@ Deno.test("decideApplication selecting an applicant auto-creates participation",
   assertEquals(application!.status, "selected");
 });
 
-Deno.test("decideApplication rejects when staff lacks a role in the application's org", async () => {
+Deno.test("decideApplication re-selecting an already-selected application does not create a duplicate participation row", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { applicationId } = await makeApplication(supabase, orgId);
+
+  const first = await decideApplication(supabase, staffClaims(orgId), {
+    applicationId,
+    decision: "selected",
+  });
+
+  const second = await decideApplication(supabase, staffClaims(orgId), {
+    applicationId,
+    decision: "selected",
+  });
+
+  assertEquals(second.participationId, first.participationId);
+
+  const { data: rows } = await supabase.from("participation").select("id").eq("application_id", applicationId);
+  assertEquals(rows?.length, 1);
+});
+
+Deno.test("decideApplication rejects selecting an applicant with no emergency_contact on file", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { applicationId } = await makeApplication(supabase, orgId, { emergency_contact: null });
+
+  await assertRejects(
+    () =>
+      decideApplication(supabase, staffClaims(orgId), {
+        applicationId,
+        decision: "selected",
+      }),
+    Error,
+    "emergency_contact_required",
+  );
+});
+
+Deno.test("decideApplication accepts waitlisted as a decision without creating participation", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { applicationId } = await makeApplication(supabase, orgId);
+
+  const result = await decideApplication(supabase, staffClaims(orgId), {
+    applicationId,
+    decision: "waitlisted",
+  });
+
+  assertEquals(result.participationId, null);
+  const { data: application } = await supabase.from("applications").select("status").eq("id", applicationId).single();
+  assertEquals(application!.status, "waitlisted");
+});
+
+Deno.test("decideApplication rejects when staff lacks applications:update for the application's org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
   const otherOrgId = crypto.randomUUID();
@@ -1974,24 +2328,30 @@ Deno.test("decideApplication rejects when staff lacks a role in the application'
       decideApplication(supabase, staffClaims(otherOrgId), {
         applicationId,
         decision: "selected",
-        staffId: crypto.randomUUID(),
       }),
     Error,
     "forbidden",
   );
 });
 
-Deno.test("decideApplication writes an admin_action_log entry", async () => {
+Deno.test("decideApplication writes an admin_action_log entry and applications.decided_by using the caller's own staffId from the token, never a client-supplied value", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
   const { applicationId } = await makeApplication(supabase, orgId);
-  const staffId = crypto.randomUUID();
+  const realStaffId = crypto.randomUUID();
 
-  await decideApplication(supabase, staffClaims(orgId), {
+  // Regression test: the input object below deliberately has no `staffId` field
+  // at all — DecideApplicationInput no longer has one. If a future change
+  // reintroduces trusting a client-supplied staffId, TypeScript would need a
+  // field here that doesn't exist on the type, and this test would need updating
+  // to actually pass one through to prove the spoof — it should not compile as-is.
+  await decideApplication(supabase, staffClaims(orgId, realStaffId), {
     applicationId,
     decision: "rejected",
-    staffId,
   });
+
+  const { data: application } = await supabase.from("applications").select("decided_by").eq("id", applicationId).single();
+  assertEquals(application!.decided_by, realStaffId);
 
   const { data: logRows } = await supabase
     .from("admin_action_log")
@@ -2000,6 +2360,7 @@ Deno.test("decideApplication writes an admin_action_log entry", async () => {
     .eq("action", "application_decided");
 
   assertEquals(logRows?.length, 1);
+  assertEquals(logRows![0].staff_id, realStaffId);
 });
 ```
 
@@ -2014,21 +2375,16 @@ Create `backend/supabase/functions/decide-application/handler.ts`:
 
 ```typescript
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 export interface DecideApplicationInput {
   applicationId: string;
-  decision: "selected" | "rejected" | "under_review";
-  staffId: string;
+  decision: "selected" | "waitlisted" | "rejected" | "under_review";
 }
 
 export interface DecideApplicationResult {
   applicationId: string;
   participationId: string | null;
-}
-
-function staffCanActOnOrg(claims: StaffClaims, organizationId: string): boolean {
-  return claims.platformOwner || claims.orgRoles.some((r) => r.organizationId === organizationId);
 }
 
 export async function decideApplication(
@@ -2043,31 +2399,58 @@ export async function decideApplication(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffCanActOnOrg(staffClaims, application.organization_id)) {
+  if (!staffHasPermission(staffClaims, application.organization_id, "vms", "applications:update")) {
     throw new Error("forbidden");
+  }
+
+  if (input.decision === "selected") {
+    const { data: volunteer, error: volunteerError } = await supabase
+      .from("volunteers")
+      .select("emergency_contact")
+      .eq("id", application.volunteer_id)
+      .single();
+    if (volunteerError) throw volunteerError;
+    if (!volunteer.emergency_contact) {
+      throw new Error("emergency_contact_required");
+    }
   }
 
   const { error: updateError } = await supabase
     .from("applications")
-    .update({ status: input.decision, decided_at: new Date().toISOString(), decided_by: input.staffId })
+    .update({ status: input.decision, decided_at: new Date().toISOString(), decided_by: staffClaims.staffId })
     .eq("id", input.applicationId);
   if (updateError) throw updateError;
 
   let participationId: string | null = null;
 
   if (input.decision === "selected") {
-    const { data: participation, error: participationError } = await supabase
+    const { data: existingParticipation, error: existingError } = await supabase
       .from("participation")
-      .insert({
-        application_id: application.id,
-        volunteer_id: application.volunteer_id,
-        opportunity_id: application.opportunity_id,
-        organization_id: application.organization_id,
-      })
       .select("id")
-      .single();
-    if (participationError) throw participationError;
-    participationId = participation.id;
+      .eq("application_id", application.id)
+      .maybeSingle();
+    if (existingError) throw existingError;
+
+    if (existingParticipation) {
+      // Idempotent: re-deciding an already-selected application (double-click,
+      // client retry) must not create a second participation row for it — the
+      // migration's partial unique index on participation.application_id
+      // (Task 6) backstops this at the DB level too.
+      participationId = existingParticipation.id;
+    } else {
+      const { data: participation, error: participationError } = await supabase
+        .from("participation")
+        .insert({
+          application_id: application.id,
+          volunteer_id: application.volunteer_id,
+          opportunity_id: application.opportunity_id,
+          organization_id: application.organization_id,
+        })
+        .select("id")
+        .single();
+      if (participationError) throw participationError;
+      participationId = participation.id;
+    }
 
     await supabase.rpc("touch_org_volunteer_index", {
       p_org_id: application.organization_id,
@@ -2076,7 +2459,7 @@ export async function decideApplication(
   }
 
   await supabase.from("admin_action_log").insert({
-    staff_id: input.staffId,
+    staff_id: staffClaims.staffId,
     actor_type: staffClaims.actorType,
     action: "application_decided",
     target_type: "application",
@@ -2092,7 +2475,7 @@ export async function decideApplication(
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/decide-application/handler.test.ts`
-Expected: PASS on all 3 tests.
+Expected: PASS on all 6 tests.
 
 - [ ] **Step 5: Write the HTTP wrapper**
 
@@ -2108,7 +2491,7 @@ Deno.serve(async (req) => {
     const claims = await verifyStaffToken(req.headers.get("Authorization"));
     const supabase = getAdminClient();
     const input = await req.json();
-    const result = await decideApplication(supabase, claims, { ...input, staffId: input.staffId });
+    const result = await decideApplication(supabase, claims, input);
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -2125,7 +2508,7 @@ Deno.serve(async (req) => {
 
 ```bash
 git add backend/supabase/functions/decide-application/
-git commit -m "feat(backend): add decide-application Edge Function"
+git commit -m "feat(backend): add decide-application Edge Function with waitlisting and emergency-contact gating"
 ```
 
 ---
@@ -2141,7 +2524,7 @@ git commit -m "feat(backend): add decide-application Edge Function"
 - Create: `backend/supabase/functions/verify-hours/index.ts`
 
 **Interfaces:**
-- Produces: `submitHours(supabase, input: { participationId, volunteerId, opportunityId, organizationId, activityDate, hoursSubmitted, role?, location? }): Promise<{ activityHoursId: string }>` and `verifyHours(supabase, staffClaims, input: { activityHoursId, decision: "verified" | "rejected", hoursVerified?, rejectionReason?, staffId }): Promise<{ activityHoursId: string }>`.
+- Produces: `submitHours(supabase, input: { participationId, volunteerId, opportunityId, organizationId, activityDate, hoursSubmitted, role?, location? }): Promise<{ activityHoursId: string }>` (volunteer-driven, no staff permission check) and `verifyHours(supabase, staffClaims, input: { activityHoursId, decision: "verified" | "rejected", hoursVerified?, rejectionReason? }): Promise<{ activityHoursId: string }>` — requires `hours:update` for the row's org. `activity_hours.verified_by` and `admin_action_log.staff_id` are set from `staffClaims.staffId` (Task 12), not a client-supplied `staffId` input field.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2236,8 +2619,12 @@ async function makeActivityHours(supabase: ReturnType<typeof testClient>) {
   return { activityHoursId: hours!.id as string, orgId };
 }
 
-const staffClaims = (orgId: string): StaffClaims => ({
-  actorType: "staff", platformOwner: false, orgRoles: [{ organizationId: orgId, role: "org_admin" }], modules: ["vms"],
+const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims => ({
+  actorType: "staff",
+  staffId,
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["hours:update"] }],
 });
 
 Deno.test("verifyHours verifying sets hours_verified and status", async () => {
@@ -2245,7 +2632,7 @@ Deno.test("verifyHours verifying sets hours_verified and status", async () => {
   const { activityHoursId, orgId } = await makeActivityHours(supabase);
 
   await verifyHours(supabase, staffClaims(orgId), {
-    activityHoursId, decision: "verified", hoursVerified: 5, staffId: crypto.randomUUID(),
+    activityHoursId, decision: "verified", hoursVerified: 5,
   });
 
   const { data: row } = await supabase.from("activity_hours").select("verification_status, hours_verified").eq("id", activityHoursId).single();
@@ -2258,12 +2645,32 @@ Deno.test("verifyHours rejecting retains the row with a reason", async () => {
   const { activityHoursId, orgId } = await makeActivityHours(supabase);
 
   await verifyHours(supabase, staffClaims(orgId), {
-    activityHoursId, decision: "rejected", rejectionReason: "No proof of attendance", staffId: crypto.randomUUID(),
+    activityHoursId, decision: "rejected", rejectionReason: "No proof of attendance",
   });
 
   const { data: row } = await supabase.from("activity_hours").select("verification_status, rejection_reason").eq("id", activityHoursId).single();
   assertEquals(row!.verification_status, "rejected");
   assertEquals(row!.rejection_reason, "No proof of attendance");
+});
+
+Deno.test("verifyHours sets verified_by and admin_action_log.staff_id from the caller's own staffId, never a client-supplied value", async () => {
+  const supabase = testClient();
+  const { activityHoursId, orgId } = await makeActivityHours(supabase);
+  const realStaffId = crypto.randomUUID();
+
+  await verifyHours(supabase, staffClaims(orgId, realStaffId), {
+    activityHoursId, decision: "verified", hoursVerified: 5,
+  });
+
+  const { data: row } = await supabase.from("activity_hours").select("verified_by").eq("id", activityHoursId).single();
+  assertEquals(row!.verified_by, realStaffId);
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("staff_id")
+    .eq("target_id", activityHoursId)
+    .eq("action", "hours_decided");
+  assertEquals(logRows![0].staff_id, realStaffId);
 });
 ```
 
@@ -2322,22 +2729,17 @@ Create `backend/supabase/functions/verify-hours/handler.ts`:
 
 ```typescript
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 export interface VerifyHoursInput {
   activityHoursId: string;
   decision: "verified" | "rejected";
   hoursVerified?: number;
   rejectionReason?: string;
-  staffId: string;
 }
 
 export interface VerifyHoursResult {
   activityHoursId: string;
-}
-
-function staffCanActOnOrg(claims: StaffClaims, organizationId: string): boolean {
-  return claims.platformOwner || claims.orgRoles.some((r) => r.organizationId === organizationId);
 }
 
 export async function verifyHours(
@@ -2352,7 +2754,7 @@ export async function verifyHours(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffCanActOnOrg(staffClaims, row.organization_id)) {
+  if (!staffHasPermission(staffClaims, row.organization_id, "vms", "hours:update")) {
     throw new Error("forbidden");
   }
 
@@ -2362,14 +2764,14 @@ export async function verifyHours(
       verification_status: input.decision,
       hours_verified: input.decision === "verified" ? input.hoursVerified ?? null : null,
       rejection_reason: input.decision === "rejected" ? input.rejectionReason ?? null : null,
-      verified_by: input.staffId,
+      verified_by: staffClaims.staffId,
       verified_at: new Date().toISOString(),
     })
     .eq("id", input.activityHoursId);
   if (updateError) throw updateError;
 
   await supabase.from("admin_action_log").insert({
-    staff_id: input.staffId,
+    staff_id: staffClaims.staffId,
     actor_type: staffClaims.actorType,
     action: "hours_decided",
     target_type: "activity_hours",
@@ -2448,7 +2850,7 @@ git commit -m "feat(backend): add submit-hours and verify-hours Edge Functions"
 
 **Interfaces:**
 - Consumes: `submitHours()` pattern from Task 17 (reuses the same insert shape for each participant).
-- Produces: `bulkAssignHours(supabase, staffClaims, input: { organizationId: string; opportunityId: string; activityDate: string; hoursSubmitted: number; participationIds: string[]; staffId: string }): Promise<{ createdCount: number }>`.
+- Produces: `bulkAssignHours(supabase, staffClaims, input: { organizationId: string; opportunityId: string; activityDate: string; hoursSubmitted: number; participationIds: string[] }): Promise<{ createdCount: number }>`. Requires `hours:write` for the org — this creates new `activity_hours` rows (the `write` action), unlike `verifyHours()`'s `hours:update` on existing ones. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12), not a client-supplied `staffId` field.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2483,8 +2885,12 @@ async function makeParticipants(supabase: ReturnType<typeof testClient>, orgId: 
   return ids;
 }
 
-const staffClaims = (orgId: string): StaffClaims => ({
-  actorType: "staff", platformOwner: false, orgRoles: [{ organizationId: orgId, role: "org_admin" }], modules: ["vms"],
+const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims => ({
+  actorType: "staff",
+  staffId,
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["hours:write"] }],
 });
 
 Deno.test("bulkAssignHours creates one activity_hours row per participant", async () => {
@@ -2497,13 +2903,13 @@ Deno.test("bulkAssignHours creates one activity_hours row per participant", asyn
 
   const result = await bulkAssignHours(supabase, staffClaims(orgId), {
     organizationId: orgId, opportunityId: opportunity!.id, activityDate: "2026-08-01",
-    hoursSubmitted: 4, participationIds, staffId: crypto.randomUUID(),
+    hoursSubmitted: 4, participationIds,
   });
 
   assertEquals(result.createdCount, 3);
 });
 
-Deno.test("bulkAssignHours rejects staff without a role in the org", async () => {
+Deno.test("bulkAssignHours rejects staff without hours:write in the org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
   const otherOrgId = crypto.randomUUID();
@@ -2516,11 +2922,33 @@ Deno.test("bulkAssignHours rejects staff without a role in the org", async () =>
     () =>
       bulkAssignHours(supabase, staffClaims(otherOrgId), {
         organizationId: orgId, opportunityId: opportunity!.id, activityDate: "2026-08-01",
-        hoursSubmitted: 4, participationIds, staffId: crypto.randomUUID(),
+        hoursSubmitted: 4, participationIds,
       }),
     Error,
     "forbidden",
   );
+});
+
+Deno.test("bulkAssignHours attributes admin_action_log to the caller's own staffId, never a client-supplied value", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const realStaffId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Bulk Opp 3", type: "event",
+  }).select("id").single();
+  const participationIds = await makeParticipants(supabase, orgId, opportunity!.id, 1);
+
+  await bulkAssignHours(supabase, staffClaims(orgId, realStaffId), {
+    organizationId: orgId, opportunityId: opportunity!.id, activityDate: "2026-08-01",
+    hoursSubmitted: 4, participationIds,
+  });
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("staff_id")
+    .eq("target_id", opportunity!.id)
+    .eq("action", "bulk_hours_assigned");
+  assertEquals(logRows![0].staff_id, realStaffId);
 });
 ```
 
@@ -2535,7 +2963,7 @@ Create `backend/supabase/functions/bulk-assign-hours/handler.ts`:
 
 ```typescript
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 export interface BulkAssignHoursInput {
   organizationId: string;
@@ -2543,15 +2971,10 @@ export interface BulkAssignHoursInput {
   activityDate: string;
   hoursSubmitted: number;
   participationIds: string[];
-  staffId: string;
 }
 
 export interface BulkAssignHoursResult {
   createdCount: number;
-}
-
-function staffCanActOnOrg(claims: StaffClaims, organizationId: string): boolean {
-  return claims.platformOwner || claims.orgRoles.some((r) => r.organizationId === organizationId);
 }
 
 export async function bulkAssignHours(
@@ -2559,7 +2982,7 @@ export async function bulkAssignHours(
   staffClaims: StaffClaims,
   input: BulkAssignHoursInput,
 ): Promise<BulkAssignHoursResult> {
-  if (!staffCanActOnOrg(staffClaims, input.organizationId)) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "hours:write")) {
     throw new Error("forbidden");
   }
 
@@ -2582,7 +3005,7 @@ export async function bulkAssignHours(
   if (insertError) throw insertError;
 
   await supabase.from("admin_action_log").insert({
-    staff_id: input.staffId,
+    staff_id: staffClaims.staffId,
     actor_type: staffClaims.actorType,
     action: "bulk_hours_assigned",
     target_type: "opportunity",
@@ -2598,7 +3021,7 @@ export async function bulkAssignHours(
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/bulk-assign-hours/handler.test.ts`
-Expected: PASS on both tests.
+Expected: PASS on all 3 tests.
 
 - [ ] **Step 5: Write the HTTP wrapper**
 
@@ -2939,7 +3362,7 @@ git commit -m "feat(backend): add update-sensitive-field Edge Function with chan
 - Create: `backend/supabase/functions/export-csv/index.ts`
 
 **Interfaces:**
-- Produces: `exportApplicationsCsv(supabase, staffClaims, organizationId: string): Promise<string>` — returns CSV text (volunteer_code, full_name, email, opportunity name, status, applied_at).
+- Produces: `exportApplicationsCsv(supabase, staffClaims, organizationId: string): Promise<string>` — returns CSV text (volunteer_code, full_name, email, opportunity name, status, applied_at). Requires `applications:read` for the org. Also produces `exportVolunteersCsv(supabase, staffClaims, organizationId: string): Promise<string>` — returns CSV text (volunteer_code, full_name, email, phone, city, province, institution, status) for every volunteer with an `org_volunteer_index` link to the org. Requires `volunteers:read` for the org. Platform-design.md §6 lists volunteer-list export as needing "the same treatment" as the applications/opportunity/hours exports already scoped here — this closes that gap.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2948,7 +3371,7 @@ Create `backend/supabase/functions/export-csv/handler.test.ts`:
 ```typescript
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createClient } from "@supabase/supabase-js";
-import { exportApplicationsCsv } from "./handler.ts";
+import { exportApplicationsCsv, exportVolunteersCsv } from "./handler.ts";
 import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 function testClient() {
@@ -2956,7 +3379,11 @@ function testClient() {
 }
 
 const staffClaims = (orgId: string): StaffClaims => ({
-  actorType: "staff", platformOwner: false, orgRoles: [{ organizationId: orgId, role: "org_admin" }], modules: ["vms"],
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["applications:read"] }],
 });
 
 Deno.test("exportApplicationsCsv includes a header row and one row per application", async () => {
@@ -2982,12 +3409,46 @@ Deno.test("exportApplicationsCsv includes a header row and one row per applicati
   assertEquals(lines[1].includes(volunteer!.volunteer_code), true);
 });
 
-Deno.test("exportApplicationsCsv rejects staff without a role in the org", async () => {
+Deno.test("exportApplicationsCsv rejects staff without applications:read for the org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
   const otherOrgId = crypto.randomUUID();
 
   await assertRejects(() => exportApplicationsCsv(supabase, staffClaims(otherOrgId), orgId), Error, "forbidden");
+});
+
+const volunteersReadClaims = (orgId: string): StaffClaims => ({
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["volunteers:read"] }],
+});
+
+Deno.test("exportVolunteersCsv includes a header row and one row per volunteer linked to the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: crypto.randomUUID(), full_name: "CSV Volunteer Test", email: `csv-vol-${crypto.randomUUID()}@example.com`,
+    phone: `0300-${Math.floor(Math.random() * 10000000)}`, dob: "1999-01-01", gender: "male",
+    city: "Lahore", province: "Punjab", country: "Pakistan", institution: "Test Uni", degree_program: "BSCS",
+  }).select("id, volunteer_code").single();
+  await supabase.rpc("touch_org_volunteer_index", { p_org_id: orgId, p_volunteer_id: volunteer!.id });
+
+  const csv = await exportVolunteersCsv(supabase, volunteersReadClaims(orgId), orgId);
+  const lines = csv.trim().split("\n");
+
+  assertEquals(lines[0], "volunteer_code,full_name,email,phone,city,province,institution,status");
+  assertEquals(lines.length, 2);
+  assertEquals(lines[1].includes(volunteer!.volunteer_code), true);
+});
+
+Deno.test("exportVolunteersCsv rejects staff without volunteers:read for the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const otherOrgId = crypto.randomUUID();
+
+  await assertRejects(() => exportVolunteersCsv(supabase, volunteersReadClaims(otherOrgId), orgId), Error, "forbidden");
 });
 ```
 
@@ -3002,11 +3463,7 @@ Create `backend/supabase/functions/export-csv/handler.ts`:
 
 ```typescript
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
-
-function staffCanActOnOrg(claims: StaffClaims, organizationId: string): boolean {
-  return claims.platformOwner || claims.orgRoles.some((r) => r.organizationId === organizationId);
-}
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 function csvEscape(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
@@ -3017,7 +3474,7 @@ export async function exportApplicationsCsv(
   staffClaims: StaffClaims,
   organizationId: string,
 ): Promise<string> {
-  if (!staffCanActOnOrg(staffClaims, organizationId)) {
+  if (!staffHasPermission(staffClaims, organizationId, "vms", "applications:read")) {
     throw new Error("forbidden");
   }
 
@@ -3043,12 +3500,48 @@ export async function exportApplicationsCsv(
 
   return [header, ...lines].join("\n") + "\n";
 }
+
+export async function exportVolunteersCsv(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  organizationId: string,
+): Promise<string> {
+  if (!staffHasPermission(staffClaims, organizationId, "vms", "volunteers:read")) {
+    throw new Error("forbidden");
+  }
+
+  const { data: rows, error } = await supabase
+    .from("org_volunteer_index")
+    .select("volunteers(volunteer_code, full_name, email, phone, city, province, institution, status)")
+    .eq("organization_id", organizationId);
+  if (error) throw error;
+
+  const header = "volunteer_code,full_name,email,phone,city,province,institution,status";
+  const lines = (rows ?? []).map((r: Record<string, unknown>) => {
+    const v = r.volunteers as {
+      volunteer_code: string; full_name: string; email: string; phone: string;
+      city: string; province: string; institution: string; status: string;
+    };
+    return [
+      csvEscape(v.volunteer_code),
+      csvEscape(v.full_name),
+      csvEscape(v.email),
+      csvEscape(v.phone),
+      csvEscape(v.city),
+      csvEscape(v.province),
+      csvEscape(v.institution),
+      csvEscape(v.status),
+    ].join(",");
+  });
+
+  return [header, ...lines].join("\n") + "\n";
+}
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/export-csv/handler.test.ts`
-Expected: PASS on both tests.
+Expected: PASS on all 4 tests.
 
 - [ ] **Step 5: Write the HTTP wrapper**
 
@@ -3057,14 +3550,18 @@ Create `backend/supabase/functions/export-csv/index.ts`:
 ```typescript
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
-import { exportApplicationsCsv } from "./handler.ts";
+import { exportApplicationsCsv, exportVolunteersCsv } from "./handler.ts";
 
 Deno.serve(async (req) => {
   try {
     const claims = await verifyStaffToken(req.headers.get("Authorization"));
     const supabase = getAdminClient();
-    const { organizationId } = await req.json();
-    const csv = await exportApplicationsCsv(supabase, claims, organizationId);
+    const { organizationId, entity } = await req.json();
+
+    const csv = entity === "volunteers"
+      ? await exportVolunteersCsv(supabase, claims, organizationId)
+      : await exportApplicationsCsv(supabase, claims, organizationId);
+
     return new Response(csv, { status: 200, headers: { "Content-Type": "text/csv" } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
@@ -3073,6 +3570,8 @@ Deno.serve(async (req) => {
   }
 });
 ```
+
+`entity` defaults to `"applications"` when omitted, matching the shape `platform`'s admin hub already expects for the applications export; `entity: "volunteers"` is the new addition covering platform-design.md §6's volunteer-list export requirement.
 
 - [ ] **Step 6: Commit**
 
@@ -3203,7 +3702,7 @@ Deno.test("decideApplication sends a status-change email to the volunteer", asyn
   const emailClient = new FakeEmailClient();
 
   await decideApplication(supabase, staffClaims(orgId), {
-    applicationId, decision: "selected", staffId: crypto.randomUUID(),
+    applicationId, decision: "selected",
   }, emailClient);
 
   assertEquals(emailClient.sent.length, 1);
@@ -3258,7 +3757,7 @@ Add, immediately before the final `return { applicationId: input.applicationId, 
 - [ ] **Step 8: Run tests to verify they pass**
 
 Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/decide-application/handler.test.ts`
-Expected: PASS on all 4 tests.
+Expected: PASS on all 7 tests.
 
 - [ ] **Step 9: Wire the real email client into the HTTP wrapper**
 
@@ -3269,9 +3768,9 @@ Modify `backend/supabase/functions/decide-application/index.ts` — add the impo
 import { getResendEmailClient } from "../_shared/sendEmail.ts";
 
 // Change:
-//   const result = await decideApplication(supabase, claims, { ...input, staffId: input.staffId });
+//   const result = await decideApplication(supabase, claims, input);
 // to:
-const result = await decideApplication(supabase, claims, { ...input, staffId: input.staffId }, getResendEmailClient());
+const result = await decideApplication(supabase, claims, input, getResendEmailClient());
 ```
 
 - [ ] **Step 10: Repeat the same pattern for `verify-hours`**
@@ -3285,7 +3784,7 @@ Deno.test("verifyHours sends a status-change email to the volunteer", async () =
   const emailClient = new FakeEmailClient();
 
   await verifyHours(supabase, staffClaims(orgId), {
-    activityHoursId, decision: "verified", hoursVerified: 5, staffId: crypto.randomUUID(),
+    activityHoursId, decision: "verified", hoursVerified: 5,
   }, emailClient);
 
   assertEquals(emailClient.sent.length, 1);
@@ -3579,7 +4078,7 @@ Replace the file's contents with:
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
-import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { verifyStaffToken, staffHasPermission } from "../_shared/verifyStaffToken.ts";
 import { createCnicUploadUrl, getCnicReadUrl, R2Client } from "./handler.ts";
 
 function buildR2Client(): R2Client {
@@ -3617,20 +4116,29 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (action === "read") {
-      await verifyStaffToken(req.headers.get("Authorization"));
+      const claims = await verifyStaffToken(req.headers.get("Authorization"));
+      const volunteerId = objectKey.split("/")[1];
+      const { data: links } = await supabase
+        .from("org_volunteer_index")
+        .select("organization_id")
+        .eq("volunteer_id", volunteerId);
+      const canRead = claims.platformOwner || (links ?? []).some(
+        (link) => staffHasPermission(claims, link.organization_id, "vms", "volunteers:read"),
+      );
+      if (!canRead) throw new Error("forbidden");
       const result = await getCnicReadUrl(r2Client, objectKey);
       return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({ error: "unknown_action" }), { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
-    const status = message === "unauthorized" ? 401 : 400;
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
     return new Response(JSON.stringify({ error: message }), { status });
   }
 });
 ```
 
-`action: "upload"` now requires the calling volunteer's own session and always issues a key scoped to their own `volunteerId`; `action: "read"` now requires a valid staff token, matching the spec's "read access is admin-only" requirement (spec §4).
+`action: "upload"` now requires the calling volunteer's own session and always issues a key scoped to their own `volunteerId`; `action: "read"` now requires `volunteers:read` in at least one org the volunteer is linked to via `org_volunteer_index` — the objectKey format (`cnic/{volunteerId}/{uuid}`, set by `createCnicUploadUrl` above) is what makes extracting `volunteerId` from it safe, matching the spec's "read access is admin-only" requirement (spec §4) with the fine-grained permission model layered on top.
 
 - [ ] **Step 10: Re-run every affected test suite**
 
@@ -3646,9 +4154,1207 @@ git commit -m "fix(backend): derive volunteer identity from session token, not c
 
 ---
 
+### Task 24: `organizations` mirror table and `sync-organization` Edge Function
+
+**Files:**
+- Create: `backend/supabase/migrations/0012_organizations.sql`
+- Test: `backend/supabase/tests/database/organizations_test.sql`
+- Create: `backend/supabase/functions/sync-organization/handler.ts`
+- Create: `backend/supabase/functions/sync-organization/handler.test.ts`
+- Create: `backend/supabase/functions/sync-organization/index.ts`
+
+**Interfaces:**
+- Consumes: `verifyStaffToken()` (Task 12).
+- Produces: table `organizations` (id, name, slug, deactivated_at — a local mirror, not a source of truth); function `syncOrganization()`. Consumed by vms/frontend's opportunity pages to resolve `opportunities.organization_id` to a display name with no cross-project call.
+
+`platform` (the `tmp-partner-admin` repo) owns organizations as the source of truth. Rather than vms/frontend calling out to `platform` on every page load to resolve an org name — an avoidable runtime dependency on another project being up — `platform` pushes a copy into this table whenever it creates, renames, or deactivates an organization that has the `vms` module enabled. This is a rare, admin-triggered write, not a hot path. `platform` authenticates the call with a staff token carrying `platform_owner: true`, minted the same way as any staff token (shared `STAFF_JWT_SECRET`) — no new secret is introduced.
+
+- [ ] **Step 1: Write the failing database test**
+
+Create `backend/supabase/tests/database/organizations_test.sql`:
+
+```sql
+begin;
+select plan(4);
+
+select has_table('public', 'organizations', 'organizations exists');
+
+insert into organizations (id, name, slug)
+values ('11111111-1111-1111-1111-111111111111', 'Rizq', 'rizq');
+
+select is((select name from organizations where id = '11111111-1111-1111-1111-111111111111'), 'Rizq', 'row stores the mirrored name');
+
+insert into organizations (id, name, slug)
+values ('11111111-1111-1111-1111-111111111111', 'Rizq Renamed', 'rizq')
+on conflict (id) do update set name = excluded.name, synced_at = now();
+
+select is((select name from organizations where id = '11111111-1111-1111-1111-111111111111'), 'Rizq Renamed', 'upsert updates name on re-sync, not a duplicate row');
+select is((select count(*) from organizations), 1::bigint, 're-sync does not create a second row');
+
+select * from finish();
+rollback;
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx supabase test db`
+Expected: FAIL — `organizations` table does not exist.
+
+- [ ] **Step 3: Write the migration**
+
+Create `backend/supabase/migrations/0012_organizations.sql`:
+
+```sql
+create table organizations (
+  id uuid primary key,
+  name text not null,
+  slug text not null unique,
+  deactivated_at timestamptz,
+  synced_at timestamptz not null default now()
+);
+
+create index organizations_slug_idx on organizations (slug);
+
+alter table organizations enable row level security;
+
+create policy organizations_public_select on organizations
+  for select using (deactivated_at is null);
+```
+
+No insert/update/delete policy is defined — this table is written only by the `sync-organization` Edge Function using the service-role key, same pattern as `admin_action_log`. `id` has no default: it is always the canonical organization id assigned by `platform`, never generated locally.
+
+- [ ] **Step 4: Apply and run tests**
+
+Run: `npx supabase db reset && npx supabase test db`
+Expected: PASS on all 4 assertions.
+
+- [ ] **Step 5: Commit the table**
+
+```bash
+git add backend/supabase/migrations/0012_organizations.sql backend/supabase/tests/database/organizations_test.sql
+git commit -m "feat(backend): add organizations mirror table synced from platform"
+```
+
+- [ ] **Step 6: Write the failing handler test**
+
+Create `backend/supabase/functions/sync-organization/handler.test.ts`:
+
+```typescript
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { syncOrganization } from "./handler.ts";
+
+function fakeSupabase() {
+  const calls: unknown[] = [];
+  return {
+    client: {
+      from(_table: string) {
+        return {
+          async upsert(row: unknown) {
+            calls.push(row);
+            return { error: null };
+          },
+        };
+      },
+    },
+    calls,
+  };
+}
+
+Deno.test("syncOrganization upserts the mirrored row", async () => {
+  const { client, calls } = fakeSupabase();
+  const result = await syncOrganization(client as never, {
+    organizationId: "org-1",
+    name: "Rizq",
+    slug: "rizq",
+  });
+  assertEquals(result.organizationId, "org-1");
+  assertEquals((calls[0] as { name: string }).name, "Rizq");
+});
+```
+
+- [ ] **Step 7: Run test to verify it fails**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/sync-organization/handler.test.ts`
+Expected: FAIL — `handler.ts` does not exist.
+
+- [ ] **Step 8: Write the handler**
+
+Create `backend/supabase/functions/sync-organization/handler.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+
+export interface SyncOrganizationInput {
+  organizationId: string;
+  name: string;
+  slug: string;
+  deactivatedAt?: string | null;
+}
+
+export async function syncOrganization(supabase: SupabaseClient, input: SyncOrganizationInput) {
+  const { error } = await supabase.from("organizations").upsert({
+    id: input.organizationId,
+    name: input.name,
+    slug: input.slug,
+    deactivated_at: input.deactivatedAt ?? null,
+    synced_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(error.message);
+  return { organizationId: input.organizationId };
+}
+```
+
+- [ ] **Step 9: Run test to verify it passes**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/sync-organization/handler.test.ts`
+Expected: PASS.
+
+- [ ] **Step 10: Write `index.ts`, requiring `platform_owner`**
+
+Create `backend/supabase/functions/sync-organization/index.ts`:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { syncOrganization } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const claims = await verifyStaffToken(req.headers.get("Authorization"));
+    if (!claims.platformOwner) {
+      throw new Error("unauthorized");
+    }
+    const supabase = getAdminClient();
+    const input = await req.json();
+    const result = await syncOrganization(supabase, input);
+    return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+Only `platform_owner` may call this — an org-scoped `org_admin` token is not sufficient, since this writes data other organizations' opportunity pages also read.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add backend/supabase/functions/sync-organization/
+git commit -m "feat(backend): add sync-organization Edge Function for platform-pushed org data"
+```
+
+---
+
+### Task 25: `update-participation-status` Edge Function
+
+**Files:**
+- Create: `backend/supabase/functions/update-participation-status/handler.ts`
+- Create: `backend/supabase/functions/update-participation-status/handler.test.ts`
+- Create: `backend/supabase/functions/update-participation-status/index.ts`
+
+**Interfaces:**
+- Consumes: `verifyStaffToken()`, `staffHasPermission()` (Task 12); `participation` (Task 6).
+- Produces: `updateParticipationStatus(supabase, staffClaims: StaffClaims, input: { participationId: string; status: "participating" | "completed" | "no_show" | "withdrawn" }): Promise<{ participationId: string }>`. Requires `participation:update` for the row's org. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12).
+
+Rows are created at `selected` (Task 6) whether auto-created by `decideApplication()` or admin-enrolled directly. This function drives the rest of the requirements doc's participation lifecycle (§5D): `selected → participating → {completed | no_show | withdrawn}`. `selected` itself is never a valid target here — a row is already `selected` the moment it exists; this function only ever moves it forward.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `backend/supabase/functions/update-participation-status/handler.test.ts`:
+
+```typescript
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { createClient } from "@supabase/supabase-js";
+import { updateParticipationStatus } from "./handler.ts";
+import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+function testClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+}
+
+async function makeParticipation(supabase: ReturnType<typeof testClient>, organizationId: string) {
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: crypto.randomUUID(),
+    full_name: "Participation Test",
+    email: `participation-${crypto.randomUUID()}@example.com`,
+    phone: `0300-${Math.floor(Math.random() * 10000000)}`,
+    dob: "1999-01-01",
+    gender: "male",
+    city: "Lahore",
+    province: "Punjab",
+    country: "Pakistan",
+    institution: "Test Uni",
+    degree_program: "BSCS",
+  }).select("id").single();
+
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: organizationId,
+    name: "Participation Test Opp",
+    type: "event",
+  }).select("id").single();
+
+  const { data: participation } = await supabase.from("participation").insert({
+    volunteer_id: volunteer!.id,
+    opportunity_id: opportunity!.id,
+    organization_id: organizationId,
+  }).select("id").single();
+
+  return participation!.id as string;
+}
+
+const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims => ({
+  actorType: "staff",
+  staffId,
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["participation:update"] }],
+});
+
+Deno.test("updateParticipationStatus moves selected to participating", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const participationId = await makeParticipation(supabase, orgId);
+
+  await updateParticipationStatus(supabase, staffClaims(orgId), {
+    participationId,
+    status: "participating",
+  });
+
+  const { data } = await supabase.from("participation").select("status").eq("id", participationId).single();
+  assertEquals(data!.status, "participating");
+});
+
+Deno.test("updateParticipationStatus writes an admin_action_log entry attributed to the caller's own staffId", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const participationId = await makeParticipation(supabase, orgId);
+  const realStaffId = crypto.randomUUID();
+
+  await updateParticipationStatus(supabase, staffClaims(orgId, realStaffId), {
+    participationId,
+    status: "no_show",
+  });
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("*")
+    .eq("target_id", participationId)
+    .eq("action", "participation_status_updated");
+
+  assertEquals(logRows?.length, 1);
+  assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("updateParticipationStatus rejects when staff lacks participation:update for the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const otherOrgId = crypto.randomUUID();
+  const participationId = await makeParticipation(supabase, orgId);
+
+  await assertRejects(
+    () =>
+      updateParticipationStatus(supabase, staffClaims(otherOrgId), {
+        participationId,
+        status: "completed",
+      }),
+    Error,
+    "forbidden",
+  );
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/update-participation-status/handler.test.ts`
+Expected: FAIL — `handler.ts` does not exist.
+
+- [ ] **Step 3: Write the implementation**
+
+Create `backend/supabase/functions/update-participation-status/handler.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+export interface UpdateParticipationStatusInput {
+  participationId: string;
+  status: "participating" | "completed" | "no_show" | "withdrawn";
+}
+
+export async function updateParticipationStatus(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  input: UpdateParticipationStatusInput,
+): Promise<{ participationId: string }> {
+  const { data: participation, error: fetchError } = await supabase
+    .from("participation")
+    .select("id, organization_id")
+    .eq("id", input.participationId)
+    .single();
+  if (fetchError) throw fetchError;
+
+  if (!staffHasPermission(staffClaims, participation.organization_id, "vms", "participation:update")) {
+    throw new Error("forbidden");
+  }
+
+  const { error: updateError } = await supabase
+    .from("participation")
+    .update({ status: input.status, updated_at: new Date().toISOString() })
+    .eq("id", input.participationId);
+  if (updateError) throw updateError;
+
+  await supabase.from("admin_action_log").insert({
+    staff_id: staffClaims.staffId,
+    actor_type: staffClaims.actorType,
+    action: "participation_status_updated",
+    target_type: "participation",
+    target_id: input.participationId,
+    organization_id: participation.organization_id,
+    metadata: { status: input.status },
+  });
+
+  return { participationId: input.participationId };
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/update-participation-status/handler.test.ts`
+Expected: PASS on all 3 tests.
+
+- [ ] **Step 5: Write the HTTP wrapper**
+
+Create `backend/supabase/functions/update-participation-status/index.ts`:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { updateParticipationStatus } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const claims = await verifyStaffToken(req.headers.get("Authorization"));
+    const supabase = getAdminClient();
+    const input = await req.json();
+    const result = await updateParticipationStatus(supabase, claims, input);
+    return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/supabase/functions/update-participation-status/
+git commit -m "feat(backend): add update-participation-status Edge Function"
+```
+
+---
+
+### Task 26: `create-opportunity` and `update-opportunity` Edge Functions
+
+**Files:**
+- Create: `backend/supabase/functions/create-opportunity/handler.ts`
+- Create: `backend/supabase/functions/create-opportunity/handler.test.ts`
+- Create: `backend/supabase/functions/create-opportunity/index.ts`
+- Create: `backend/supabase/functions/update-opportunity/handler.ts`
+- Create: `backend/supabase/functions/update-opportunity/handler.test.ts`
+- Create: `backend/supabase/functions/update-opportunity/index.ts`
+
+**Interfaces:**
+- Consumes: `verifyStaffToken()`, `staffHasPermission()` (Task 12); `opportunities` (Task 4).
+- Produces: `createOpportunity(supabase, staffClaims, input: { organizationId, name, type, description?, location?, isOnline?, applicationOpenAt?, applicationDeadline?, activityStartAt?, activityEndAt?, eligibilityCriteria?, capacity? }): Promise<{ opportunityId: string }>`, requiring `opportunities:write`. `updateOpportunity(supabase, staffClaims, input: { opportunityId, organizationId, ...same optional fields as create, plus statusOverride? })`, requiring `opportunities:update`. "Publish" is just `updateOpportunity()` setting `statusOverride` — no separate publish function, matching the `decideApplication()`/waitlist-promotion pattern already used elsewhere in this plan. This closes the gap where `platform` (spec §6, "Opportunities — create, edit, publish") had no Edge Function to call and the coarse Task 11 RLS write policy was the only path. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12), never a client-supplied field.
+
+This task bundles both functions since they share the same shape and permission-check pattern — a reviewer needs to see them together to confirm `write` vs. `update` is applied consistently.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `backend/supabase/functions/create-opportunity/handler.test.ts`:
+
+```typescript
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { createClient } from "@supabase/supabase-js";
+import { createOpportunity } from "./handler.ts";
+import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+function testClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+}
+
+const staffClaims = (orgId: string, permission: string, staffId = crypto.randomUUID()): StaffClaims => ({
+  actorType: "staff",
+  staffId,
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+});
+
+Deno.test("createOpportunity creates a row and logs the action under the caller's own staffId", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const realStaffId = crypto.randomUUID();
+
+  const result = await createOpportunity(supabase, staffClaims(orgId, "opportunities:write", realStaffId), {
+    organizationId: orgId, name: "Beach Cleanup", type: "event",
+  });
+
+  assertEquals(typeof result.opportunityId, "string");
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("*")
+    .eq("target_id", result.opportunityId)
+    .eq("action", "opportunity_created");
+  assertEquals(logRows?.length, 1);
+  assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("createOpportunity rejects staff without opportunities:write for the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+
+  await assertRejects(
+    () => createOpportunity(supabase, staffClaims(orgId, "opportunities:read"), {
+      organizationId: orgId, name: "Beach Cleanup", type: "event",
+    }),
+    Error,
+    "forbidden",
+  );
+});
+```
+
+Create `backend/supabase/functions/update-opportunity/handler.test.ts`:
+
+```typescript
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { createClient } from "@supabase/supabase-js";
+import { updateOpportunity } from "./handler.ts";
+import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+function testClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+}
+
+const staffClaims = (orgId: string, permission: string, staffId = crypto.randomUUID()): StaffClaims => ({
+  actorType: "staff",
+  staffId,
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+});
+
+Deno.test("updateOpportunity publishes by setting status_override and logs the action", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Draft Opp", type: "event",
+  }).select("id").single();
+
+  await updateOpportunity(supabase, staffClaims(orgId, "opportunities:update"), {
+    opportunityId: opportunity!.id, organizationId: orgId, statusOverride: "open",
+  });
+
+  const { data: updated } = await supabase.from("opportunities").select("status_override").eq("id", opportunity!.id).single();
+  assertEquals(updated!.status_override, "open");
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("*")
+    .eq("target_id", opportunity!.id)
+    .eq("action", "opportunity_updated");
+  assertEquals(logRows?.length, 1);
+});
+
+Deno.test("updateOpportunity rejects staff without opportunities:update for the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Draft Opp", type: "event",
+  }).select("id").single();
+
+  await assertRejects(
+    () => updateOpportunity(supabase, staffClaims(orgId, "opportunities:read"), {
+      opportunityId: opportunity!.id, organizationId: orgId, statusOverride: "open",
+    }),
+    Error,
+    "forbidden",
+  );
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/create-opportunity/handler.test.ts functions/update-opportunity/handler.test.ts`
+Expected: FAIL — `handler.ts` files do not exist.
+
+- [ ] **Step 3: Write the implementations**
+
+Create `backend/supabase/functions/create-opportunity/handler.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+export interface CreateOpportunityInput {
+  organizationId: string;
+  name: string;
+  type: string;
+  description?: string;
+  location?: string;
+  isOnline?: boolean;
+  applicationOpenAt?: string;
+  applicationDeadline?: string;
+  activityStartAt?: string;
+  activityEndAt?: string;
+  eligibilityCriteria?: string;
+  capacity?: number;
+}
+
+export async function createOpportunity(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  input: CreateOpportunityInput,
+): Promise<{ opportunityId: string }> {
+  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "opportunities:write")) {
+    throw new Error("forbidden");
+  }
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .insert({
+      organization_id: input.organizationId,
+      name: input.name,
+      type: input.type,
+      description: input.description ?? null,
+      location: input.location ?? null,
+      is_online: input.isOnline ?? false,
+      application_open_at: input.applicationOpenAt ?? null,
+      application_deadline: input.applicationDeadline ?? null,
+      activity_start_at: input.activityStartAt ?? null,
+      activity_end_at: input.activityEndAt ?? null,
+      eligibility_criteria: input.eligibilityCriteria ?? null,
+      capacity: input.capacity ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  await supabase.from("admin_action_log").insert({
+    staff_id: staffClaims.staffId,
+    actor_type: staffClaims.actorType,
+    action: "opportunity_created",
+    target_type: "opportunity",
+    target_id: data.id,
+    organization_id: input.organizationId,
+  });
+
+  return { opportunityId: data.id };
+}
+```
+
+Create `backend/supabase/functions/update-opportunity/handler.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+export interface UpdateOpportunityInput {
+  opportunityId: string;
+  organizationId: string;
+  name?: string;
+  description?: string;
+  location?: string;
+  isOnline?: boolean;
+  applicationOpenAt?: string;
+  applicationDeadline?: string;
+  activityStartAt?: string;
+  activityEndAt?: string;
+  eligibilityCriteria?: string;
+  capacity?: number;
+  statusOverride?: string;
+}
+
+export async function updateOpportunity(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  input: UpdateOpportunityInput,
+): Promise<{ opportunityId: string }> {
+  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "opportunities:update")) {
+    throw new Error("forbidden");
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.location !== undefined) patch.location = input.location;
+  if (input.isOnline !== undefined) patch.is_online = input.isOnline;
+  if (input.applicationOpenAt !== undefined) patch.application_open_at = input.applicationOpenAt;
+  if (input.applicationDeadline !== undefined) patch.application_deadline = input.applicationDeadline;
+  if (input.activityStartAt !== undefined) patch.activity_start_at = input.activityStartAt;
+  if (input.activityEndAt !== undefined) patch.activity_end_at = input.activityEndAt;
+  if (input.eligibilityCriteria !== undefined) patch.eligibility_criteria = input.eligibilityCriteria;
+  if (input.capacity !== undefined) patch.capacity = input.capacity;
+  if (input.statusOverride !== undefined) patch.status_override = input.statusOverride;
+
+  const { error } = await supabase.from("opportunities").update(patch).eq("id", input.opportunityId);
+  if (error) throw error;
+
+  await supabase.from("admin_action_log").insert({
+    staff_id: staffClaims.staffId,
+    actor_type: staffClaims.actorType,
+    action: "opportunity_updated",
+    target_type: "opportunity",
+    target_id: input.opportunityId,
+    organization_id: input.organizationId,
+    metadata: patch,
+  });
+
+  return { opportunityId: input.opportunityId };
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/create-opportunity/handler.test.ts functions/update-opportunity/handler.test.ts`
+Expected: PASS on all 4 tests.
+
+- [ ] **Step 5: Write the HTTP wrappers**
+
+Create `backend/supabase/functions/create-opportunity/index.ts`:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { createOpportunity } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const claims = await verifyStaffToken(req.headers.get("Authorization"));
+    const supabase = getAdminClient();
+    const input = await req.json();
+    const result = await createOpportunity(supabase, claims, input);
+    return new Response(JSON.stringify(result), { status: 201, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+Create `backend/supabase/functions/update-opportunity/index.ts`:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { updateOpportunity } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const claims = await verifyStaffToken(req.headers.get("Authorization"));
+    const supabase = getAdminClient();
+    const input = await req.json();
+    const result = await updateOpportunity(supabase, claims, input);
+    return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/supabase/functions/create-opportunity/ backend/supabase/functions/update-opportunity/
+git commit -m "feat(backend): add create-opportunity and update-opportunity Edge Functions"
+```
+
+---
+
+### Task 27: `create-chapter` and `update-chapter` Edge Functions
+
+**Files:**
+- Create: `backend/supabase/functions/create-chapter/handler.ts`
+- Create: `backend/supabase/functions/create-chapter/handler.test.ts`
+- Create: `backend/supabase/functions/create-chapter/index.ts`
+- Create: `backend/supabase/functions/update-chapter/handler.ts`
+- Create: `backend/supabase/functions/update-chapter/handler.test.ts`
+- Create: `backend/supabase/functions/update-chapter/index.ts`
+
+**Interfaces:**
+- Consumes: `verifyStaffToken()`, `staffHasPermission()` (Task 12); `chapters` (Task 8).
+- Produces: `createChapter(supabase, staffClaims, input: { organizationId, name, institution?, city?, province? }): Promise<{ chapterId: string }>`, requiring `chapters:write`. `updateChapter(supabase, staffClaims, input: { chapterId, organizationId, name?, institution?, city?, province?, status? })`, requiring `chapters:update`. Same rationale as Task 26 — this was previously only reachable via the coarse Task 11 RLS policy. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12).
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `backend/supabase/functions/create-chapter/handler.test.ts`:
+
+```typescript
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { createClient } from "@supabase/supabase-js";
+import { createChapter } from "./handler.ts";
+import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+function testClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+}
+
+const staffClaims = (orgId: string, permission: string, staffId = crypto.randomUUID()): StaffClaims => ({
+  actorType: "staff",
+  staffId,
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+});
+
+Deno.test("createChapter creates a row and logs the action under the caller's own staffId", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const realStaffId = crypto.randomUUID();
+
+  const result = await createChapter(supabase, staffClaims(orgId, "chapters:write", realStaffId), {
+    organizationId: orgId, name: "LUMS Chapter", institution: "LUMS", city: "Lahore", province: "Punjab",
+  });
+
+  assertEquals(typeof result.chapterId, "string");
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("*")
+    .eq("target_id", result.chapterId)
+    .eq("action", "chapter_created");
+  assertEquals(logRows?.length, 1);
+  assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("createChapter rejects staff without chapters:write for the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+
+  await assertRejects(
+    () => createChapter(supabase, staffClaims(orgId, "chapters:read"), {
+      organizationId: orgId, name: "LUMS Chapter",
+    }),
+    Error,
+    "forbidden",
+  );
+});
+```
+
+Create `backend/supabase/functions/update-chapter/handler.test.ts`:
+
+```typescript
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { createClient } from "@supabase/supabase-js";
+import { updateChapter } from "./handler.ts";
+import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+function testClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+}
+
+const staffClaims = (orgId: string, permission: string): StaffClaims => ({
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+});
+
+Deno.test("updateChapter renames a chapter and logs the action", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: chapter } = await supabase.from("chapters").insert({
+    organization_id: orgId, name: "Old Name",
+  }).select("id").single();
+
+  await updateChapter(supabase, staffClaims(orgId, "chapters:update"), {
+    chapterId: chapter!.id, organizationId: orgId, name: "New Name",
+  });
+
+  const { data: updated } = await supabase.from("chapters").select("name").eq("id", chapter!.id).single();
+  assertEquals(updated!.name, "New Name");
+});
+
+Deno.test("updateChapter rejects staff without chapters:update for the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: chapter } = await supabase.from("chapters").insert({
+    organization_id: orgId, name: "Old Name",
+  }).select("id").single();
+
+  await assertRejects(
+    () => updateChapter(supabase, staffClaims(orgId, "chapters:read"), {
+      chapterId: chapter!.id, organizationId: orgId, name: "New Name",
+    }),
+    Error,
+    "forbidden",
+  );
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/create-chapter/handler.test.ts functions/update-chapter/handler.test.ts`
+Expected: FAIL — `handler.ts` files do not exist.
+
+- [ ] **Step 3: Write the implementations**
+
+Create `backend/supabase/functions/create-chapter/handler.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+export interface CreateChapterInput {
+  organizationId: string;
+  name: string;
+  institution?: string;
+  city?: string;
+  province?: string;
+}
+
+export async function createChapter(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  input: CreateChapterInput,
+): Promise<{ chapterId: string }> {
+  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "chapters:write")) {
+    throw new Error("forbidden");
+  }
+
+  const { data, error } = await supabase
+    .from("chapters")
+    .insert({
+      organization_id: input.organizationId,
+      name: input.name,
+      institution: input.institution ?? null,
+      city: input.city ?? null,
+      province: input.province ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  await supabase.from("admin_action_log").insert({
+    staff_id: staffClaims.staffId,
+    actor_type: staffClaims.actorType,
+    action: "chapter_created",
+    target_type: "chapter",
+    target_id: data.id,
+    organization_id: input.organizationId,
+  });
+
+  return { chapterId: data.id };
+}
+```
+
+Create `backend/supabase/functions/update-chapter/handler.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+export interface UpdateChapterInput {
+  chapterId: string;
+  organizationId: string;
+  name?: string;
+  institution?: string;
+  city?: string;
+  province?: string;
+  status?: "active" | "inactive";
+}
+
+export async function updateChapter(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  input: UpdateChapterInput,
+): Promise<{ chapterId: string }> {
+  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "chapters:update")) {
+    throw new Error("forbidden");
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.institution !== undefined) patch.institution = input.institution;
+  if (input.city !== undefined) patch.city = input.city;
+  if (input.province !== undefined) patch.province = input.province;
+  if (input.status !== undefined) patch.status = input.status;
+
+  const { error } = await supabase.from("chapters").update(patch).eq("id", input.chapterId);
+  if (error) throw error;
+
+  await supabase.from("admin_action_log").insert({
+    staff_id: staffClaims.staffId,
+    actor_type: staffClaims.actorType,
+    action: "chapter_updated",
+    target_type: "chapter",
+    target_id: input.chapterId,
+    organization_id: input.organizationId,
+    metadata: patch,
+  });
+
+  return { chapterId: input.chapterId };
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/create-chapter/handler.test.ts functions/update-chapter/handler.test.ts`
+Expected: PASS on all 4 tests.
+
+- [ ] **Step 5: Write the HTTP wrappers**
+
+Create `backend/supabase/functions/create-chapter/index.ts`:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { createChapter } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const claims = await verifyStaffToken(req.headers.get("Authorization"));
+    const supabase = getAdminClient();
+    const input = await req.json();
+    const result = await createChapter(supabase, claims, input);
+    return new Response(JSON.stringify(result), { status: 201, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+Create `backend/supabase/functions/update-chapter/index.ts`:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { updateChapter } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const claims = await verifyStaffToken(req.headers.get("Authorization"));
+    const supabase = getAdminClient();
+    const input = await req.json();
+    const result = await updateChapter(supabase, claims, input);
+    return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/supabase/functions/create-chapter/ backend/supabase/functions/update-chapter/
+git commit -m "feat(backend): add create-chapter and update-chapter Edge Functions"
+```
+
+---
+
+### Task 28: `enroll-participant` Edge Function
+
+**Files:**
+- Create: `backend/supabase/functions/enroll-participant/handler.ts`
+- Create: `backend/supabase/functions/enroll-participant/handler.test.ts`
+- Create: `backend/supabase/functions/enroll-participant/index.ts`
+
+**Interfaces:**
+- Consumes: `verifyStaffToken()`, `staffHasPermission()` (Task 12); `participation` (Task 6).
+- Produces: `enrollParticipant(supabase, staffClaims, input: { organizationId: string; opportunityId: string; volunteerId: string }): Promise<{ participationId: string }>`. Requires `participation:write` — this is the admin-direct enrollment path spec §3 describes ("admin can enroll directly without a prior application"), distinct from `decideApplication()`'s auto-created participation (which uses `participation:update`'s sibling permission model but is triggered by an `applications:update` action, not this one). This was previously undocumented as an Edge Function entirely; `participation:write` is a new addition to `platform`'s permission catalog (`tmp-partner-admin` plan Task 6) alongside the pre-existing `participation:read`/`participation:update`. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12).
+
+- [ ] **Step 1: Write the failing test**
+
+Create `backend/supabase/functions/enroll-participant/handler.test.ts`:
+
+```typescript
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { createClient } from "@supabase/supabase-js";
+import { enrollParticipant } from "./handler.ts";
+import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+function testClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+}
+
+const staffClaims = (orgId: string, permission: string, staffId = crypto.randomUUID()): StaffClaims => ({
+  actorType: "staff",
+  staffId,
+  platformOwner: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+});
+
+Deno.test("enrollParticipant creates a participation row with no application_id and logs the action under the caller's own staffId", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const realStaffId = crypto.randomUUID();
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: crypto.randomUUID(), full_name: "Enroll Test", email: `enroll-${crypto.randomUUID()}@example.com`,
+    phone: `0300-${Math.floor(Math.random() * 10000000)}`, dob: "1999-01-01", gender: "male",
+    city: "Lahore", province: "Punjab", country: "Pakistan", institution: "Test Uni", degree_program: "BSCS",
+  }).select("id").single();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Direct Enroll Opp", type: "event",
+  }).select("id").single();
+
+  const result = await enrollParticipant(supabase, staffClaims(orgId, "participation:write", realStaffId), {
+    organizationId: orgId, opportunityId: opportunity!.id, volunteerId: volunteer!.id,
+  });
+
+  const { data: row } = await supabase.from("participation").select("application_id, status").eq("id", result.participationId).single();
+  assertEquals(row!.application_id, null);
+  assertEquals(row!.status, "selected");
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("*")
+    .eq("target_id", result.participationId)
+    .eq("action", "participant_enrolled");
+  assertEquals(logRows?.length, 1);
+  assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("enrollParticipant rejects staff without participation:write for the org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: crypto.randomUUID(), full_name: "Enroll Reject Test", email: `enroll-reject-${crypto.randomUUID()}@example.com`,
+    phone: `0300-${Math.floor(Math.random() * 10000000)}`, dob: "1999-01-01", gender: "male",
+    city: "Lahore", province: "Punjab", country: "Pakistan", institution: "Test Uni", degree_program: "BSCS",
+  }).select("id").single();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Direct Enroll Opp", type: "event",
+  }).select("id").single();
+
+  await assertRejects(
+    () => enrollParticipant(supabase, staffClaims(orgId, "participation:update"), {
+      organizationId: orgId, opportunityId: opportunity!.id, volunteerId: volunteer!.id,
+    }),
+    Error,
+    "forbidden",
+  );
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `cd backend/supabase && deno test --allow-net --allow-env functions/enroll-participant/handler.test.ts`
+Expected: FAIL — `handler.ts` does not exist.
+
+- [ ] **Step 3: Write the implementation**
+
+Create `backend/supabase/functions/enroll-participant/handler.ts`:
+
+```typescript
+import { SupabaseClient } from "@supabase/supabase-js";
+import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+
+export interface EnrollParticipantInput {
+  organizationId: string;
+  opportunityId: string;
+  volunteerId: string;
+}
+
+export async function enrollParticipant(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  input: EnrollParticipantInput,
+): Promise<{ participationId: string }> {
+  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "participation:write")) {
+    throw new Error("forbidden");
+  }
+
+  const { data: participation, error } = await supabase
+    .from("participation")
+    .insert({
+      volunteer_id: input.volunteerId,
+      opportunity_id: input.opportunityId,
+      organization_id: input.organizationId,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  await supabase.rpc("touch_org_volunteer_index", {
+    p_org_id: input.organizationId,
+    p_volunteer_id: input.volunteerId,
+  });
+
+  await supabase.from("admin_action_log").insert({
+    staff_id: staffClaims.staffId,
+    actor_type: staffClaims.actorType,
+    action: "participant_enrolled",
+    target_type: "participation",
+    target_id: participation.id,
+    organization_id: input.organizationId,
+  });
+
+  return { participationId: participation.id };
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run: `npx supabase db reset && cd backend/supabase && deno test --allow-net --allow-env functions/enroll-participant/handler.test.ts`
+Expected: PASS on both tests.
+
+- [ ] **Step 5: Write the HTTP wrapper**
+
+Create `backend/supabase/functions/enroll-participant/index.ts`:
+
+```typescript
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { enrollParticipant } from "./handler.ts";
+
+Deno.serve(async (req) => {
+  try {
+    const claims = await verifyStaffToken(req.headers.get("Authorization"));
+    const supabase = getAdminClient();
+    const input = await req.json();
+    const result = await enrollParticipant(supabase, claims, input);
+    return new Response(JSON.stringify(result), { status: 201, headers: { "Content-Type": "application/json" } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown_error";
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
+  }
+});
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/supabase/functions/enroll-participant/
+git commit -m "feat(backend): add enroll-participant Edge Function for admin-direct enrollment"
+```
+
+---
+
 ## Post-plan checklist (not a task — verify before moving to Plan 2)
 
 - [ ] `npx supabase db reset && npx supabase test db` passes in full.
 - [ ] `cd backend/supabase && deno task test` passes in full.
-- [ ] Every table listed in spec §3 exists with RLS enabled (`select relrowsecurity from pg_class where relname = '<table>';` for each).
+- [ ] Every table listed in spec §3 exists with RLS enabled (`select relrowsecurity from pg_class where relname = '<table>';` for each) — explicitly including `org_volunteer_index` and `rate_limit_hits`, both of which historically shipped with RLS disabled entirely; run `select relname from pg_class where relkind = 'r' and relnamespace = 'public'::regnamespace and not relrowsecurity;` once and confirm it returns zero rows, rather than checking tables one at a time from a list that can go stale.
 - [ ] `STAFF_JWT_SECRET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_URL`, `RESEND_API_KEY`, `EMAIL_FROM_ADDRESS` are documented in `backend/README.md` as required environment variables (values are set per-environment, never committed).
+- [ ] The `organizations` table has at least one synced row (Rizq) before `frontend`'s opportunity pages rely on it for display names — otherwise opportunity org names render blank rather than erroring, since the join is a local read against a mirror, not a live check.
+- [ ] `platform`'s `permissions` catalog (`tmp-partner-admin` plan Task 6) includes `participation:write` — a mint-time dependency for Task 28's `enroll-participant` to ever be reachable by a real staff token; confirm both repos' catalogs agree before testing Task 28 end-to-end against a real `platform` instance.
+- [ ] Every RLS write policy from Task 11 has a matching Edge Function (Tasks 14–28) that's the documented path for that write, and no table has a `for insert`/`for update`/`for delete` policy whose only gate is `staff_has_org_role()` without a paired `staff_has_permission()` check — this was the root cause behind the coarse RLS on opportunities/chapters/participation/activity_hours before this pass.
