@@ -526,7 +526,7 @@ git commit -m "feat(frontend): add typed Edge Function client wrappers"
 - Modify: `frontend/app/layout.tsx`
 
 **Interfaces:**
-- Produces: `getBrowserSupabaseClient(): SupabaseClient` (for client components), `getServerSupabaseClient(): Promise<SupabaseClient>` (for server components, reads cookies). `AppShell({ children }: { children: ReactNode })` — the shared nav/layout wrapper with a mobile menu toggle, used by every page from Task 5 onward.
+- Produces: `getBrowserSupabaseClient(): SupabaseClient` (for client components), `getServerSupabaseClient(): Promise<SupabaseClient>` (for server components, reads cookies). `AppShell({ children }: { children: ReactNode })` — the shared nav/layout wrapper with a mobile menu toggle, used by every page from Task 5 onward. Also renders a persistent "Support" link (`mailto:support@themohsinproject.org`) in the footer, present on every page regardless of auth state — clicking it opens the visitor's own mail client with that address pre-filled, no in-app contact form or backend involved.
 
 - [ ] **Step 1: Write the failing test for `AppShell`**
 
@@ -565,6 +565,16 @@ describe("AppShell", () => {
 
     await user.click(toggle);
     expect(screen.queryByTestId("mobile-nav")).not.toBeInTheDocument();
+  });
+
+  it("renders a Support link that opens the visitor's mail client", () => {
+    render(
+      <AppShell>
+        <p>page content</p>
+      </AppShell>,
+    );
+    const supportLink = screen.getByRole("link", { name: "Support" });
+    expect(supportLink).toHaveAttribute("href", "mailto:support@themohsinproject.org");
   });
 });
 ```
@@ -715,6 +725,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       </header>
       <div className="mx-auto max-w-5xl px-4 py-6">{children}</div>
+      <footer className="border-t border-gray-200 px-4 py-6 text-center text-sm text-gray-500">
+        <a href="mailto:support@themohsinproject.org" className="hover:text-gray-800">
+          Support
+        </a>
+      </footer>
     </div>
   );
 }
@@ -748,7 +763,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 - [ ] **Step 7: Run tests to verify they pass**
 
 Run: `cd frontend && npm test -- components/AppShell.test.tsx`
-Expected: PASS on both tests.
+Expected: PASS on all 3 tests.
 
 - [ ] **Step 8: Commit**
 
