@@ -1,0 +1,21 @@
+# Environment files — never commit real secrets, only .env.example files
+.env
+.env.local
+*.env
+!*.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+
+# Deno
+.deno/
+
+# Supabase local dev artifacts (irrelevant once running against a hosted project, harmless either way)
+supabase/.temp/
+supabase/.branches/
+
+# OS
+.DS_Store
