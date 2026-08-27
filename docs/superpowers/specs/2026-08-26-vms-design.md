@@ -66,10 +66,10 @@ than hard deletes, except append-only logs.
 | full_name, email (unique), phone (unique), dob, gender | mandatory |
 | city, province, country | mandatory |
 | institution, degree_program | mandatory |
-| cnic_number (unique, nullable) | mandatory eventually; not blocking at registration |
+| cnic_number (unique, nullable) | not required at registration; required before `applyToOpportunity()` succeeds (§4) — this is what makes the uniqueness constraint meaningful for volunteers who actually go on to participate, without adding registration friction for those who only browse |
 | cnic_document_url | nullable, R2 object reference, signed-URL access only |
 | graduation_year, skills, interests, availability | optional |
-| emergency_contact | structured: name, phone, relation |
+| emergency_contact | structured: name, phone, relation; nullable — not required at registration, but required before `decideApplication()` can set an application to `selected` (§4) |
 | profile_picture_url | optional, R2 |
 | guardian_name, guardian_contact | nullable; required together when registrant is a minor |
 | guardian_consent_at | nullable timestamp; must be set before a minor's registration write succeeds |
@@ -78,6 +78,18 @@ than hard deletes, except append-only logs.
 
 `is_minor` is **not** a stored column — it's computed from `dob` at read/
 write time, so it never goes stale as a volunteer ages past 18.
+
+### `organizations` (local read-only mirror)
+
+`platform` (the `tmp-partner-admin` repo) owns organizations as the source
+of truth. `vms/backend` keeps a local mirror — `id, name, slug,
+deactivated_at, synced_at` — so `vms/frontend` can resolve an opportunity's
+owning org name with a local read, never a live call into `platform`. The
+mirror is written only by `syncOrganization()` (§4), pushed by `platform`
+whenever it creates, renames, or deactivates an organization with the `vms`
+module enabled — an infrequent, admin-triggered write, not a request-time
+dependency. `id` has no default: it is always the canonical id assigned by
+`platform`.
 
 ### `org_volunteer_index` (org-visibility junction)
 
@@ -97,15 +109,24 @@ deactivated_at.
 ### `applications`
 
 id, volunteer_id, opportunity_id, organization_id (denormalized for
-RLS/query convenience), motivation_statement, status, applied_at,
+RLS/query convenience), motivation_statement, status (`submitted |
+under_review | selected | waitlisted | rejected | withdrawn`), applied_at,
 decided_at, decided_by (opaque staff_id reference — no cross-DB FK into
-`platform`).
+`platform`). `waitlisted` supports manual admin promotion to `selected`
+when a spot opens (requirements doc §5D) — promotion is just another
+`decideApplication()` call, not a separate mechanism.
 
 ### `participation`
 
 id, application_id (nullable — admin can enroll directly without a prior
-application), volunteer_id, opportunity_id, organization_id, status,
-timestamps. Auto-created when an application's status becomes "Selected."
+application), volunteer_id, opportunity_id, organization_id, status
+(`selected | participating | completed | no_show | withdrawn`),
+timestamps. Rows default to `selected` — auto-created when an
+application's status becomes "Selected," or created directly by an admin
+without a prior application. `selected → participating →
+{completed|no_show|withdrawn}` are admin-driven transitions via
+`updateParticipationStatus()` (§4), matching the requirements doc's own
+two-phase participation lifecycle (§5D).
 
 ### `activity_hours`
 
@@ -145,15 +166,28 @@ shared-secret JWT (HS256) issued by `platform`, verified through a single
 touches one file, not every call site.
 
 **RLS:**
-- Volunteers may read/write their own row only (`auth.uid()` from this
-  project's own Auth).
+- Volunteers may read their own row only (`auth.uid()` from this project's
+  own Auth). There is no direct-write RLS policy on `volunteers` — a
+  volunteer's own row is written only by `registerVolunteer()` (create) and
+  `updateSensitiveField()` (update), both service-role Edge Functions. RLS
+  update policies filter which rows an update can touch, not which columns,
+  so a self-write policy scoped to "own row" would let a volunteer bypass
+  `updateSensitiveField()`'s `profile_field_changes` audit log for the exact
+  safeguarding-relevant fields (§3) that log exists to cover.
 - Staff may read a volunteer's row only if an `EXISTS` check against
   `org_volunteer_index` (or `applications`/`participation`) finds a link to
   an organization present in their `org_roles` claim, or they carry
   `platform_owner`. This is a join-based policy, not a flat column match —
   `volunteers` has no `organization_id` to match against.
-- Writes to org-scoped tables require a matching `org_roles` entry;
-  destructive actions require `org_super_admin`.
+- Writes to org-scoped tables require a matching `org_roles` entry for
+  visibility, plus the specific fine-grained permission for that action
+  (e.g. `applications:write`), resolved into the JWT's `module_access`
+  claim by `platform`'s `mintStaffToken()` — see the `platform`
+  (`tmp-partner-admin`) spec §3–4 for the full permission model. This
+  supersedes an earlier, coarser "destructive actions require
+  `org_super_admin`" role-name check that was never actually implemented
+  (every existing RLS test calls `staff_has_org_role(org_id, null)`,
+  never filtering by role name).
 
 **Key functions / Edge Functions** (every meaningful write goes through
 one of these — never a direct frontend-to-DB write):
@@ -161,13 +195,24 @@ one of these — never a direct frontend-to-DB write):
 - `registerVolunteer()` — creates the volunteer row. If DOB implies a
   minor, requires `guardian_name` + `guardian_contact` + a consent flag in
   the same request, and sets `guardian_consent_at`; rejects the write
-  otherwise.
-- `applyToOpportunity()` — creates an application; runs platform-wide
-  near-duplicate detection (same name+city, different email) and flags
-  matches for admin review rather than silently allowing or blocking.
-- `decideApplication()` — updates application status; auto-creates
-  `participation` on "Selected"; writes `admin_action_log`; triggers a
-  status-change email.
+  otherwise. Runs platform-wide near-duplicate detection (same name+city,
+  different email) after a successful insert and flags matches for admin
+  review rather than silently allowing or blocking — this lives at
+  registration, matching the requirements doc's own placement (§5A), not
+  at application time.
+- `applyToOpportunity()` — creates an application. Requires the volunteer
+  to already have a `cnic_number` on file, rejecting the write otherwise
+  — CNIC isn't required at registration (§3), but is required to move
+  past it, which is what makes CNIC-based duplicate uniqueness meaningful
+  for anyone who actually engages with an opportunity.
+- `decideApplication()` — updates application status (including manual
+  `waitlisted` → `selected` promotion); requires the volunteer to have an
+  `emergency_contact` on file before a decision of `selected` succeeds,
+  rejecting otherwise; auto-creates `participation` (status `selected`)
+  on "Selected"; writes `admin_action_log`; triggers a status-change
+  email.
+- `updateParticipationStatus()` — drives `selected → participating →
+  {completed | no_show | withdrawn}`; writes `admin_action_log`.
 - `submitHours()` / `verifyHours()` — drives the Recorded → Pending →
   Verified/Rejected workflow; auto-rolls up to the volunteer's total
   verified hours; rejected entries are retained with a reason, never
@@ -184,6 +229,10 @@ one of these — never a direct frontend-to-DB write):
   dob/cnic_number/phone/emergency_contact/guardian_name/guardian_contact;
   writes an entry to `profile_field_changes` as a side effect of every
   successful edit.
+- `syncOrganization()` — upserts the local `organizations` mirror (§3).
+  Callable only with a `platform_owner` staff token, since it writes data
+  every organization's opportunity pages read, not just the calling org's
+  own.
 
 ## 5. Frontend (`vms/frontend`)
 
@@ -229,6 +278,14 @@ One central deployment serving all organizations on the platform.
   (scheduled export at minimum, or the Pro upgrade) before real volunteer
   PII enters the system at MVP launch. This is tied to the Pro-upgrade
   timing decision, not a separate open item.
+- **Cross-repo contract stability with `platform`** — `platform`'s admin
+  hub is a separately deployed consumer of this repo's Edge Functions and
+  PostgREST-exposed columns (§4). An Edge Function's request/response
+  shape, or an existing table's RLS-visible columns, must never change in
+  place if `platform` depends on it — ship an additively-versioned
+  replacement instead, verified by `platform`'s own contract/integration
+  test suite before the old shape is removed. See the `platform`
+  (`tmp-partner-admin`) spec for the verification mechanism.
 - **Testing** — unit tests on the three state-machine transitions
   (application → participation → hours) and on near-duplicate detection.
   RLS policies get an explicit test pass: a staff member from one
@@ -240,6 +297,9 @@ One central deployment serving all organizations on the platform.
 ## 7. Explicitly Out of Scope (for this repo/spec)
 
 - Staff identity, org/module registry, admin hub UI — `platform` repo.
+  This repo's own `organizations` table (§3) is a read-only mirror for
+  display purposes only, never the source of truth, and is never written
+  to except by `syncOrganization()` (§4).
 - Self-serve organization onboarding — deferred past MVP.
 - A general-purpose volunteer-side action log — the state machines
   themselves already provide this; only sensitive-field edits get a
