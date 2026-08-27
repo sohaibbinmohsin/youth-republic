@@ -1739,9 +1739,16 @@ export default async function OpportunitiesPage() {
   const supabase = await getServerSupabaseClient();
   const { data: opportunities } = await supabase
     .from("opportunities")
-    .select("id, name, type, location")
+    .select("id, name, type, location, organization_id")
     .is("deactivated_at", null)
     .order("created_at", { ascending: false });
+
+  const organizationIds = [...new Set((opportunities ?? []).map((o) => o.organization_id))];
+  const { data: organizations } = await supabase
+    .from("organizations")
+    .select("id, name")
+    .in("id", organizationIds);
+  const organizationNameById = new Map((organizations ?? []).map((o) => [o.id, o.name]));
 
   return (
     <div>
@@ -1750,7 +1757,10 @@ export default async function OpportunitiesPage() {
         {(opportunities ?? []).map((opportunity) => (
           <OpportunityCard
             key={opportunity.id}
-            opportunity={{ ...opportunity, organizationName: "Youth Republic" }}
+            opportunity={{
+              ...opportunity,
+              organizationName: organizationNameById.get(opportunity.organization_id) ?? "Unknown organization",
+            }}
           />
         ))}
       </div>
@@ -1759,7 +1769,7 @@ export default async function OpportunitiesPage() {
 }
 ```
 
-`organizationName` is hardcoded to "Youth Republic" here because `organizations` is owned by the `platform` repo's database, not `vms/backend` — this plan has no cross-project join available. When `platform`'s implementation plan is written, add a `GET /internal/organizations` read endpoint there and replace this hardcoded value with a lookup keyed by `opportunities.organization_id`; tracked as a known follow-up, not a gap in this plan's own scope.
+`organizationName` now comes from `vms/backend`'s own local `organizations` mirror table (backend plan Task 24) — a second query against the same local Supabase project, not a cross-project call into `platform`. This replaces an earlier draft of this page that hardcoded the name and planned to add a live `GET /internal/organizations` call into `platform`; that approach was rejected in favor of `platform` pushing org data into each module backend on create/rename, specifically so `vms/frontend`'s request path never depends on `platform` being up (see the `platform`/`tmp-partner-admin` spec §2, and the vms design spec's `organizations` mirror section, §3).
 
 - [ ] **Step 6: Commit**
 
@@ -2502,4 +2512,4 @@ git commit -m "feat(frontend): add portfolio dashboard with hours submission"
 - [ ] Repeat registration with a DOB under 18 and confirm the guardian fields are required and submission is blocked without them.
 - [ ] Resize the browser below 640px (Tailwind's `sm` breakpoint) and confirm the mobile nav toggle works and no page requires horizontal scrolling.
 - [ ] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_FUNCTIONS_URL` are documented in `frontend/.env.local.example` and set in the Vercel project.
-- [ ] Confirm the `organizations` lookup gap noted in Task 9 is tracked for resolution once the `platform` plan exists.
+- [ ] Confirm `backend`'s local `organizations` table (backend plan Task 24) has at least one synced row (Rizq) before relying on Task 9's opportunity list page — org names render as "Unknown organization" rather than erroring if the mirror is empty, since `platform` pushes this data on org create/rename rather than `vms/frontend` pulling it live.
