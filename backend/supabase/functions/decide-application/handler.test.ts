@@ -2,6 +2,14 @@ import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/asser
 import { createClient } from "@supabase/supabase-js";
 import { decideApplication } from "./handler.ts";
 import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+import type { EmailClient } from "../_shared/sendEmail.ts";
+
+class FakeEmailClient implements EmailClient {
+  sent: Array<{ to: string; subject: string; html: string }> = [];
+  async send(to: string, subject: string, html: string): Promise<void> {
+    this.sent.push({ to, subject, html });
+  }
+}
 
 function testClient() {
   return createClient(
@@ -68,7 +76,7 @@ Deno.test("decideApplication selecting an applicant auto-creates participation",
   const result = await decideApplication(supabase, staffClaims(orgId), {
     applicationId,
     decision: "selected",
-  });
+  }, new FakeEmailClient());
 
   assertEquals(result.participationId !== null, true);
 
@@ -84,12 +92,12 @@ Deno.test("decideApplication re-selecting an already-selected application does n
   const first = await decideApplication(supabase, staffClaims(orgId), {
     applicationId,
     decision: "selected",
-  });
+  }, new FakeEmailClient());
 
   const second = await decideApplication(supabase, staffClaims(orgId), {
     applicationId,
     decision: "selected",
-  });
+  }, new FakeEmailClient());
 
   assertEquals(second.participationId, first.participationId);
 
@@ -107,7 +115,7 @@ Deno.test("decideApplication rejects selecting an applicant with no emergency_co
       decideApplication(supabase, staffClaims(orgId), {
         applicationId,
         decision: "selected",
-      }),
+      }, new FakeEmailClient()),
     Error,
     "emergency_contact_required",
   );
@@ -121,7 +129,7 @@ Deno.test("decideApplication accepts waitlisted as a decision without creating p
   const result = await decideApplication(supabase, staffClaims(orgId), {
     applicationId,
     decision: "waitlisted",
-  });
+  }, new FakeEmailClient());
 
   assertEquals(result.participationId, null);
   const { data: application } = await supabase.from("applications").select("status").eq("id", applicationId).single();
@@ -139,7 +147,7 @@ Deno.test("decideApplication rejects when staff lacks applications:update for th
       decideApplication(supabase, staffClaims(otherOrgId), {
         applicationId,
         decision: "selected",
-      }),
+      }, new FakeEmailClient()),
     Error,
     "forbidden",
   );
@@ -159,7 +167,7 @@ Deno.test("decideApplication writes an admin_action_log entry and applications.d
   await decideApplication(supabase, staffClaims(orgId, realStaffId), {
     applicationId,
     decision: "rejected",
-  });
+  }, new FakeEmailClient());
 
   const { data: application } = await supabase.from("applications").select("decided_by").eq("id", applicationId).single();
   assertEquals(application!.decided_by, realStaffId);
@@ -172,4 +180,19 @@ Deno.test("decideApplication writes an admin_action_log entry and applications.d
 
   assertEquals(logRows?.length, 1);
   assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("decideApplication sends a status-change email to the volunteer", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { applicationId, volunteerId } = await makeApplication(supabase, orgId);
+  const { data: volunteer } = await supabase.from("volunteers").select("email").eq("id", volunteerId).single();
+  const emailClient = new FakeEmailClient();
+
+  await decideApplication(supabase, staffClaims(orgId), {
+    applicationId, decision: "selected",
+  }, emailClient);
+
+  assertEquals(emailClient.sent.length, 1);
+  assertEquals(emailClient.sent[0].to, volunteer!.email);
 });

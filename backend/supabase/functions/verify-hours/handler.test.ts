@@ -2,6 +2,14 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createClient } from "@supabase/supabase-js";
 import { verifyHours } from "./handler.ts";
 import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
+import type { EmailClient } from "../_shared/sendEmail.ts";
+
+class FakeEmailClient implements EmailClient {
+  sent: Array<{ to: string; subject: string; html: string }> = [];
+  async send(to: string, subject: string, html: string): Promise<void> {
+    this.sent.push({ to, subject, html });
+  }
+}
 
 function testClient() {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -55,7 +63,7 @@ Deno.test("verifyHours verifying sets hours_verified and status", async () => {
 
   await verifyHours(supabase, staffClaims(orgId), {
     activityHoursId, decision: "verified", hoursVerified: 5,
-  });
+  }, new FakeEmailClient());
 
   const { data: row } = await supabase.from("activity_hours").select("verification_status, hours_verified").eq("id", activityHoursId).single();
   assertEquals(row!.verification_status, "verified");
@@ -68,7 +76,7 @@ Deno.test("verifyHours rejecting retains the row with a reason", async () => {
 
   await verifyHours(supabase, staffClaims(orgId), {
     activityHoursId, decision: "rejected", rejectionReason: "No proof of attendance",
-  });
+  }, new FakeEmailClient());
 
   const { data: row } = await supabase.from("activity_hours").select("verification_status, rejection_reason").eq("id", activityHoursId).single();
   assertEquals(row!.verification_status, "rejected");
@@ -82,7 +90,7 @@ Deno.test("verifyHours sets verified_by and admin_action_log.staff_id from the c
 
   await verifyHours(supabase, staffClaims(orgId, realStaffId), {
     activityHoursId, decision: "verified", hoursVerified: 5,
-  });
+  }, new FakeEmailClient());
 
   const { data: row } = await supabase.from("activity_hours").select("verified_by").eq("id", activityHoursId).single();
   assertEquals(row!.verified_by, realStaffId);
@@ -93,4 +101,16 @@ Deno.test("verifyHours sets verified_by and admin_action_log.staff_id from the c
     .eq("target_id", activityHoursId)
     .eq("action", "hours_decided");
   assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("verifyHours sends a status-change email to the volunteer", async () => {
+  const supabase = testClient();
+  const { activityHoursId, orgId } = await makeActivityHours(supabase);
+  const emailClient = new FakeEmailClient();
+
+  await verifyHours(supabase, staffClaims(orgId), {
+    activityHoursId, decision: "verified", hoursVerified: 5,
+  }, emailClient);
+
+  assertEquals(emailClient.sent.length, 1);
 });

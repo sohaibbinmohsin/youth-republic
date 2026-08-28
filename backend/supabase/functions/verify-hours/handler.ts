@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import type { EmailClient } from "../_shared/sendEmail.ts";
 
 export interface VerifyHoursInput {
   activityHoursId: string;
@@ -16,10 +17,11 @@ export async function verifyHours(
   supabase: SupabaseClient,
   staffClaims: StaffClaims,
   input: VerifyHoursInput,
+  emailClient: EmailClient,
 ): Promise<VerifyHoursResult> {
   const { data: row, error: fetchError } = await supabase
     .from("activity_hours")
-    .select("id, organization_id")
+    .select("id, organization_id, volunteer_id")
     .eq("id", input.activityHoursId)
     .single();
   if (fetchError) throw fetchError;
@@ -49,6 +51,18 @@ export async function verifyHours(
     organization_id: row.organization_id,
     metadata: { decision: input.decision },
   });
+
+  const { data: volunteer } = await supabase
+    .from("volunteers")
+    .select("email, full_name")
+    .eq("id", row.volunteer_id)
+    .single();
+
+  if (volunteer) {
+    const subject = "Your volunteer hours have been reviewed";
+    const html = `<p>Hi ${volunteer.full_name},</p><p>Your submitted hours were <strong>${input.decision}</strong>.</p>`;
+    await emailClient.send(volunteer.email, subject, html);
+  }
 
   return { activityHoursId: input.activityHoursId };
 }

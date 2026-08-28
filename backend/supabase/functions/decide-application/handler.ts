@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import type { EmailClient } from "../_shared/sendEmail.ts";
 
 export interface DecideApplicationInput {
   applicationId: string;
@@ -15,6 +16,7 @@ export async function decideApplication(
   supabase: SupabaseClient,
   staffClaims: StaffClaims,
   input: DecideApplicationInput,
+  emailClient: EmailClient,
 ): Promise<DecideApplicationResult> {
   const { data: application, error: fetchError } = await supabase
     .from("applications")
@@ -91,6 +93,18 @@ export async function decideApplication(
     organization_id: application.organization_id,
     metadata: { decision: input.decision },
   });
+
+  const { data: volunteer } = await supabase
+    .from("volunteers")
+    .select("email, full_name")
+    .eq("id", application.volunteer_id)
+    .single();
+
+  if (volunteer) {
+    const subject = "Your application status has been updated";
+    const html = `<p>Hi ${volunteer.full_name},</p><p>Your application status is now: <strong>${input.decision}</strong>.</p>`;
+    await emailClient.send(volunteer.email, subject, html);
+  }
 
   return { applicationId: input.applicationId, participationId };
 }
