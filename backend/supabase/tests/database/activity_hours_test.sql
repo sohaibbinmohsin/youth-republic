@@ -23,7 +23,7 @@ insert into activity_hours (participation_id, volunteer_id, opportunity_id, orga
 values (:'part_id', :'vol_id', :'opp_id', '11111111-1111-1111-1111-111111111111', current_date, 2, 'rejected', 'No sign-in sheet provided');
 
 select is(volunteer_total_verified_hours(:'vol_id'), 4::numeric, 'only verified hours count toward total');
-select is((select count(*) from activity_hours where verification_status = 'rejected'), 1::bigint, 'rejected rows are retained, not deleted');
+select is((select count(*) from activity_hours where verification_status = 'rejected' and participation_id = :'part_id'), 1::bigint, 'rejected rows are retained, not deleted');
 
 select throws_ok(
   format($$ insert into activity_hours (participation_id, volunteer_id, opportunity_id, organization_id, activity_date, hours_submitted) values ('%s', '%s', '%s', '11111111-1111-1111-1111-111111111111', current_date, -1) $$, :'part_id', :'vol_id', :'opp_id'),
