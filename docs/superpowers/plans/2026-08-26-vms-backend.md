@@ -150,7 +150,7 @@ Each Edge Function directory splits `handler.ts` (pure logic, takes a Supabase c
 
 **Environment note:** this plan runs against a real hosted Supabase Cloud project, not a local Docker-based stack — `npx supabase start`/`db reset`/`test db` all assume a local Postgres container, and there is no Docker in either the local dev machine or the cloud execution environment this plan is meant to run in. Every `Run:` command from here on either pushes migrations to the linked hosted project (`supabase db push --linked`) or runs pgTAP test files directly against it via `psql "$SUPABASE_DB_URL"` — safe to run repeatedly against a shared project because every test file wraps its assertions in `begin; ...; rollback;` (this was already true of every test in this plan; nothing about the tests themselves changes, only how they're invoked). See the Global Constraints section for the full rationale.
 
-- [ ] **Step 1: Install the Supabase CLI and initialize the project**
+- [x] **Step 1: Install the Supabase CLI and initialize the project**
 
 ```bash
 mkdir -p backend
@@ -160,7 +160,7 @@ npx supabase init
 
 This creates `supabase/config.toml` and an empty `supabase/migrations/` directory. `supabase init` is local scaffolding only — it doesn't need Docker, and stays the same step whether the eventual target is a local or hosted project.
 
-- [ ] **Step 2: Link to the hosted Supabase Cloud project and confirm connectivity**
+- [x] **Step 2: Link to the hosted Supabase Cloud project and confirm connectivity**
 
 Copy `backend/.env.example` to `backend/.env` (if not already done) and fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `SUPABASE_PROJECT_REF`, and `SUPABASE_ACCESS_TOKEN` from the project's dashboard (Settings > API for the first three, Settings > Database > Connection string > URI for `SUPABASE_DB_URL`, Settings > General for the project ref, and https://supabase.com/dashboard/account/tokens for a personal access token). Then, from `backend/`:
 
@@ -172,7 +172,7 @@ psql "$SUPABASE_DB_URL" -c "select 1;"
 
 Expected: `link` completes without error, and the `psql` sanity check returns a single row containing `1` — confirming the project is reachable before any migration work starts. Every later task's `Run:` commands assume `.env` has already been sourced this way in the current shell (or that you re-run `set -a; source backend/.env; set +a` in any new shell).
 
-- [ ] **Step 3: Add the Deno config for Edge Functions**
+- [x] **Step 3: Add the Deno config for Edge Functions**
 
 Create `backend/supabase/deno.jsonc`:
 
@@ -187,7 +187,7 @@ Create `backend/supabase/deno.jsonc`:
 }
 ```
 
-- [ ] **Step 4: Write the shared admin client module**
+- [x] **Step 4: Write the shared admin client module**
 
 Create `backend/supabase/functions/_shared/supabaseAdmin.ts`:
 
@@ -206,7 +206,7 @@ export function getAdminClient(): SupabaseClient {
 }
 ```
 
-- [ ] **Step 5: Document dev setup in the backend README**
+- [x] **Step 5: Document dev setup in the backend README**
 
 Create `backend/README.md`:
 
@@ -236,7 +236,7 @@ per-environment, never committed): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
 `EMAIL_FROM_ADDRESS`.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/config.toml backend/supabase/deno.jsonc backend/supabase/functions/_shared/supabaseAdmin.ts backend/README.md
@@ -255,7 +255,7 @@ git commit -m "chore: bootstrap vms backend Supabase project"
 **Interfaces:**
 - Produces: table `volunteers` with columns per spec §3; function `generate_volunteer_code() returns text`; function `volunteer_is_minor(v_dob date) returns boolean`. Later tasks (Task 3 onward) reference `volunteers(id)`.
 
-- [ ] **Step 1: Write the pgTAP test setup file**
+- [x] **Step 1: Write the pgTAP test setup file**
 
 Create `backend/supabase/tests/database/000_setup.sql`:
 
@@ -263,7 +263,7 @@ Create `backend/supabase/tests/database/000_setup.sql`:
 create extension if not exists pgtap with schema extensions;
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `backend/supabase/tests/database/volunteers_test.sql`:
 
@@ -308,12 +308,12 @@ select ok(
 );
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — `volunteers` table does not exist.
 
-- [ ] **Step 4: Write the migration**
+- [x] **Step 4: Write the migration**
 
 Create `backend/supabase/migrations/0001_volunteers.sql`:
 
@@ -368,12 +368,12 @@ create index volunteers_institution_idx on volunteers (institution);
 create index volunteers_status_idx on volunteers (status);
 ```
 
-- [ ] **Step 5: Apply the migration and run tests**
+- [x] **Step 5: Apply the migration and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS on all 9 assertions.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/migrations/0001_volunteers.sql backend/supabase/tests/database/000_setup.sql backend/supabase/tests/database/volunteers_test.sql
@@ -392,7 +392,7 @@ git commit -m "feat(backend): add volunteers table with minor/guardian constrain
 - Consumes: `volunteers(id)` from Task 2.
 - Produces: table `org_volunteer_index`; function `touch_org_volunteer_index(p_org_id uuid, p_volunteer_id uuid) returns void`. Used by Task 9/10 (`decide-application`, `submit-hours` handlers) to record org contact.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/org_volunteer_index_test.sql`:
 
@@ -417,12 +417,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — table does not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0002_org_volunteer_index.sql`:
 
@@ -445,12 +445,12 @@ create or replace function touch_org_volunteer_index(p_org_id uuid, p_volunteer_
 $$ language sql;
 ```
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0002_org_volunteer_index.sql backend/supabase/tests/database/org_volunteer_index_test.sql
@@ -468,7 +468,7 @@ git commit -m "feat(backend): add org_volunteer_index junction table"
 **Interfaces:**
 - Produces: table `opportunities`; function `opportunity_status(o opportunities) returns text`. Used by Task 5 (`applications` FK) and the `decide-application`/`apply-to-opportunity` handlers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/opportunities_test.sql`:
 
@@ -498,12 +498,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — table does not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0003_opportunities.sql`:
 
@@ -546,12 +546,12 @@ create or replace function opportunity_status(o opportunities) returns text as $
 $$ language sql stable;
 ```
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0003_opportunities.sql backend/supabase/tests/database/opportunities_test.sql
@@ -570,7 +570,7 @@ git commit -m "feat(backend): add opportunities table with computed status"
 - Consumes: `volunteers(id)` (Task 2), `opportunities(id)` (Task 4).
 - Produces: table `applications` with statuses `submitted | under_review | selected | waitlisted | rejected | withdrawn`. `waitlisted` supports manual admin promotion to `selected` when a spot opens (requirements doc §5D) — promotion is just another `decideApplication()` call, no separate mechanism needed. Consumed by Task 6 (`participation`) and `apply-to-opportunity`/`decide-application` handlers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/applications_test.sql`:
 
@@ -614,12 +614,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — table does not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0004_applications.sql`:
 
@@ -643,12 +643,12 @@ create index applications_status_idx on applications (status);
 create index applications_volunteer_idx on applications (volunteer_id);
 ```
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0004_applications.sql backend/supabase/tests/database/applications_test.sql
@@ -667,7 +667,7 @@ git commit -m "feat(backend): add applications table"
 - Consumes: `applications(id)` (Task 5, nullable FK), `volunteers(id)`, `opportunities(id)`.
 - Produces: table `participation`, statuses `selected | participating | completed | no_show | withdrawn` — matching the requirements doc's own two-phase participation lifecycle (`Selected → Participating → Completed/No-show/Withdrawn`, §5D). Rows default to `selected` whether auto-created by `decideApplication()` or created directly by an admin without a prior application; the `selected → participating → {completed|no_show|withdrawn}` transitions are admin-driven via `update-participation-status` (Task 25). A partial unique index on `application_id` (non-null only) enforces at most one participation row per application — a DB-level backstop for `decideApplication()`'s own idempotency check (Task 16), so re-selecting an already-selected application can never silently double the volunteer's participation/hours history even if the application-code check is ever bypassed or raced. Consumed by Task 7 (`activity_hours`) and `decide-application`/`submit-hours` handlers.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/participation_test.sql`:
 
@@ -709,12 +709,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — table does not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0005_participation.sql`:
 
@@ -741,12 +741,12 @@ create unique index participation_application_id_key on participation (applicati
   where application_id is not null;
 ```
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0005_participation.sql backend/supabase/tests/database/participation_test.sql
@@ -765,7 +765,7 @@ git commit -m "feat(backend): add participation table"
 - Consumes: `participation(id)` (Task 6).
 - Produces: table `activity_hours`; function `volunteer_total_verified_hours(p_volunteer_id uuid) returns numeric`. Consumed by `submit-hours`/`verify-hours` handlers and the frontend portfolio view.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/activity_hours_test.sql`:
 
@@ -807,12 +807,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — table does not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0006_activity_hours.sql`:
 
@@ -847,12 +847,12 @@ create or replace function volunteer_total_verified_hours(p_volunteer_id uuid) r
 $$ language sql stable;
 ```
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0006_activity_hours.sql backend/supabase/tests/database/activity_hours_test.sql
@@ -871,7 +871,7 @@ git commit -m "feat(backend): add activity_hours table with verified-hours rollu
 - Consumes: `volunteers(id)` (Task 2).
 - Produces: tables `chapters`, `volunteer_chapter_link`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/chapters_test.sql`:
 
@@ -899,12 +899,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — tables do not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0007_chapters.sql`:
 
@@ -930,12 +930,12 @@ create table volunteer_chapter_link (
 );
 ```
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0007_chapters.sql backend/supabase/tests/database/chapters_test.sql
@@ -954,7 +954,7 @@ git commit -m "feat(backend): add chapters and volunteer_chapter_link tables"
 - Consumes: `volunteers(id)` (Task 2).
 - Produces: append-only tables `admin_action_log`, `profile_field_changes`. Written to by every state-changing Edge Function from Task 12 onward.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/admin_action_log_and_profile_field_changes_test.sql`:
 
@@ -985,12 +985,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — tables do not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0008_admin_action_log_and_profile_field_changes.sql`:
 
@@ -1023,12 +1023,12 @@ create table profile_field_changes (
 create index profile_field_changes_volunteer_idx on profile_field_changes (volunteer_id);
 ```
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0008_admin_action_log_and_profile_field_changes.sql backend/supabase/tests/database/admin_action_log_and_profile_field_changes_test.sql
@@ -1064,7 +1064,7 @@ The staff JWT (issued by `platform`, verified here because both Supabase project
 
 `volunteers` gets a self-select policy only, no self-update policy. A volunteer's own row can only be written by `registerVolunteer()` (create) and `updateSensitiveField()` (update) — both service-role Edge Functions. This was not the case originally: a `volunteers_self_update` policy with no `with check` clause let a volunteer `PATCH` their own row directly via PostgREST and edit `dob`, `cnic_number`, `phone`, `emergency_contact`, `guardian_name`, and `guardian_contact` — exactly the fields `updateSensitiveField()` exists to gate and log to `profile_field_changes` (spec §3, §4). Postgres RLS can't restrict *which columns* an `update` policy allows (only which *rows*), so there is no safe middle ground here: since the frontend plan never has a legitimate reason to write any field on `volunteers` directly (every self-edit already routes through `updateSensitiveField()`, and there is currently no frontend flow for editing any other field), the correct fix is no self-update RLS policy at all, not a narrower one.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/rls_volunteers_test.sql`:
 
@@ -1109,12 +1109,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — functions do not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0009_rls_volunteers.sql`:
 
@@ -1168,12 +1168,12 @@ create policy volunteers_staff_select on volunteers
 
 Note: `auth.jwt()` reads verified claims from `request.jwt.claims`, which pgTAP tests set directly via `set_config` to simulate a request without needing a real HTTP call — this is the standard way to test RLS policies locally.
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0009_rls_volunteers.sql backend/supabase/tests/database/rls_volunteers_test.sql
@@ -1193,7 +1193,7 @@ git commit -m "feat(backend): add RLS on volunteers with join-based staff visibi
 
 `applications` and `activity_hours` also drop their volunteer-side self-insert policies entirely, for the same reason `volunteers` drops its self-update policy (Task 10): every legitimate volunteer write to these tables already goes through `apply-to-opportunity()` and `submit-hours()` (both service-role Edge Functions), so a direct-insert RLS policy only exists to be bypassed. It previously was one — `applications_self_insert` let a volunteer insert an application directly, skipping `apply-to-opportunity()`'s `cnic_required` gate entirely, and `activity_hours_self_insert` let a volunteer submit hours against *any* `participation_id` system-wide, since the policy only checked that `volunteer_id` matched the caller and never verified the referenced participation actually belonged to them. `applications_self_select`/`activity_hours_self_select` are unaffected — volunteers still need to read their own rows for the My Applications and Portfolio pages.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/tests/database/rls_org_scoped_test.sql`:
 
@@ -1290,12 +1290,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — RLS not yet enabled/tightened, so the "read-only cannot write," "org_volunteer_index not readable with no claim," and "no insert policy" assertions fail.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0010_rls_org_scoped.sql`:
 
@@ -1422,12 +1422,12 @@ create policy org_volunteer_index_staff_select on org_volunteer_index
 
 No insert/update/delete policies are defined for `admin_action_log`, `profile_field_changes`, or **`org_volunteer_index`** — all three are written only by Edge Functions using the service-role key, which bypasses RLS entirely, matching the spec's "never a direct frontend-to-DB write" constraint. `org_volunteer_index` previously had RLS disabled altogether (no `alter table ... enable row level security` statement anywhere in this plan), which meant every row — the entire platform-wide graph of which volunteers have contacted which organizations — was readable by any authenticated caller by default, and, far more seriously, writable: anyone could `insert` an `(organization_id, volunteer_id)` row directly, and since `volunteers_staff_select` (Task 10) and `upload-cnic-document`'s "read" action (Task 23) both grant visibility based on an `org_volunteer_index` link existing, a forged row was a way to self-grant visibility into any volunteer's PII or CNIC document. Enabling RLS with a select-only policy and no write policy closes this — `touch_org_volunteer_index()` remains the only write path, and since it's `language sql` (invoker-rights by default, no `security definer`), its internal `insert ... on conflict` is itself subject to this same RLS when called directly via `supabase.rpc()` outside a service-role Edge Function, so no separate `revoke execute` is needed.
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS on all 10 assertions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/migrations/0010_rls_org_scoped.sql backend/supabase/tests/database/rls_org_scoped_test.sql
@@ -1445,7 +1445,7 @@ git commit -m "fix(backend): enable RLS on org_volunteer_index, require fine-gra
 **Interfaces:**
 - Produces: `verifyStaffToken(authHeader: string | null): StaffClaims` — throws `Error("unauthorized")` on any failure. `StaffClaims = { actorType: string; staffId: string; platformOwner: boolean; orgRoles: { organizationId: string }[]; moduleAccess: { organizationId: string; module: string; permissions: string[] }[] }`; `staffHasPermission(claims: StaffClaims, organizationId: string, module: string, permission: string): boolean`. Used by every Edge Function handler that needs to check staff authority in application code (Tasks 16–21, 25–28). `staffId` is parsed from the token's `staff_id` claim (minted by `platform`'s `mintStaffToken()`, `tmp-partner-admin` plan Task 12) — this is the durable identifier every state-changing handler now uses for `admin_action_log.staff_id`/`applications.decided_by`/`activity_hours.verified_by`, instead of a client-supplied `staffId` field in the request body. Before this claim existed, every staff-driven Edge Function trusted whatever `staffId` a caller put in its own JSON body, letting any staff member with valid write permission forge the audit trail by attributing their action to an arbitrary `staff_id`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/_shared/verifyStaffToken.test.ts`:
 
@@ -1538,12 +1538,12 @@ Deno.test("staffHasPermission bypasses everything for platform_owner", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/verifyStaffToken.test.ts`
 Expected: FAIL — `verifyStaffToken.ts` does not exist yet.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/_shared/verifyStaffToken.ts`:
 
@@ -1624,12 +1624,12 @@ export function staffHasPermission(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/verifyStaffToken.test.ts`
 Expected: PASS on all 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/supabase/functions/_shared/verifyStaffToken.ts backend/supabase/functions/_shared/verifyStaffToken.test.ts
@@ -1648,7 +1648,7 @@ git commit -m "feat(backend): add verifyStaffToken shared JWT verification with 
 - Produces: `checkRateLimit(supabase: SupabaseClient, key: string, limit: number, windowSeconds: number): Promise<boolean>` — returns `false` when the caller should be rejected with a 429. Used by `register-volunteer` and `apply-to-opportunity` (Tasks 14–15), the two open public-write endpoints named in spec §6.
 - Consumes: a new `rate_limit_hits` table, created in this task's migration.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/_shared/rateLimit.test.ts`:
 
@@ -1681,12 +1681,12 @@ Deno.test("checkRateLimit rejects once the limit is exceeded", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/rateLimit.test.ts`
 Expected: FAIL — module and table do not exist.
 
-- [ ] **Step 3: Add the migration**
+- [x] **Step 3: Add the migration**
 
 Create `backend/supabase/migrations/0011_rate_limit_hits.sql`:
 
@@ -1704,7 +1704,7 @@ alter table rate_limit_hits enable row level security;
 
 No policy of any kind is defined — this is a purely internal bookkeeping table, read and written only via `checkRateLimit()` using the service-role admin client, which bypasses RLS entirely. Enabling RLS with zero policies makes it default-deny for every other role, so a caller can no longer `DELETE`/forge rows via PostgREST directly to reset or manipulate their own rate limit and bypass the abuse protection Task 13 exists to provide (this table previously shipped with RLS disabled, same class of gap as `org_volunteer_index` in Task 11).
 
-- [ ] **Step 4: Write the implementation**
+- [x] **Step 4: Write the implementation**
 
 Create `backend/supabase/functions/_shared/rateLimit.ts`:
 
@@ -1733,12 +1733,12 @@ export async function checkRateLimit(
 }
 ```
 
-- [ ] **Step 5: Apply migration and run tests**
+- [x] **Step 5: Apply migration and run tests**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/_shared/rateLimit.test.ts`
 Expected: PASS on both tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/migrations/0011_rate_limit_hits.sql backend/supabase/functions/_shared/rateLimit.ts backend/supabase/functions/_shared/rateLimit.test.ts
@@ -1758,7 +1758,7 @@ git commit -m "feat(backend): add rate limiting helper for public write endpoint
 - Consumes: `getAdminClient()` (Task 1), `checkRateLimit()` (Task 13), `volunteer_is_minor()` (Task 2).
 - Produces: `registerVolunteer(supabase: SupabaseClient, input: RegisterVolunteerInput): Promise<RegisterVolunteerResult>`. `RegisterVolunteerInput` includes `authUserId`, all mandatory `volunteers` fields, and optional `guardianName`/`guardianContact`/`guardianConsent: boolean`. `RegisterVolunteerResult = { volunteerId: string; volunteerCode: string }`. Throws `Error("minor_consent_required")` when DOB implies a minor and consent fields are incomplete. Runs near-duplicate detection (same `full_name` + `city`, different `email`) after a successful insert and, on a match, writes an `admin_action_log` row with `actor_type: 'system'`, `action: 'duplicate_flagged'` rather than blocking registration — this lives here, not in `applyToOpportunity()`, matching the requirements doc's own placement under registration (§5A): "On a near-duplicate match ... flag the registration for administrator review."
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/register-volunteer/handler.test.ts`:
 
@@ -1861,12 +1861,12 @@ Deno.test("registerVolunteer flags a near-duplicate without blocking registratio
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/register-volunteer/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/register-volunteer/handler.ts`:
 
@@ -1965,12 +1965,12 @@ export async function registerVolunteer(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/register-volunteer/handler.test.ts`
 Expected: PASS on all 4 tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/register-volunteer/index.ts`:
 
@@ -2003,7 +2003,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/register-volunteer/
@@ -2023,7 +2023,7 @@ git commit -m "feat(backend): add register-volunteer Edge Function with minor co
 - Consumes: `getAdminClient()`, `checkRateLimit()`.
 - Produces: `applyToOpportunity(supabase, input: { volunteerId: string; opportunityId: string; organizationId: string; motivationStatement?: string }): Promise<{ applicationId: string }>`. Throws `Error("cnic_required")` if the volunteer has no `cnic_number` on file — registration itself doesn't require CNIC (spec §3: "mandatory eventually; not blocking at registration"), but this is the enforcement point that makes CNIC-based duplicate uniqueness actually meaningful across the volunteers who go on to participate, without adding friction for volunteers who only browse. (Near-duplicate detection itself lives in `registerVolunteer()`, Task 14 — not here.)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/apply-to-opportunity/handler.test.ts`:
 
@@ -2096,12 +2096,12 @@ Deno.test("applyToOpportunity rejects when the volunteer has no cnic_number on f
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/apply-to-opportunity/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/apply-to-opportunity/handler.ts`:
 
@@ -2155,12 +2155,12 @@ export async function applyToOpportunity(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/apply-to-opportunity/handler.test.ts`
 Expected: PASS on both tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/apply-to-opportunity/index.ts`:
 
@@ -2192,7 +2192,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/apply-to-opportunity/
@@ -2214,7 +2214,7 @@ git commit -m "feat(backend): add apply-to-opportunity Edge Function, requiring 
 
 The original version of this function took `staffId` as an `input` field, trusting whatever the client's own request body said — any staff member with `applications:update` could attribute a decision to an arbitrary `staff_id`, forging `decided_by` and the audit log. Fixed by deriving it from the verified JWT's `staffId` claim instead.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/decide-application/handler.test.ts`:
 
@@ -2390,12 +2390,12 @@ Deno.test("decideApplication writes an admin_action_log entry and applications.d
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/decide-application/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/decide-application/handler.ts`:
 
@@ -2498,12 +2498,12 @@ export async function decideApplication(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/decide-application/handler.test.ts`
 Expected: PASS on all 6 tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/decide-application/index.ts`:
 
@@ -2530,7 +2530,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/decide-application/
@@ -2552,7 +2552,7 @@ git commit -m "feat(backend): add decide-application Edge Function with waitlist
 **Interfaces:**
 - Produces: `submitHours(supabase, input: { participationId, volunteerId, opportunityId, organizationId, activityDate, hoursSubmitted, role?, location? }): Promise<{ activityHoursId: string }>` (volunteer-driven, no staff permission check) and `verifyHours(supabase, staffClaims, input: { activityHoursId, decision: "verified" | "rejected", hoursVerified?, rejectionReason? }): Promise<{ activityHoursId: string }>` — requires `hours:update` for the row's org. `activity_hours.verified_by` and `admin_action_log.staff_id` are set from `staffClaims.staffId` (Task 12), not a client-supplied `staffId` input field.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/supabase/functions/submit-hours/handler.test.ts`:
 
@@ -2700,12 +2700,12 @@ Deno.test("verifyHours sets verified_by and admin_action_log.staff_id from the c
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/submit-hours/handler.test.ts functions/verify-hours/handler.test.ts`
 Expected: FAIL — handlers do not exist.
 
-- [ ] **Step 3: Write the implementations**
+- [x] **Step 3: Write the implementations**
 
 Create `backend/supabase/functions/submit-hours/handler.ts`:
 
@@ -2810,12 +2810,12 @@ export async function verifyHours(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/submit-hours/handler.test.ts functions/verify-hours/handler.test.ts`
 Expected: PASS on all tests.
 
-- [ ] **Step 5: Write the HTTP wrappers**
+- [x] **Step 5: Write the HTTP wrappers**
 
 Create `backend/supabase/functions/submit-hours/index.ts`:
 
@@ -2858,7 +2858,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/submit-hours/ backend/supabase/functions/verify-hours/
@@ -2878,7 +2878,7 @@ git commit -m "feat(backend): add submit-hours and verify-hours Edge Functions"
 - Consumes: `submitHours()` pattern from Task 17 (reuses the same insert shape for each participant).
 - Produces: `bulkAssignHours(supabase, staffClaims, input: { organizationId: string; opportunityId: string; activityDate: string; hoursSubmitted: number; participationIds: string[] }): Promise<{ createdCount: number }>`. Requires `hours:write` for the org — this creates new `activity_hours` rows (the `write` action), unlike `verifyHours()`'s `hours:update` on existing ones. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12), not a client-supplied `staffId` field.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/bulk-assign-hours/handler.test.ts`:
 
@@ -2978,12 +2978,12 @@ Deno.test("bulkAssignHours attributes admin_action_log to the caller's own staff
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/bulk-assign-hours/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/bulk-assign-hours/handler.ts`:
 
@@ -3044,12 +3044,12 @@ export async function bulkAssignHours(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/bulk-assign-hours/handler.test.ts`
 Expected: PASS on all 3 tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/bulk-assign-hours/index.ts`:
 
@@ -3073,7 +3073,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/bulk-assign-hours/
@@ -3092,7 +3092,7 @@ git commit -m "feat(backend): add bulk-assign-hours Edge Function"
 **Interfaces:**
 - Produces: `createCnicUploadUrl(r2Client: R2Client, volunteerId: string): Promise<{ uploadUrl: string; objectKey: string }>` and `getCnicReadUrl(r2Client: R2Client, objectKey: string): Promise<{ readUrl: string }>`. `R2Client` is a small interface (`putSignedUrl`, `getSignedUrl`) so the handler is testable with a fake, without a real R2 bucket.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/upload-cnic-document/handler.test.ts`:
 
@@ -3123,12 +3123,12 @@ Deno.test("getCnicReadUrl returns a signed read URL for a given key", async () =
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/upload-cnic-document/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/upload-cnic-document/handler.ts`:
 
@@ -3165,12 +3165,12 @@ export async function getCnicReadUrl(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/upload-cnic-document/handler.test.ts`
 Expected: PASS on both tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/upload-cnic-document/index.ts`:
 
@@ -3222,7 +3222,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/upload-cnic-document/
@@ -3241,7 +3241,7 @@ git commit -m "feat(backend): add upload-cnic-document Edge Function with R2 sig
 **Interfaces:**
 - Produces: `updateSensitiveField(supabase, input: { volunteerId: string; fieldName: "dob" | "cnic_number" | "phone" | "emergency_contact" | "guardian_name" | "guardian_contact"; newValue: string }): Promise<{ volunteerId: string }>` — this is the single write path the frontend (Task in Plan 2) calls for any edit to these fields.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/update-sensitive-field/handler.test.ts`:
 
@@ -3290,12 +3290,12 @@ Deno.test("updateSensitiveField updates the volunteer row and logs the change", 
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/update-sensitive-field/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/update-sensitive-field/handler.ts`:
 
@@ -3345,12 +3345,12 @@ export async function updateSensitiveField(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/update-sensitive-field/handler.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/update-sensitive-field/index.ts`:
 
@@ -3371,7 +3371,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/update-sensitive-field/
@@ -3390,7 +3390,7 @@ git commit -m "feat(backend): add update-sensitive-field Edge Function with chan
 **Interfaces:**
 - Produces: `exportApplicationsCsv(supabase, staffClaims, organizationId: string): Promise<string>` — returns CSV text (volunteer_code, full_name, email, opportunity name, status, applied_at). Requires `applications:read` for the org. Also produces `exportVolunteersCsv(supabase, staffClaims, organizationId: string): Promise<string>` — returns CSV text (volunteer_code, full_name, email, phone, city, province, institution, status) for every volunteer with an `org_volunteer_index` link to the org. Requires `volunteers:read` for the org. Platform-design.md §6 lists volunteer-list export as needing "the same treatment" as the applications/opportunity/hours exports already scoped here — this closes that gap.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/export-csv/handler.test.ts`:
 
@@ -3478,12 +3478,12 @@ Deno.test("exportVolunteersCsv rejects staff without volunteers:read for the org
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/export-csv/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/export-csv/handler.ts`:
 
@@ -3564,12 +3564,12 @@ export async function exportVolunteersCsv(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/export-csv/handler.test.ts`
 Expected: PASS on all 4 tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/export-csv/index.ts`:
 
@@ -3599,7 +3599,7 @@ Deno.serve(async (req) => {
 
 `entity` defaults to `"applications"` when omitted, matching the shape `platform`'s admin hub already expects for the applications export; `entity: "volunteers"` is the new addition covering platform-design.md §6's volunteer-list export requirement.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/export-csv/
@@ -3624,7 +3624,7 @@ git commit -m "feat(backend): add export-csv Edge Function"
 - Produces: `EmailClient = { send(to: string, subject: string, html: string): Promise<void> }`, `getResendEmailClient(): EmailClient`.
 - Consumes into: `decideApplication()` and `verifyHours()` gain a required `emailClient: EmailClient` parameter (spec §4: both "trigger a status-change email"; spec §6: Resend is the provider).
 
-- [ ] **Step 1: Write the failing test for the shared email module**
+- [x] **Step 1: Write the failing test for the shared email module**
 
 Create `backend/supabase/functions/_shared/sendEmail.test.ts`:
 
@@ -3655,12 +3655,12 @@ Deno.test("getResendEmailClient sends via the Resend API", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/sendEmail.test.ts`
 Expected: FAIL — `sendEmail.ts` does not exist.
 
-- [ ] **Step 3: Write the shared email module**
+- [x] **Step 3: Write the shared email module**
 
 Create `backend/supabase/functions/_shared/sendEmail.ts`:
 
@@ -3694,12 +3694,12 @@ export function getResendEmailClient(): EmailClient {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/sendEmail.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Write the failing tests for email-on-decision behavior**
+- [x] **Step 5: Write the failing tests for email-on-decision behavior**
 
 Modify `backend/supabase/functions/decide-application/handler.test.ts` — add a fake email client and a new test, and update every existing `decideApplication(supabase, staffClaims(...), {...})` call to pass it as a fourth argument:
 
@@ -3736,12 +3736,12 @@ Deno.test("decideApplication sends a status-change email to the volunteer", asyn
 });
 ```
 
-- [ ] **Step 6: Run tests to verify the new one fails**
+- [x] **Step 6: Run tests to verify the new one fails**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/decide-application/handler.test.ts`
 Expected: FAIL — `decideApplication` does not yet accept or call an email client.
 
-- [ ] **Step 7: Update the implementation**
+- [x] **Step 7: Update the implementation**
 
 Modify `backend/supabase/functions/decide-application/handler.ts` — add the import and change the function signature and body:
 
@@ -3780,12 +3780,12 @@ Add, immediately before the final `return { applicationId: input.applicationId, 
   }
 ```
 
-- [ ] **Step 8: Run tests to verify they pass**
+- [x] **Step 8: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/decide-application/handler.test.ts`
 Expected: PASS on all 7 tests.
 
-- [ ] **Step 9: Wire the real email client into the HTTP wrapper**
+- [x] **Step 9: Wire the real email client into the HTTP wrapper**
 
 Modify `backend/supabase/functions/decide-application/index.ts` — add the import and pass the client through:
 
@@ -3799,7 +3799,7 @@ import { getResendEmailClient } from "../_shared/sendEmail.ts";
 const result = await decideApplication(supabase, claims, input, getResendEmailClient());
 ```
 
-- [ ] **Step 10: Repeat the same pattern for `verify-hours`**
+- [x] **Step 10: Repeat the same pattern for `verify-hours`**
 
 Modify `backend/supabase/functions/verify-hours/handler.test.ts` the same way: import `EmailClient` and `FakeEmailClient` (same shape as above), pass `new FakeEmailClient()` as a fourth argument to every `verifyHours(...)` call, and add:
 
@@ -3835,12 +3835,12 @@ Modify `backend/supabase/functions/verify-hours/handler.ts`: add the `EmailClien
 
 Modify `backend/supabase/functions/verify-hours/index.ts` the same way as Step 9, importing `getResendEmailClient` and passing it as the fourth argument to `verifyHours`.
 
-- [ ] **Step 11: Run all affected tests**
+- [x] **Step 11: Run all affected tests**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/decide-application/handler.test.ts functions/verify-hours/handler.test.ts functions/_shared/sendEmail.test.ts`
 Expected: PASS on all tests.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add backend/supabase/functions/_shared/sendEmail.ts backend/supabase/functions/_shared/sendEmail.test.ts backend/supabase/functions/decide-application/ backend/supabase/functions/verify-hours/
@@ -3866,7 +3866,7 @@ git commit -m "feat(backend): send status-change emails via Resend on decision a
 
 Tasks 14, 15, 17, 19, and 20 as originally written accept `volunteerId`/`authUserId` straight from the parsed JSON body in their `index.ts` wrappers, and Task 19's "read" action has no auth check at all. That lets any caller act as an arbitrary volunteer or fetch any CNIC document. This task closes that gap without touching any `handler.ts` or its tests — only the HTTP wrappers change, since they're the trust boundary.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/supabase/functions/_shared/verifyVolunteerAuth.test.ts`:
 
@@ -3927,12 +3927,12 @@ Deno.test("verifyVolunteerToken rejects when no volunteer row exists yet for thi
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/verifyVolunteerAuth.test.ts`
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/_shared/verifyVolunteerAuth.ts`:
 
@@ -3971,12 +3971,12 @@ export async function verifyVolunteerToken(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/_shared/verifyVolunteerAuth.test.ts`
 Expected: PASS on all 4 tests.
 
-- [ ] **Step 5: Fix `register-volunteer/index.ts`**
+- [x] **Step 5: Fix `register-volunteer/index.ts`**
 
 Replace the file's contents with:
 
@@ -4013,7 +4013,7 @@ Deno.serve(async (req) => {
 
 The caller must sign up via Supabase Auth first (creating the session) and pass that session's access token — `register-volunteer` then creates the profile row for that exact authenticated user, never for an `authUserId` the client claims.
 
-- [ ] **Step 6: Fix `apply-to-opportunity/index.ts`**
+- [x] **Step 6: Fix `apply-to-opportunity/index.ts`**
 
 Replace the file's contents with:
 
@@ -4048,7 +4048,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 7: Fix `submit-hours/index.ts`**
+- [x] **Step 7: Fix `submit-hours/index.ts`**
 
 Replace the file's contents with:
 
@@ -4072,7 +4072,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 8: Fix `update-sensitive-field/index.ts`**
+- [x] **Step 8: Fix `update-sensitive-field/index.ts`**
 
 Replace the file's contents with:
 
@@ -4096,7 +4096,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 9: Fix `upload-cnic-document/index.ts`**
+- [x] **Step 9: Fix `upload-cnic-document/index.ts`**
 
 Replace the file's contents with:
 
@@ -4166,12 +4166,12 @@ Deno.serve(async (req) => {
 
 `action: "upload"` now requires the calling volunteer's own session and always issues a key scoped to their own `volunteerId`; `action: "read"` now requires `volunteers:read` in at least one org the volunteer is linked to via `org_volunteer_index` — the objectKey format (`cnic/{volunteerId}/{uuid}`, set by `createCnicUploadUrl` above) is what makes extracting `volunteerId` from it safe, matching the spec's "read access is admin-only" requirement (spec §4) with the fine-grained permission model layered on top.
 
-- [ ] **Step 10: Re-run every affected test suite**
+- [x] **Step 10: Re-run every affected test suite**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno task test`
 Expected: PASS across all Edge Function tests — none of the `handler.test.ts` files changed, so they should be unaffected; this confirms the wrapper changes didn't break the pure-function contracts.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add backend/supabase/functions/_shared/verifyVolunteerAuth.ts backend/supabase/functions/_shared/verifyVolunteerAuth.test.ts backend/supabase/functions/register-volunteer/index.ts backend/supabase/functions/apply-to-opportunity/index.ts backend/supabase/functions/submit-hours/index.ts backend/supabase/functions/update-sensitive-field/index.ts backend/supabase/functions/upload-cnic-document/index.ts
@@ -4195,7 +4195,7 @@ git commit -m "fix(backend): derive volunteer identity from session token, not c
 
 `platform` (the `tmp-partner-admin` repo) owns organizations as the source of truth. Rather than vms/frontend calling out to `platform` on every page load to resolve an org name — an avoidable runtime dependency on another project being up — `platform` pushes a copy into this table whenever it creates, renames, or deactivates an organization that has the `vms` module enabled. This is a rare, admin-triggered write, not a hot path. `platform` authenticates the call with a staff token carrying `platform_owner: true`, minted the same way as any staff token (shared `STAFF_JWT_SECRET`) — no new secret is introduced.
 
-- [ ] **Step 1: Write the failing database test**
+- [x] **Step 1: Write the failing database test**
 
 Create `backend/supabase/tests/database/organizations_test.sql`:
 
@@ -4221,12 +4221,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: FAIL — `organizations` table does not exist.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `backend/supabase/migrations/0012_organizations.sql`:
 
@@ -4249,19 +4249,19 @@ create policy organizations_public_select on organizations
 
 No insert/update/delete policy is defined — this table is written only by the `sync-organization` Edge Function using the service-role key, same pattern as `admin_action_log`. `id` has no default: it is always the canonical organization id assigned by `platform`, never generated locally.
 
-- [ ] **Step 4: Apply and run tests**
+- [x] **Step 4: Apply and run tests**
 
 Run: `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done`
 Expected: PASS on all 4 assertions.
 
-- [ ] **Step 5: Commit the table**
+- [x] **Step 5: Commit the table**
 
 ```bash
 git add backend/supabase/migrations/0012_organizations.sql backend/supabase/tests/database/organizations_test.sql
 git commit -m "feat(backend): add organizations mirror table synced from platform"
 ```
 
-- [ ] **Step 6: Write the failing handler test**
+- [x] **Step 6: Write the failing handler test**
 
 Create `backend/supabase/functions/sync-organization/handler.test.ts`:
 
@@ -4298,12 +4298,12 @@ Deno.test("syncOrganization upserts the mirrored row", async () => {
 });
 ```
 
-- [ ] **Step 7: Run test to verify it fails**
+- [x] **Step 7: Run test to verify it fails**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/sync-organization/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 8: Write the handler**
+- [x] **Step 8: Write the handler**
 
 Create `backend/supabase/functions/sync-organization/handler.ts`:
 
@@ -4330,12 +4330,12 @@ export async function syncOrganization(supabase: SupabaseClient, input: SyncOrga
 }
 ```
 
-- [ ] **Step 9: Run test to verify it passes**
+- [x] **Step 9: Run test to verify it passes**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/sync-organization/handler.test.ts`
 Expected: PASS.
 
-- [ ] **Step 10: Write `index.ts`, requiring `platform_owner`**
+- [x] **Step 10: Write `index.ts`, requiring `platform_owner`**
 
 Create `backend/supabase/functions/sync-organization/index.ts`:
 
@@ -4364,7 +4364,7 @@ Deno.serve(async (req) => {
 
 Only `platform_owner` may call this — an org-scoped `org_admin` token is not sufficient, since this writes data other organizations' opportunity pages also read.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add backend/supabase/functions/sync-organization/
@@ -4386,7 +4386,7 @@ git commit -m "feat(backend): add sync-organization Edge Function for platform-p
 
 Rows are created at `selected` (Task 6) whether auto-created by `decideApplication()` or admin-enrolled directly. This function drives the rest of the requirements doc's participation lifecycle (§5D): `selected → participating → {completed | no_show | withdrawn}`. `selected` itself is never a valid target here — a row is already `selected` the moment it exists; this function only ever moves it forward.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/update-participation-status/handler.test.ts`:
 
@@ -4494,12 +4494,12 @@ Deno.test("updateParticipationStatus rejects when staff lacks participation:upda
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/update-participation-status/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/update-participation-status/handler.ts`:
 
@@ -4548,12 +4548,12 @@ export async function updateParticipationStatus(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/update-participation-status/handler.test.ts`
 Expected: PASS on all 3 tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/update-participation-status/index.ts`:
 
@@ -4577,7 +4577,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/update-participation-status/
@@ -4602,7 +4602,7 @@ git commit -m "feat(backend): add update-participation-status Edge Function"
 
 This task bundles both functions since they share the same shape and permission-check pattern — a reviewer needs to see them together to confirm `write` vs. `update` is applied consistently.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/supabase/functions/create-opportunity/handler.test.ts`:
 
@@ -4717,12 +4717,12 @@ Deno.test("updateOpportunity rejects staff without opportunities:update for the 
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/create-opportunity/handler.test.ts functions/update-opportunity/handler.test.ts`
 Expected: FAIL — `handler.ts` files do not exist.
 
-- [ ] **Step 3: Write the implementations**
+- [x] **Step 3: Write the implementations**
 
 Create `backend/supabase/functions/create-opportunity/handler.ts`:
 
@@ -4848,12 +4848,12 @@ export async function updateOpportunity(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/create-opportunity/handler.test.ts functions/update-opportunity/handler.test.ts`
 Expected: PASS on all 4 tests.
 
-- [ ] **Step 5: Write the HTTP wrappers**
+- [x] **Step 5: Write the HTTP wrappers**
 
 Create `backend/supabase/functions/create-opportunity/index.ts`:
 
@@ -4899,7 +4899,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/create-opportunity/ backend/supabase/functions/update-opportunity/
@@ -4922,7 +4922,7 @@ git commit -m "feat(backend): add create-opportunity and update-opportunity Edge
 - Consumes: `verifyStaffToken()`, `staffHasPermission()` (Task 12); `chapters` (Task 8).
 - Produces: `createChapter(supabase, staffClaims, input: { organizationId, name, institution?, city?, province? }): Promise<{ chapterId: string }>`, requiring `chapters:write`. `updateChapter(supabase, staffClaims, input: { chapterId, organizationId, name?, institution?, city?, province?, status? })`, requiring `chapters:update`. Same rationale as Task 26 — this was previously only reachable via the coarse Task 11 RLS policy. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/supabase/functions/create-chapter/handler.test.ts`:
 
@@ -5030,12 +5030,12 @@ Deno.test("updateChapter rejects staff without chapters:update for the org", asy
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/create-chapter/handler.test.ts functions/update-chapter/handler.test.ts`
 Expected: FAIL — `handler.ts` files do not exist.
 
-- [ ] **Step 3: Write the implementations**
+- [x] **Step 3: Write the implementations**
 
 Create `backend/supabase/functions/create-chapter/handler.ts`:
 
@@ -5135,12 +5135,12 @@ export async function updateChapter(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/create-chapter/handler.test.ts functions/update-chapter/handler.test.ts`
 Expected: PASS on all 4 tests.
 
-- [ ] **Step 5: Write the HTTP wrappers**
+- [x] **Step 5: Write the HTTP wrappers**
 
 Create `backend/supabase/functions/create-chapter/index.ts`:
 
@@ -5186,7 +5186,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/create-chapter/ backend/supabase/functions/update-chapter/
@@ -5206,7 +5206,7 @@ git commit -m "feat(backend): add create-chapter and update-chapter Edge Functio
 - Consumes: `verifyStaffToken()`, `staffHasPermission()` (Task 12); `participation` (Task 6).
 - Produces: `enrollParticipant(supabase, staffClaims, input: { organizationId: string; opportunityId: string; volunteerId: string }): Promise<{ participationId: string }>`. Requires `participation:write` — this is the admin-direct enrollment path spec §3 describes ("admin can enroll directly without a prior application"), distinct from `decideApplication()`'s auto-created participation (which uses `participation:update`'s sibling permission model but is triggered by an `applications:update` action, not this one). This was previously undocumented as an Edge Function entirely; `participation:write` is a new addition to `platform`'s permission catalog (`tmp-partner-admin` plan Task 6) alongside the pre-existing `participation:read`/`participation:update`. `admin_action_log.staff_id` comes from `staffClaims.staffId` (Task 12).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `backend/supabase/functions/enroll-participant/handler.test.ts`:
 
@@ -5280,12 +5280,12 @@ Deno.test("enrollParticipant rejects staff without participation:write for the o
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd backend/supabase && deno test --allow-net --allow-env functions/enroll-participant/handler.test.ts`
 Expected: FAIL — `handler.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `backend/supabase/functions/enroll-participant/handler.ts`:
 
@@ -5337,12 +5337,12 @@ export async function enrollParticipant(
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `(cd backend && npx supabase db push --linked) && cd backend/supabase && deno test --allow-net --allow-env functions/enroll-participant/handler.test.ts`
 Expected: PASS on both tests.
 
-- [ ] **Step 5: Write the HTTP wrapper**
+- [x] **Step 5: Write the HTTP wrapper**
 
 Create `backend/supabase/functions/enroll-participant/index.ts`:
 
@@ -5366,7 +5366,7 @@ Deno.serve(async (req) => {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/supabase/functions/enroll-participant/
@@ -5377,10 +5377,10 @@ git commit -m "feat(backend): add enroll-participant Edge Function for admin-dir
 
 ## Post-plan checklist (not a task — verify before moving to Plan 2)
 
-- [ ] `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done` passes in full.
-- [ ] `cd backend/supabase && deno task test` passes in full.
-- [ ] Every table listed in spec §3 exists with RLS enabled (`select relrowsecurity from pg_class where relname = '<table>';` for each) — explicitly including `org_volunteer_index` and `rate_limit_hits`, both of which historically shipped with RLS disabled entirely; run `select relname from pg_class where relkind = 'r' and relnamespace = 'public'::regnamespace and not relrowsecurity;` once and confirm it returns zero rows, rather than checking tables one at a time from a list that can go stale.
-- [ ] `STAFF_JWT_SECRET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_URL`, `RESEND_API_KEY`, `EMAIL_FROM_ADDRESS` are documented in `backend/README.md` as required environment variables (values are set per-environment, never committed).
-- [ ] The `organizations` table has at least one synced row (Rizq) before `frontend`'s opportunity pages rely on it for display names — otherwise opportunity org names render blank rather than erroring, since the join is a local read against a mirror, not a live check.
-- [ ] `platform`'s `permissions` catalog (`tmp-partner-admin` plan Task 6) includes `participation:write` — a mint-time dependency for Task 28's `enroll-participant` to ever be reachable by a real staff token; confirm both repos' catalogs agree before testing Task 28 end-to-end against a real `platform` instance.
-- [ ] Every RLS write policy from Task 11 has a matching Edge Function (Tasks 14–28) that's the documented path for that write, and no table has a `for insert`/`for update`/`for delete` policy whose only gate is `staff_has_org_role()` without a paired `staff_has_permission()` check — this was the root cause behind the coarse RLS on opportunities/chapters/participation/activity_hours before this pass.
+- [x] `npx supabase db push --linked && for f in supabase/tests/database/*.sql; do psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"; done` passes in full. (Verified via `npx -y supabase@2.116.0 db push --linked --dry-run` reporting "Remote database is up to date" plus the full pgTAP loop: 62/62 assertions pass, zero `not ok`, across all 12 test files.)
+- [x] `cd backend/supabase && deno task test` passes in full. (57/57 tests pass, zero failed, verified independently by the controller as the final step of Task 28.)
+- [x] Every table listed in spec §3 exists with RLS enabled (`select relrowsecurity from pg_class where relname = '<table>';` for each) — explicitly including `org_volunteer_index` and `rate_limit_hits`, both of which historically shipped with RLS disabled entirely; run `select relname from pg_class where relkind = 'r' and relnamespace = 'public'::regnamespace and not relrowsecurity;` once and confirm it returns zero rows, rather than checking tables one at a time from a list that can go stale. (Ran exactly this query: zero rows returned.)
+- [x] `STAFF_JWT_SECRET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_URL`, `RESEND_API_KEY`, `EMAIL_FROM_ADDRESS` are documented in `backend/README.md` as required environment variables (values are set per-environment, never committed). (Confirmed present in the README's "Required environment variables" list.)
+- [ ] The `organizations` table has at least one synced row (Rizq) before `frontend`'s opportunity pages rely on it for display names — otherwise opportunity org names render blank rather than erroring, since the join is a local read against a mirror, not a live check. **NOT DONE** — `select count(*) from organizations;` returns 0. This is expected at this stage: populating it requires a real call to `sync-organization` from an actual `platform_owner`-claimed staff token (minted by the `platform`/`tmp-partner-admin` repo, which this session did not touch), not something this backend-only plan can self-seed. Flagging for whoever wires up `platform` next.
+- [ ] `platform`'s `permissions` catalog (`tmp-partner-admin` plan Task 6) includes `participation:write` — a mint-time dependency for Task 28's `enroll-participant` to ever be reachable by a real staff token; confirm both repos' catalogs agree before testing Task 28 end-to-end against a real `platform` instance. **NOT VERIFIABLE FROM THIS REPO** — `tmp-partner-admin` was explicitly out of scope for this session (top-level instructions: do not touch it). Flagging for whoever owns that repo.
+- [ ] Every RLS write policy from Task 11 has a matching Edge Function (Tasks 14–28) that's the documented path for that write, and no table has a `for insert`/`for update`/`for delete` policy whose only gate is `staff_has_org_role()` without a paired `staff_has_permission()` check — this was the root cause behind the coarse RLS on opportunities/chapters/participation/activity_hours before this pass. **PARTIALLY VERIFIED, ONE GAP FOUND**: every write policy across all migrations uses `staff_has_permission()`, never a bare `staff_has_org_role()` gate (grepped every `for insert`/`for update`/`for delete` line — confirmed clean on that half). However, three RLS delete policies from Task 11's migration (`opportunities_staff_delete`, `chapters_staff_delete`, `volunteer_chapter_link_staff_delete`) have **no matching Edge Function** anywhere across Tasks 14–28 — no `delete-opportunity`, `delete-chapter`, or `unlink-chapter` function was ever specified by the plan. These policies are reachable only via a direct PostgREST `DELETE` call from a sufficiently-permissioned staff token, bypassing `admin_action_log` entirely and performing a real hard delete — which conflicts with this plan's own Global Constraint ("No hard deletes outside append-only logs; use `deactivated_at`"). This is a plan-authoring gap (the migration text and this checklist item both predate any delete-*, unlink-* task ever being written), not something introduced during this execution — the migration was transcribed byte-for-byte from Task 11's brief. Left unfixed and unchecked: closing it would mean either stripping delete policies from an already-committed, plan-mandated migration or inventing three new Edge Functions with no brief to transcribe from, neither of which is authorized without a ruling from whoever owns this plan next.
