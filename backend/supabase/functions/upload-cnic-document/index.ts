@@ -1,4 +1,7 @@
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+import { getAdminClient } from "../_shared/supabaseAdmin.ts";
+import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
+import { verifyStaffToken, staffHasPermission } from "../_shared/verifyStaffToken.ts";
 import { createCnicUploadUrl, getCnicReadUrl, R2Client } from "./handler.ts";
 
 function buildR2Client(): R2Client {
@@ -26,20 +29,33 @@ function buildR2Client(): R2Client {
 
 Deno.serve(async (req) => {
   try {
-    const { action, volunteerId, objectKey } = await req.json();
+    const { action, objectKey } = await req.json();
+    const supabase = getAdminClient();
     const r2Client = buildR2Client();
 
     if (action === "upload") {
+      const { volunteerId } = await verifyVolunteerToken(supabase, req.headers.get("Authorization"));
       const result = await createCnicUploadUrl(r2Client, volunteerId);
       return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (action === "read") {
+      const claims = await verifyStaffToken(req.headers.get("Authorization"));
+      const volunteerId = objectKey.split("/")[1];
+      const { data: links } = await supabase
+        .from("org_volunteer_index")
+        .select("organization_id")
+        .eq("volunteer_id", volunteerId);
+      const canRead = claims.platformOwner || (links ?? []).some(
+        (link) => staffHasPermission(claims, link.organization_id, "vms", "volunteers:read"),
+      );
+      if (!canRead) throw new Error("forbidden");
       const result = await getCnicReadUrl(r2Client, objectKey);
       return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     return new Response(JSON.stringify({ error: "unknown_action" }), { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
-    return new Response(JSON.stringify({ error: message }), { status: 400 });
+    const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
+    return new Response(JSON.stringify({ error: message }), { status });
   }
 });
