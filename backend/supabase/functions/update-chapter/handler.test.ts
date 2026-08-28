@@ -30,6 +30,35 @@ Deno.test("updateChapter renames a chapter and logs the action", async () => {
   assertEquals(updated!.name, "New Name");
 });
 
+Deno.test("updateChapter rejects a cross-tenant write even when the caller holds chapters:update in the org they claim", async () => {
+  const supabase = testClient();
+  const orgA = crypto.randomUUID();
+  const orgB = crypto.randomUUID();
+  const originalName = `Org B Chapter ${crypto.randomUUID()}`;
+  const { data: chapter } = await supabase.from("chapters").insert({
+    organization_id: orgB, name: originalName,
+  }).select("id").single();
+
+  // Staff genuinely hold chapters:update for org A and pass orgA in the input,
+  // but the referenced chapter actually belongs to org B.
+  await assertRejects(
+    () => updateChapter(supabase, staffClaims(orgA, "chapters:update"), {
+      chapterId: chapter!.id, organizationId: orgA, name: "hijacked", status: "inactive",
+    }),
+    Error,
+    "forbidden",
+  );
+
+  const { data: unchanged } = await supabase
+    .from("chapters")
+    .select("name, status, organization_id")
+    .eq("id", chapter!.id)
+    .single();
+  assertEquals(unchanged!.name, originalName);
+  assertEquals(unchanged!.status, "active");
+  assertEquals(unchanged!.organization_id, orgB);
+});
+
 Deno.test("updateChapter rejects staff without chapters:update for the org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

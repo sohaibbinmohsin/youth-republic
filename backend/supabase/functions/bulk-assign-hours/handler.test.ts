@@ -55,6 +55,57 @@ Deno.test("bulkAssignHours creates one activity_hours row per participant", asyn
   assertEquals(result.createdCount, 3);
 });
 
+Deno.test("bulkAssignHours silently excludes participation ids belonging to a different org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const otherOrgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Bulk Opp Cross-Tenant", type: "event",
+  }).select("id").single();
+  const { data: otherOpportunity } = await supabase.from("opportunities").insert({
+    organization_id: otherOrgId, name: "Other Org Opp", type: "event",
+  }).select("id").single();
+
+  const ownIds = await makeParticipants(supabase, orgId, opportunity!.id, 2);
+  const foreignIds = await makeParticipants(supabase, otherOrgId, otherOpportunity!.id, 2);
+
+  const result = await bulkAssignHours(supabase, staffClaims(orgId), {
+    organizationId: orgId, opportunityId: opportunity!.id, activityDate: "2026-08-01",
+    hoursSubmitted: 4, participationIds: [...ownIds, ...foreignIds],
+  });
+
+  assertEquals(result.createdCount, 2);
+
+  const { data: foreignHours } = await supabase
+    .from("activity_hours")
+    .select("id")
+    .in("participation_id", foreignIds);
+  assertEquals(foreignHours?.length, 0);
+});
+
+Deno.test("bulkAssignHours rejects an opportunityId that belongs to a different org", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const otherOrgId = crypto.randomUUID();
+  const { data: ownOpportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Bulk Opp Own", type: "event",
+  }).select("id").single();
+  const { data: foreignOpportunity } = await supabase.from("opportunities").insert({
+    organization_id: otherOrgId, name: "Bulk Opp Foreign", type: "event",
+  }).select("id").single();
+  const participationIds = await makeParticipants(supabase, orgId, ownOpportunity!.id, 1);
+
+  await assertRejects(
+    () =>
+      bulkAssignHours(supabase, staffClaims(orgId), {
+        organizationId: orgId, opportunityId: foreignOpportunity!.id, activityDate: "2026-08-01",
+        hoursSubmitted: 4, participationIds,
+      }),
+    Error,
+    "forbidden",
+  );
+});
+
 Deno.test("bulkAssignHours rejects staff without hours:write in the org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

@@ -50,6 +50,49 @@ Deno.test("enrollParticipant creates a participation row with no application_id 
   assertEquals(logRows![0].staff_id, realStaffId);
 });
 
+Deno.test("enrollParticipant rejects an opportunityId that belongs to a different org than the caller's", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const otherOrgId = crypto.randomUUID();
+  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    email: `auth-${crypto.randomUUID()}@example.com`,
+    email_confirm: true,
+  });
+  if (authError) throw authError;
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: authUser.user!.id, full_name: "Enroll Cross Tenant Test",
+    email: `enroll-cross-${crypto.randomUUID()}@example.com`,
+    phone: `0300-${Math.floor(Math.random() * 10000000)}`, dob: "1999-01-01", gender: "male",
+    city: "Lahore", province: "Punjab", country: "Pakistan", institution: "Test Uni", degree_program: "BSCS",
+  }).select("id").single();
+  // The opportunity belongs to otherOrgId, but the caller claims (and genuinely
+  // holds participation:write for) orgId.
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: otherOrgId, name: "Foreign Org Opp", type: "event",
+  }).select("id").single();
+
+  await assertRejects(
+    () => enrollParticipant(supabase, staffClaims(orgId, "participation:write"), {
+      organizationId: orgId, opportunityId: opportunity!.id, volunteerId: volunteer!.id,
+    }),
+    Error,
+    "forbidden",
+  );
+
+  const { data: participationRows } = await supabase
+    .from("participation")
+    .select("id")
+    .eq("volunteer_id", volunteer!.id);
+  assertEquals(participationRows?.length, 0);
+
+  // No org_volunteer_index link may have been minted for the claimed org.
+  const { data: indexRows } = await supabase
+    .from("org_volunteer_index")
+    .select("organization_id")
+    .eq("volunteer_id", volunteer!.id);
+  assertEquals(indexRows?.length, 0);
+});
+
 Deno.test("enrollParticipant rejects staff without participation:write for the org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

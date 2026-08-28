@@ -11,6 +11,15 @@ class FakeEmailClient implements EmailClient {
   }
 }
 
+class ThrowingEmailClient implements EmailClient {
+  attempts = 0;
+  // deno-lint-ignore require-await
+  async send(_to: string, _subject: string, _html: string): Promise<void> {
+    this.attempts++;
+    throw new Error("resend_send_failed: 500");
+  }
+}
+
 function testClient() {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -195,4 +204,30 @@ Deno.test("decideApplication sends a status-change email to the volunteer", asyn
 
   assertEquals(emailClient.sent.length, 1);
   assertEquals(emailClient.sent[0].to, volunteer!.email);
+});
+
+Deno.test("decideApplication completes successfully when the email send throws — the committed state change is still reported as success", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { applicationId } = await makeApplication(supabase, orgId);
+  const emailClient = new ThrowingEmailClient();
+
+  // Must not throw: by the time the send is attempted, the application status,
+  // participation row and admin_action_log entry have already committed.
+  const result = await decideApplication(supabase, staffClaims(orgId), {
+    applicationId, decision: "selected",
+  }, emailClient);
+
+  assertEquals(emailClient.attempts, 1);
+  assertEquals(result.participationId !== null, true);
+
+  const { data: application } = await supabase.from("applications").select("status").eq("id", applicationId).single();
+  assertEquals(application!.status, "selected");
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("id")
+    .eq("target_id", applicationId)
+    .eq("action", "application_decided");
+  assertEquals(logRows?.length, 1);
 });

@@ -37,6 +37,35 @@ Deno.test("updateOpportunity publishes by setting status_override and logs the a
   assertEquals(logRows?.length, 1);
 });
 
+Deno.test("updateOpportunity rejects a cross-tenant write even when the caller holds opportunities:update in the org they claim", async () => {
+  const supabase = testClient();
+  const orgA = crypto.randomUUID();
+  const orgB = crypto.randomUUID();
+  const originalName = `Org B Opp ${crypto.randomUUID()}`;
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgB, name: originalName, type: "event",
+  }).select("id").single();
+
+  // Staff genuinely hold opportunities:update for org A and pass orgA in the
+  // input, but the referenced opportunity actually belongs to org B.
+  await assertRejects(
+    () => updateOpportunity(supabase, staffClaims(orgA, "opportunities:update"), {
+      opportunityId: opportunity!.id, organizationId: orgA, name: "hijacked", statusOverride: "closed",
+    }),
+    Error,
+    "forbidden",
+  );
+
+  const { data: unchanged } = await supabase
+    .from("opportunities")
+    .select("name, status_override, organization_id")
+    .eq("id", opportunity!.id)
+    .single();
+  assertEquals(unchanged!.name, originalName);
+  assertEquals(unchanged!.status_override, null);
+  assertEquals(unchanged!.organization_id, orgB);
+});
+
 Deno.test("updateOpportunity rejects staff without opportunities:update for the org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

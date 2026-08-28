@@ -1,6 +1,7 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createClient } from "@supabase/supabase-js";
 import { updateSensitiveField } from "./handler.ts";
+import type { UpdateSensitiveFieldInput } from "./handler.ts";
 
 function testClient() {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -24,6 +25,32 @@ async function makeVolunteer(supabase: ReturnType<typeof testClient>) {
   }).select("id, phone").single();
   return data!;
 }
+
+Deno.test("updateSensitiveField rejects a fieldName outside the runtime allow-list before any write happens", async () => {
+  const supabase = testClient();
+  const volunteer = await makeVolunteer(supabase);
+
+  // Cast through `as` deliberately: SensitiveFieldName is compile-time only,
+  // and the point of this test is the RUNTIME guard that a real HTTP body
+  // (which TypeScript never sees) would hit.
+  await assertRejects(
+    () =>
+      updateSensitiveField(supabase, {
+        volunteerId: volunteer.id,
+        fieldName: "status",
+        newValue: "active",
+      } as unknown as UpdateSensitiveFieldInput),
+    Error,
+    "invalid_field",
+  );
+
+  const { data: unchanged } = await supabase
+    .from("volunteers")
+    .select("status")
+    .eq("id", volunteer.id)
+    .single();
+  assertEquals(unchanged!.status, "pending_verification");
+});
 
 Deno.test("updateSensitiveField updates the volunteer row and logs the change", async () => {
   const supabase = testClient();

@@ -22,10 +22,27 @@ export async function bulkAssignHours(
     throw new Error("forbidden");
   }
 
+  // The opportunity the hours are stamped with must actually belong to the
+  // authorized org — otherwise staff at org A could write hours against an
+  // opportunity in a third org. The service-role client bypasses RLS, so this
+  // cross-reference check has to happen here.
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from("opportunities")
+    .select("id, organization_id")
+    .eq("id", input.opportunityId)
+    .single();
+  if (opportunityError) throw opportunityError;
+  if (opportunity.organization_id !== input.organizationId) {
+    throw new Error("forbidden");
+  }
+
+  // Scope the participation fetch to the authorized org: ids belonging to
+  // another org simply do not come back, so they are never written.
   const { data: participations, error: fetchError } = await supabase
     .from("participation")
     .select("id, volunteer_id")
-    .in("id", input.participationIds);
+    .in("id", input.participationIds)
+    .eq("organization_id", input.organizationId);
   if (fetchError) throw fetchError;
 
   const rows = (participations ?? []).map((p) => ({

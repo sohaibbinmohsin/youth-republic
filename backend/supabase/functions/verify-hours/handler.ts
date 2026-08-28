@@ -61,7 +61,16 @@ export async function verifyHours(
   if (volunteer) {
     const subject = "Your volunteer hours have been reviewed";
     const html = `<p>Hi ${volunteer.full_name},</p><p>Your submitted hours were <strong>${input.decision}</strong>.</p>`;
-    await emailClient.send(volunteer.email, subject, html);
+    try {
+      await emailClient.send(volunteer.email, subject, html);
+    } catch {
+      // Email delivery failure must not fail a request whose DB state change
+      // already committed — the verification status, verified_by and the
+      // admin_action_log entry are all written by this point, and surfacing a
+      // 400 here invites duplicate-producing retries. Swallow it.
+      // (A future task could log this to admin_action_log or a retry queue;
+      // out of scope here.)
+    }
   }
 
   return { activityHoursId: input.activityHoursId };

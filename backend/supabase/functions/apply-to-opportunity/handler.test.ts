@@ -57,6 +57,58 @@ Deno.test("applyToOpportunity creates an application", async () => {
   assertEquals(typeof result.applicationId, "string");
 });
 
+Deno.test("applyToOpportunity records the opportunity's real organization_id, not a mismatched client-supplied one", async () => {
+  const supabase = testClient();
+  const realOrgId = crypto.randomUUID();
+  const spoofedOrgId = crypto.randomUUID();
+  const volunteerId = await makeVolunteer(supabase);
+  const opportunityId = await makeOpportunity(supabase, realOrgId);
+
+  const result = await applyToOpportunity(supabase, {
+    volunteerId,
+    opportunityId,
+    organizationId: spoofedOrgId,
+  });
+
+  const { data: application } = await supabase
+    .from("applications")
+    .select("organization_id")
+    .eq("id", result.applicationId)
+    .single();
+  assertEquals(application!.organization_id, realOrgId);
+
+  // The org_volunteer_index link (which grants staff PII read access) must
+  // likewise be minted only for the opportunity's real org.
+  const { data: indexRows } = await supabase
+    .from("org_volunteer_index")
+    .select("organization_id")
+    .eq("volunteer_id", volunteerId);
+  assertEquals(indexRows?.length, 1);
+  assertEquals(indexRows![0].organization_id, realOrgId);
+});
+
+Deno.test("applyToOpportunity rejects an application to a deactivated opportunity", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const volunteerId = await makeVolunteer(supabase);
+  const opportunityId = await makeOpportunity(supabase, orgId);
+  await supabase.from("opportunities")
+    .update({ deactivated_at: new Date().toISOString() })
+    .eq("id", opportunityId);
+
+  await assertRejects(
+    () => applyToOpportunity(supabase, { volunteerId, opportunityId, organizationId: orgId }),
+    Error,
+    "opportunity_unavailable",
+  );
+
+  const { data: applications } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("volunteer_id", volunteerId);
+  assertEquals(applications?.length, 0);
+});
+
 Deno.test("applyToOpportunity rejects when the volunteer has no cnic_number on file", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

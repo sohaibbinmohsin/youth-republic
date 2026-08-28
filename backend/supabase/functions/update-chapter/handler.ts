@@ -16,7 +16,17 @@ export async function updateChapter(
   staffClaims: StaffClaims,
   input: UpdateChapterInput,
 ): Promise<{ chapterId: string }> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "chapters:update")) {
+  // Authorize against the chapter's STORED organization_id, never the
+  // client-supplied input.organizationId. This handler runs on the service-role
+  // client, which bypasses RLS entirely, so RLS cannot backstop this check.
+  const { data: chapter, error: fetchError } = await supabase
+    .from("chapters")
+    .select("id, organization_id")
+    .eq("id", input.chapterId)
+    .single();
+  if (fetchError) throw fetchError;
+
+  if (!staffHasPermission(staffClaims, chapter.organization_id, "vms", "chapters:update")) {
     throw new Error("forbidden");
   }
 
@@ -27,7 +37,11 @@ export async function updateChapter(
   if (input.province !== undefined) patch.province = input.province;
   if (input.status !== undefined) patch.status = input.status;
 
-  const { error } = await supabase.from("chapters").update(patch).eq("id", input.chapterId);
+  const { error } = await supabase
+    .from("chapters")
+    .update(patch)
+    .eq("id", input.chapterId)
+    .eq("organization_id", chapter.organization_id);
   if (error) throw error;
 
   await supabase.from("admin_action_log").insert({
@@ -36,7 +50,7 @@ export async function updateChapter(
     action: "chapter_updated",
     target_type: "chapter",
     target_id: input.chapterId,
-    organization_id: input.organizationId,
+    organization_id: chapter.organization_id,
     metadata: patch,
   });
 

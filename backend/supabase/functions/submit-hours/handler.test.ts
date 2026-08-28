@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createClient } from "@supabase/supabase-js";
 import { submitHours } from "./handler.ts";
 
@@ -47,4 +47,58 @@ Deno.test("submitHours creates a recorded activity_hours row", async () => {
 
   const { data: row } = await supabase.from("activity_hours").select("verification_status").eq("id", result.activityHoursId).single();
   assertEquals(row!.verification_status, "recorded");
+});
+
+Deno.test("submitHours rejects a participationId that belongs to a different volunteer", async () => {
+  const supabase = testClient();
+  const victim = await makeParticipation(supabase);
+  const attacker = await makeParticipation(supabase);
+
+  // The attacker's session-derived volunteerId is theirs, but they point at
+  // the victim's participation row and supply their own org/opportunity ids.
+  await assertRejects(
+    () =>
+      submitHours(supabase, {
+        participationId: victim.participationId,
+        volunteerId: attacker.volunteerId,
+        opportunityId: attacker.opportunityId,
+        organizationId: attacker.orgId,
+        activityDate: "2026-08-01",
+        hoursSubmitted: 3,
+      }),
+    Error,
+    "forbidden",
+  );
+
+  const { data: rows } = await supabase
+    .from("activity_hours")
+    .select("id")
+    .eq("participation_id", victim.participationId);
+  assertEquals(rows?.length, 0);
+});
+
+Deno.test("submitHours derives opportunity_id and organization_id from the participation row, not from the input", async () => {
+  const supabase = testClient();
+  const { participationId, volunteerId, opportunityId, orgId } = await makeParticipation(supabase);
+  const bogusOrgId = crypto.randomUUID();
+  const { data: bogusOpportunity } = await supabase.from("opportunities").insert({
+    organization_id: bogusOrgId, name: "Unrelated Opp", type: "event",
+  }).select("id").single();
+
+  const result = await submitHours(supabase, {
+    participationId,
+    volunteerId,
+    opportunityId: bogusOpportunity!.id,
+    organizationId: bogusOrgId,
+    activityDate: "2026-08-01",
+    hoursSubmitted: 3,
+  });
+
+  const { data: row } = await supabase
+    .from("activity_hours")
+    .select("opportunity_id, organization_id")
+    .eq("id", result.activityHoursId)
+    .single();
+  assertEquals(row!.opportunity_id, opportunityId);
+  assertEquals(row!.organization_id, orgId);
 });

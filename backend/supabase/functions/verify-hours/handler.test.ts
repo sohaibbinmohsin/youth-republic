@@ -11,6 +11,15 @@ class FakeEmailClient implements EmailClient {
   }
 }
 
+class ThrowingEmailClient implements EmailClient {
+  attempts = 0;
+  // deno-lint-ignore require-await
+  async send(_to: string, _subject: string, _html: string): Promise<void> {
+    this.attempts++;
+    throw new Error("resend_send_failed: 500");
+  }
+}
+
 function testClient() {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 }
@@ -113,4 +122,34 @@ Deno.test("verifyHours sends a status-change email to the volunteer", async () =
   }, emailClient);
 
   assertEquals(emailClient.sent.length, 1);
+});
+
+Deno.test("verifyHours completes successfully when the email send throws — the committed state change is still reported as success", async () => {
+  const supabase = testClient();
+  const { activityHoursId, orgId } = await makeActivityHours(supabase);
+  const realStaffId = crypto.randomUUID();
+  const emailClient = new ThrowingEmailClient();
+
+  // Must not throw: by the time the send is attempted, the verification status
+  // and admin_action_log entry have already committed.
+  await verifyHours(supabase, staffClaims(orgId, realStaffId), {
+    activityHoursId, decision: "verified", hoursVerified: 5,
+  }, emailClient);
+
+  assertEquals(emailClient.attempts, 1);
+
+  const { data: row } = await supabase
+    .from("activity_hours")
+    .select("verification_status, verified_by")
+    .eq("id", activityHoursId)
+    .single();
+  assertEquals(row!.verification_status, "verified");
+  assertEquals(row!.verified_by, realStaffId);
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("id")
+    .eq("target_id", activityHoursId)
+    .eq("action", "hours_decided");
+  assertEquals(logRows?.length, 1);
 });

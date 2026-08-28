@@ -22,7 +22,17 @@ export async function updateOpportunity(
   staffClaims: StaffClaims,
   input: UpdateOpportunityInput,
 ): Promise<{ opportunityId: string }> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "opportunities:update")) {
+  // Authorize against the opportunity's STORED organization_id, never the
+  // client-supplied input.organizationId. This handler runs on the service-role
+  // client, which bypasses RLS entirely, so RLS cannot backstop this check.
+  const { data: opportunity, error: fetchError } = await supabase
+    .from("opportunities")
+    .select("id, organization_id")
+    .eq("id", input.opportunityId)
+    .single();
+  if (fetchError) throw fetchError;
+
+  if (!staffHasPermission(staffClaims, opportunity.organization_id, "vms", "opportunities:update")) {
     throw new Error("forbidden");
   }
 
@@ -39,7 +49,11 @@ export async function updateOpportunity(
   if (input.capacity !== undefined) patch.capacity = input.capacity;
   if (input.statusOverride !== undefined) patch.status_override = input.statusOverride;
 
-  const { error } = await supabase.from("opportunities").update(patch).eq("id", input.opportunityId);
+  const { error } = await supabase
+    .from("opportunities")
+    .update(patch)
+    .eq("id", input.opportunityId)
+    .eq("organization_id", opportunity.organization_id);
   if (error) throw error;
 
   await supabase.from("admin_action_log").insert({
@@ -48,7 +62,7 @@ export async function updateOpportunity(
     action: "opportunity_updated",
     target_type: "opportunity",
     target_id: input.opportunityId,
-    organization_id: input.organizationId,
+    organization_id: opportunity.organization_id,
     metadata: patch,
   });
 

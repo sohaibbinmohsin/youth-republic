@@ -16,6 +16,20 @@ export async function enrollParticipant(
     throw new Error("forbidden");
   }
 
+  // The opportunity must actually belong to the authorized org. Without this,
+  // a staff member with participation:write in their own org could enroll any
+  // volunteer against any org's opportunity — and enrollment mints an
+  // org_volunteer_index row, which grants their org full PII read access.
+  const { data: opportunity, error: opportunityError } = await supabase
+    .from("opportunities")
+    .select("id, organization_id")
+    .eq("id", input.opportunityId)
+    .single();
+  if (opportunityError) throw opportunityError;
+  if (opportunity.organization_id !== input.organizationId) {
+    throw new Error("forbidden");
+  }
+
   const { data: participation, error } = await supabase
     .from("participation")
     .insert({
