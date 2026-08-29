@@ -6,17 +6,15 @@ export async function checkRateLimit(
   limit: number,
   windowSeconds: number,
 ): Promise<boolean> {
-  const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
-  const { count } = await supabase
-    .from("rate_limit_hits")
-    .select("*", { count: "exact", head: true })
-    .eq("rate_key", key)
-    .gte("created_at", windowStart);
-
-  if ((count ?? 0) >= limit) {
-    return false;
-  }
-
-  await supabase.from("rate_limit_hits").insert({ rate_key: key });
-  return true;
+  // Delegates the count-then-insert to a single Postgres function
+  // (0015_atomic_rate_limit.sql) so it runs atomically, serialized per-key
+  // with an advisory lock -- doing the check and the record as two separate
+  // round trips from here would reopen the exact race this closes.
+  const { data, error } = await supabase.rpc("check_rate_limit", {
+    p_key: key,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) throw error;
+  return data as boolean;
 }
