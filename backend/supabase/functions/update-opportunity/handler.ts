@@ -15,6 +15,7 @@ export interface UpdateOpportunityInput {
   eligibilityCriteria?: string;
   capacity?: number;
   statusOverride?: string;
+  deactivatedAt?: string | null;
 }
 
 export async function updateOpportunity(
@@ -32,7 +33,30 @@ export async function updateOpportunity(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, opportunity.organization_id, "vms", "opportunities:update")) {
+  // Every field except deactivatedAt stays gated on opportunities:update.
+  // deactivatedAt (soft-delete/reactivate) gets its own, stricter permission
+  // — opportunities:delete — since deactivating an opportunity conceptually
+  // belongs with "delete," not a plain field edit, and the permission
+  // catalog already provisions opportunities:delete for exactly this class
+  // of action (it's what the now-removed opportunities_staff_delete RLS
+  // policy was gated on).
+  const touchesOtherFields = input.name !== undefined
+    || input.description !== undefined
+    || input.location !== undefined
+    || input.isOnline !== undefined
+    || input.applicationOpenAt !== undefined
+    || input.applicationDeadline !== undefined
+    || input.activityStartAt !== undefined
+    || input.activityEndAt !== undefined
+    || input.eligibilityCriteria !== undefined
+    || input.capacity !== undefined
+    || input.statusOverride !== undefined;
+
+  if (touchesOtherFields && !staffHasPermission(staffClaims, opportunity.organization_id, "vms", "opportunities:update")) {
+    throw new Error("forbidden");
+  }
+
+  if (input.deactivatedAt !== undefined && !staffHasPermission(staffClaims, opportunity.organization_id, "vms", "opportunities:delete")) {
     throw new Error("forbidden");
   }
 
@@ -48,6 +72,7 @@ export async function updateOpportunity(
   if (input.eligibilityCriteria !== undefined) patch.eligibility_criteria = input.eligibilityCriteria;
   if (input.capacity !== undefined) patch.capacity = input.capacity;
   if (input.statusOverride !== undefined) patch.status_override = input.statusOverride;
+  if (input.deactivatedAt !== undefined) patch.deactivated_at = input.deactivatedAt;
 
   const { error } = await supabase
     .from("opportunities")

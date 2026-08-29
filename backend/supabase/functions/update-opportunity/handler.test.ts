@@ -81,3 +81,67 @@ Deno.test("updateOpportunity rejects staff without opportunities:update for the 
     "forbidden",
   );
 });
+
+Deno.test("updateOpportunity lets staff with opportunities:delete deactivate an opportunity, and its computed status becomes closed", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Deactivate Target", type: "event",
+  }).select("id").single();
+
+  const deactivatedAt = new Date().toISOString();
+  await updateOpportunity(supabase, staffClaims(orgId, "opportunities:delete"), {
+    opportunityId: opportunity!.id, organizationId: orgId, deactivatedAt,
+  });
+
+  const { data: updated } = await supabase
+    .from("opportunities")
+    .select("deactivated_at, opportunity_status")
+    .eq("id", opportunity!.id)
+    .single();
+  assertEquals(new Date(updated!.deactivated_at).getTime(), new Date(deactivatedAt).getTime());
+  assertEquals(updated!.opportunity_status, "closed");
+});
+
+Deno.test("updateOpportunity rejects staff with only opportunities:update trying to set deactivatedAt", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Deactivate Target", type: "event",
+  }).select("id").single();
+
+  await assertRejects(
+    () => updateOpportunity(supabase, staffClaims(orgId, "opportunities:update"), {
+      opportunityId: opportunity!.id, organizationId: orgId, deactivatedAt: new Date().toISOString(),
+    }),
+    Error,
+    "forbidden",
+  );
+
+  const { data: unchanged } = await supabase
+    .from("opportunities")
+    .select("deactivated_at")
+    .eq("id", opportunity!.id)
+    .single();
+  assertEquals(unchanged!.deactivated_at, null);
+});
+
+Deno.test("updateOpportunity lets staff with opportunities:delete reactivate an opportunity by setting deactivatedAt to null", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Reactivate Target", type: "event", deactivated_at: new Date().toISOString(),
+  }).select("id").single();
+
+  await updateOpportunity(supabase, staffClaims(orgId, "opportunities:delete"), {
+    opportunityId: opportunity!.id, organizationId: orgId, deactivatedAt: null,
+  });
+
+  const { data: updated } = await supabase
+    .from("opportunities")
+    .select("deactivated_at, opportunity_status")
+    .eq("id", opportunity!.id)
+    .single();
+  assertEquals(updated!.deactivated_at, null);
+  assertEquals(updated!.opportunity_status, "open");
+});
