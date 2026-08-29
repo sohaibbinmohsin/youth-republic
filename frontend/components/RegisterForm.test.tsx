@@ -68,7 +68,7 @@ describe("RegisterForm", () => {
     expect(await screen.findByText("minor_consent_required")).toBeInTheDocument();
   });
 
-  it("calls onSuccess after a successful registration", async () => {
+  it("shows the new Volunteer ID instead of calling onSuccess immediately, then calls it once the volunteer continues", async () => {
     vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v1", volunteerCode: "VOL-2026-000001" });
     const onSuccess = vi.fn();
     const user = userEvent.setup();
@@ -78,6 +78,20 @@ describe("RegisterForm", () => {
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
     await user.click(screen.getByRole("button", { name: "Register" }));
 
-    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(await screen.findByText("VOL-2026-000001")).toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(onSuccess).toHaveBeenCalled();
+  });
+
+  it("blocks submit and shows which fields are missing when mandatory fields are left blank", async () => {
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} />);
+
+    await user.click(screen.getByRole("button", { name: "Register" }));
+
+    expect(edgeFunctions.registerVolunteer).not.toHaveBeenCalled();
+    expect(screen.getByText(/please fill in.*full name/i)).toBeInTheDocument();
   });
 });
