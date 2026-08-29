@@ -21,3 +21,13 @@ per-environment, never committed): `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
 `SUPABASE_ACCESS_TOKEN`, `STAFF_JWT_SECRET`, `R2_ACCESS_KEY_ID`,
 `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_URL`, `RESEND_API_KEY`,
 `EMAIL_FROM_ADDRESS`.
+
+Periodic hygiene: this test suite runs against a real hosted project, not
+an ephemeral one. pgTAP tests leave zero residue (`begin ... rollback`
+throughout), but several Deno handler tests call
+`supabase.auth.admin.createUser()` with no teardown, so real
+(synthetic-but-real-shaped) volunteer rows accumulate across test runs.
+Review and run `supabase/scripts/cleanup-synthetic-test-data.sql`
+occasionally to purge them:
+
+    psql "$SUPABASE_DB_URL" -f supabase/scripts/cleanup-synthetic-test-data.sql
