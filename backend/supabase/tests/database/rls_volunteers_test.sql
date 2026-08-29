@@ -1,6 +1,6 @@
 begin;
 set constraints all deferred;
-select plan(9);
+select plan(10);
 
 insert into volunteers (auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program)
 values (gen_random_uuid(), 'RLS Test', 'rls-test@example.com', '0300-7777777', '1999-01-01', 'male', 'Lahore', 'Punjab', 'Pakistan', 'Test Uni', 'BSCS')
@@ -15,6 +15,20 @@ select is(
   (select cnic_number from volunteers where id = :'vol_id'),
   null,
   'a volunteer cannot update their own row directly via RLS — with no self-update policy, the UPDATE silently matches zero rows (RLS filters rows for UPDATE, it does not raise); only updateSensitiveField() and registerVolunteer() (service-role Edge Functions) may write volunteers'
+);
+
+-- Unlike UPDATE above, a missing INSERT policy makes Postgres evaluate an
+-- implicit `with check (false)` — the insert itself raises an RLS violation
+-- rather than silently affecting zero rows (same distinction already drawn
+-- for applications/activity_hours in rls_org_scoped_test.sql).
+select set_config('request.jwt.claims', format('{"sub": "%s"}', gen_random_uuid()), true);
+select set_config('role', 'authenticated', true);
+select throws_ok(
+  $$ insert into volunteers (auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program)
+     values (gen_random_uuid(), 'Self-Registered Bypass', 'self-register-bypass@example.com', '0300-6666666', '1999-01-01', 'male', 'Lahore', 'Punjab', 'Pakistan', 'Test Uni', 'BSCS') $$,
+  null,
+  null,
+  'a volunteer-side client cannot insert into volunteers directly via RLS — no self-insert policy exists; only registerVolunteer() (service-role, enforcing minor-consent and near-duplicate flagging) may create a volunteer row'
 );
 
 select set_config('request.jwt.claims', '{"platform_owner": true}', true);
