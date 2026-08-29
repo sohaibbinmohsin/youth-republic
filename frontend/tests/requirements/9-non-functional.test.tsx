@@ -24,6 +24,7 @@ describe("§9 Clean internal APIs — every write goes through a named function 
         "submitHours",
         "requestCnicUploadUrl",
         "updateSensitiveField",
+        "updateProfileField",
       ]),
     );
   });
