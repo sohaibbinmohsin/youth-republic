@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
 import type { EmailClient } from "../_shared/sendEmail.ts";
+import { escapeHtml } from "../_shared/escapeHtml.ts";
 
 export interface VerifyHoursInput {
   activityHoursId: string;
@@ -60,7 +61,7 @@ export async function verifyHours(
 
   if (volunteer) {
     const subject = "Your volunteer hours have been reviewed";
-    const html = `<p>Hi ${volunteer.full_name},</p><p>Your submitted hours were <strong>${input.decision}</strong>.</p>`;
+    const html = `<p>Hi ${escapeHtml(volunteer.full_name)},</p><p>Your submitted hours were <strong>${input.decision}</strong>.</p>`;
     try {
       await emailClient.send(volunteer.email, subject, html);
     } catch {

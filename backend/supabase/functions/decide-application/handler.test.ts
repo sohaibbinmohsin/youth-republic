@@ -206,6 +206,25 @@ Deno.test("decideApplication sends a status-change email to the volunteer", asyn
   assertEquals(emailClient.sent[0].to, volunteer!.email);
 });
 
+Deno.test("decideApplication escapes a volunteer's full_name before interpolating it into the email HTML", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { applicationId } = await makeApplication(supabase, orgId, {
+    full_name: '<img src=x onerror=alert(1)>Evil<script>alert(2)</script>',
+  });
+  const emailClient = new FakeEmailClient();
+
+  await decideApplication(supabase, staffClaims(orgId), {
+    applicationId, decision: "selected",
+  }, emailClient);
+
+  assertEquals(emailClient.sent.length, 1);
+  const html = emailClient.sent[0].html;
+  assertEquals(html.includes("<script>"), false);
+  assertEquals(html.includes("<img"), false);
+  assertEquals(html.includes("&lt;script&gt;"), true);
+});
+
 Deno.test("decideApplication completes successfully when the email send throws — the committed state change is still reported as success", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

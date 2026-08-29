@@ -24,7 +24,7 @@ function testClient() {
   return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 }
 
-async function makeActivityHours(supabase: ReturnType<typeof testClient>) {
+async function makeActivityHours(supabase: ReturnType<typeof testClient>, volunteerOverrides: Record<string, unknown> = {}) {
   const orgId = crypto.randomUUID();
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
@@ -43,6 +43,7 @@ async function makeActivityHours(supabase: ReturnType<typeof testClient>) {
     country: "Pakistan",
     institution: "Test Uni",
     degree_program: "BSCS",
+    ...volunteerOverrides,
   }).select("id").single();
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Verify Test Opp", type: "event",
@@ -122,6 +123,24 @@ Deno.test("verifyHours sends a status-change email to the volunteer", async () =
   }, emailClient);
 
   assertEquals(emailClient.sent.length, 1);
+});
+
+Deno.test("verifyHours escapes a volunteer's full_name before interpolating it into the email HTML", async () => {
+  const supabase = testClient();
+  const { activityHoursId, orgId } = await makeActivityHours(supabase, {
+    full_name: '<img src=x onerror=alert(1)>Evil<script>alert(2)</script>',
+  });
+  const emailClient = new FakeEmailClient();
+
+  await verifyHours(supabase, staffClaims(orgId), {
+    activityHoursId, decision: "verified", hoursVerified: 5,
+  }, emailClient);
+
+  assertEquals(emailClient.sent.length, 1);
+  const html = emailClient.sent[0].html;
+  assertEquals(html.includes("<script>"), false);
+  assertEquals(html.includes("<img"), false);
+  assertEquals(html.includes("&lt;script&gt;"), true);
 });
 
 Deno.test("verifyHours completes successfully when the email send throws — the committed state change is still reported as success", async () => {
