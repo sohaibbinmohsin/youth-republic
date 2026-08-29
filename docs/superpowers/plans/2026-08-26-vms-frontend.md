@@ -91,14 +91,14 @@ Client-vs-server split: files under `app/` that need a logged-in volunteer's own
 **Interfaces:**
 - Produces: the Next.js app shell and test runner, required by every later task.
 
-- [ ] **Step 1: Scaffold the Next.js app**
+- [x] **Step 1: Scaffold the Next.js app**
 
 ```bash
 cd /Users/sohaibbinmohsin/Developer/rizq/youth-republic
 npx create-next-app@latest frontend --typescript --tailwind --app --no-src-dir --import-alias "@/*" --eslint
 ```
 
-- [ ] **Step 2: Install test and Supabase dependencies**
+- [x] **Step 2: Install test and Supabase dependencies**
 
 ```bash
 cd frontend
@@ -106,7 +106,7 @@ npm install @supabase/ssr @supabase/supabase-js
 npm install -D vitest @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom
 ```
 
-- [ ] **Step 3: Configure Vitest**
+- [x] **Step 3: Configure Vitest**
 
 Create `frontend/vitest.config.ts`:
 
@@ -136,7 +136,7 @@ import "@testing-library/jest-dom/vitest";
 
 Add to `frontend/package.json` scripts: `"test": "vitest run"`.
 
-- [ ] **Step 4: Document required environment variables**
+- [x] **Step 4: Document required environment variables**
 
 Create `frontend/.env.local.example`:
 
@@ -148,7 +148,7 @@ NEXT_PUBLIC_FUNCTIONS_URL=
 
 `NEXT_PUBLIC_FUNCTIONS_URL` is the backend's Edge Functions base (e.g. `http://localhost:54321/functions/v1` locally, or `https://<project>.functions.supabase.co` in production).
 
-- [ ] **Step 5: Write a smoke test for the home page**
+- [x] **Step 5: Write a smoke test for the home page**
 
 Create `frontend/app/page.test.tsx`:
 
@@ -165,12 +165,12 @@ describe("Home", () => {
 });
 ```
 
-- [ ] **Step 6: Run the test to verify it fails**
+- [x] **Step 6: Run the test to verify it fails**
 
 Run: `cd frontend && npm test -- app/page.test.tsx`
 Expected: FAIL — the scaffolded `page.tsx` has no `<h1>`, or the test file can't yet resolve the component export shape.
 
-- [ ] **Step 7: Write the home page**
+- [x] **Step 7: Write the home page**
 
 Replace `frontend/app/page.tsx`:
 
@@ -187,12 +187,12 @@ export default function Home() {
 }
 ```
 
-- [ ] **Step 8: Run the test to verify it passes**
+- [x] **Step 8: Run the test to verify it passes**
 
 Run: `cd frontend && npm test -- app/page.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add frontend/
@@ -210,7 +210,7 @@ git commit -m "chore(frontend): bootstrap Next.js app with Tailwind and Vitest"
 **Interfaces:**
 - Produces: `isMinor(dob: string, asOf?: Date): boolean` — mirrors the backend's `volunteer_is_minor()` SQL function (backend plan Task 2) so the registration form can show/hide guardian fields client-side before submission, without waiting on a round trip. Used by Task 5 (`RegisterForm`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/lib/ageUtils.test.ts`:
 
@@ -233,12 +233,12 @@ describe("isMinor", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- lib/ageUtils.test.ts`
 Expected: FAIL — `ageUtils.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `frontend/lib/ageUtils.ts`:
 
@@ -254,12 +254,12 @@ export function isMinor(dob: string, asOf: Date = new Date()): boolean {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- lib/ageUtils.test.ts`
 Expected: PASS on all 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/lib/ageUtils.ts frontend/lib/ageUtils.test.ts
@@ -277,7 +277,7 @@ git commit -m "feat(frontend): add isMinor age calculation for registration"
 **Interfaces:**
 - Produces: `registerVolunteer`, `applyToOpportunity`, `submitHours`, `requestCnicUploadUrl`, `updateSensitiveField` — typed wrappers over `fetch`, each taking the volunteer's access token (never `volunteerId`/`authUserId`, per the backend's Task 23 fix). Used by Tasks 5, 7, 8, 11, 13.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/lib/edgeFunctions.test.ts`:
 
@@ -393,12 +393,12 @@ describe("updateSensitiveField", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd frontend && npm test -- lib/edgeFunctions.test.ts`
 Expected: FAIL — `edgeFunctions.ts` does not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `frontend/lib/edgeFunctions.ts`:
 
@@ -501,12 +501,12 @@ export function updateSensitiveField(payload: UpdateSensitiveFieldPayload, acces
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd frontend && npm test -- lib/edgeFunctions.test.ts`
 Expected: PASS on all 6 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/lib/edgeFunctions.ts frontend/lib/edgeFunctions.test.ts
@@ -528,7 +528,7 @@ git commit -m "feat(frontend): add typed Edge Function client wrappers"
 **Interfaces:**
 - Produces: `getBrowserSupabaseClient(): SupabaseClient` (for client components), `getServerSupabaseClient(): Promise<SupabaseClient>` (for server components, reads cookies). `AppShell({ children }: { children: ReactNode })` — the shared nav/layout wrapper with a mobile menu toggle, used by every page from Task 5 onward. Also renders a persistent "Support" link (`mailto:support@themohsinproject.org`) in the footer, present on every page regardless of auth state — clicking it opens the visitor's own mail client with that address pre-filled, no in-app contact form or backend involved.
 
-- [ ] **Step 1: Write the failing test for `AppShell`**
+- [x] **Step 1: Write the failing test for `AppShell`**
 
 Create `frontend/components/AppShell.test.tsx`:
 
@@ -579,12 +579,12 @@ describe("AppShell", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/AppShell.test.tsx`
 Expected: FAIL — `AppShell.tsx` does not exist.
 
-- [ ] **Step 3: Write the Supabase client modules**
+- [x] **Step 3: Write the Supabase client modules**
 
 Create `frontend/lib/supabase/browserClient.ts`:
 
@@ -624,7 +624,7 @@ export async function getServerSupabaseClient() {
 }
 ```
 
-- [ ] **Step 4: Write the auth middleware**
+- [x] **Step 4: Write the auth middleware**
 
 Create `frontend/middleware.ts`:
 
@@ -670,7 +670,7 @@ export const config = {
 };
 ```
 
-- [ ] **Step 5: Write `AppShell`**
+- [x] **Step 5: Write `AppShell`**
 
 Create `frontend/components/AppShell.tsx`:
 
@@ -735,7 +735,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 ```
 
-- [ ] **Step 6: Wire `AppShell` into the root layout**
+- [x] **Step 6: Wire `AppShell` into the root layout**
 
 Modify `frontend/app/layout.tsx` — wrap `{children}` with `<AppShell>`:
 
@@ -760,12 +760,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `cd frontend && npm test -- components/AppShell.test.tsx`
 Expected: PASS on all 3 tests.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add frontend/lib/supabase/ frontend/middleware.ts frontend/components/AppShell.tsx frontend/components/AppShell.test.tsx frontend/app/layout.tsx
@@ -787,7 +787,7 @@ git commit -m "feat(frontend): add Supabase clients, auth middleware, and respon
 - Consumes: `isMinor()` (Task 2), `registerVolunteer()` (Task 3), `getBrowserSupabaseClient()` (Task 4).
 - Produces: `<RegisterForm />` — the U1 registration flow, including conditional guardian consent fields for minors.
 
-- [ ] **Step 1: Write the failing test for `GuardianConsentFields`**
+- [x] **Step 1: Write the failing test for `GuardianConsentFields`**
 
 Create `frontend/components/GuardianConsentFields.test.tsx`:
 
@@ -813,12 +813,12 @@ describe("GuardianConsentFields", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/GuardianConsentFields.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `GuardianConsentFields`**
+- [x] **Step 3: Write `GuardianConsentFields`**
 
 Create `frontend/components/GuardianConsentFields.tsx`:
 
@@ -870,12 +870,12 @@ export function GuardianConsentFields({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- components/GuardianConsentFields.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Write the failing test for `RegisterForm`**
+- [x] **Step 5: Write the failing test for `RegisterForm`**
 
 Create `frontend/components/RegisterForm.test.tsx`:
 
@@ -952,12 +952,12 @@ describe("RegisterForm", () => {
 });
 ```
 
-- [ ] **Step 6: Run tests to verify they fail**
+- [x] **Step 6: Run tests to verify they fail**
 
 Run: `cd frontend && npm test -- components/RegisterForm.test.tsx`
 Expected: FAIL — `RegisterForm.tsx` does not exist.
 
-- [ ] **Step 7: Write `RegisterForm`**
+- [x] **Step 7: Write `RegisterForm`**
 
 Create `frontend/components/RegisterForm.tsx`:
 
@@ -1079,12 +1079,12 @@ export function RegisterForm({ accessToken }: { accessToken: string }) {
 }
 ```
 
-- [ ] **Step 8: Run tests to verify they pass**
+- [x] **Step 8: Run tests to verify they pass**
 
 Run: `cd frontend && npm test -- components/RegisterForm.test.tsx`
 Expected: PASS on all 4 tests.
 
-- [ ] **Step 9: Add an `onSuccess` callback to `RegisterForm`**
+- [x] **Step 9: Add an `onSuccess` callback to `RegisterForm`**
 
 Modify `frontend/components/RegisterForm.tsx` — change the component signature from:
 
@@ -1104,7 +1104,7 @@ Then add, inside `handleSubmit`'s `try` block, right after the `await registerVo
       onSuccess?.();
 ```
 
-- [ ] **Step 10: Add a test for the `onSuccess` callback**
+- [x] **Step 10: Add a test for the `onSuccess` callback**
 
 Add to `frontend/components/RegisterForm.test.tsx`:
 
@@ -1123,12 +1123,12 @@ Add to `frontend/components/RegisterForm.test.tsx`:
   });
 ```
 
-- [ ] **Step 11: Run all `RegisterForm` tests to verify they pass**
+- [x] **Step 11: Run all `RegisterForm` tests to verify they pass**
 
 Run: `cd frontend && npm test -- components/RegisterForm.test.tsx`
 Expected: PASS on all 5 tests.
 
-- [ ] **Step 12: Write the register page**
+- [x] **Step 12: Write the register page**
 
 Create `frontend/app/register/page.tsx`. It gates on a Supabase Auth session: if none exists yet, it shows a sign-up form; once a session exists (either just created, or already present from a previous visit), it renders `RegisterForm` and redirects to `/profile` on success.
 
@@ -1195,7 +1195,7 @@ export default function RegisterPage() {
 }
 ```
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 git add frontend/components/GuardianConsentFields.tsx frontend/components/GuardianConsentFields.test.tsx frontend/components/RegisterForm.tsx frontend/components/RegisterForm.test.tsx frontend/app/register/page.tsx
@@ -1214,7 +1214,7 @@ git commit -m "feat(frontend): add registration flow with minor guardian consent
 - Consumes: `getBrowserSupabaseClient()` (Task 4).
 - Produces: the login screen; redirects to `redirectTo` query param or `/opportunities` on success.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/app/login/page.test.tsx`:
 
@@ -1269,12 +1269,12 @@ describe("LoginPage", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- app/login/page.test.tsx`
 Expected: FAIL — `page.tsx` does not exist.
 
-- [ ] **Step 3: Write the login page**
+- [x] **Step 3: Write the login page**
 
 Create `frontend/app/login/page.tsx`:
 
@@ -1324,12 +1324,12 @@ export default function LoginPage() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- app/login/page.test.tsx`
 Expected: PASS on both tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/app/login/
@@ -1348,7 +1348,7 @@ git commit -m "feat(frontend): add login page"
 - Consumes: `requestCnicUploadUrl()` (Task 3).
 - Produces: `<CnicUploadField accessToken={string} onUploaded={(objectKey: string) => void} />`. Used by Task 8 (`profile` page).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/components/CnicUploadField.test.tsx`:
 
@@ -1398,12 +1398,12 @@ describe("CnicUploadField", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/CnicUploadField.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `CnicUploadField`**
+- [x] **Step 3: Write `CnicUploadField`**
 
 Create `frontend/components/CnicUploadField.tsx`:
 
@@ -1450,12 +1450,12 @@ export function CnicUploadField({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- components/CnicUploadField.test.tsx`
 Expected: PASS on both tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/components/CnicUploadField.tsx frontend/components/CnicUploadField.test.tsx
@@ -1475,7 +1475,7 @@ git commit -m "feat(frontend): add CNIC signed-URL upload field"
 - Consumes: `updateSensitiveField()` (Task 3), `CnicUploadField` (Task 7), `getBrowserSupabaseClient()` (Task 4).
 - Produces: `<SensitiveFieldEditor fieldName fieldLabel currentValue accessToken volunteerId onUpdated />`.
 
-- [ ] **Step 1: Write the failing test for `SensitiveFieldEditor`**
+- [x] **Step 1: Write the failing test for `SensitiveFieldEditor`**
 
 Create `frontend/components/SensitiveFieldEditor.test.tsx`:
 
@@ -1524,12 +1524,12 @@ describe("SensitiveFieldEditor", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/SensitiveFieldEditor.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `SensitiveFieldEditor`**
+- [x] **Step 3: Write `SensitiveFieldEditor`**
 
 Create `frontend/components/SensitiveFieldEditor.tsx`:
 
@@ -1584,12 +1584,12 @@ export function SensitiveFieldEditor({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- components/SensitiveFieldEditor.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Write the profile page**
+- [x] **Step 5: Write the profile page**
 
 Create `frontend/app/profile/page.tsx`:
 
@@ -1658,7 +1658,7 @@ export default function ProfilePage() {
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/components/SensitiveFieldEditor.tsx frontend/components/SensitiveFieldEditor.test.tsx frontend/app/profile/page.tsx
@@ -1678,7 +1678,7 @@ git commit -m "feat(frontend): add profile page with sensitive-field editing and
 - Consumes: `getServerSupabaseClient()` (Task 4).
 - Produces: `<OpportunityCard opportunity={{ id, name, type, location, organizationName }} />`. Public, server-rendered list.
 
-- [ ] **Step 1: Write the failing test for `OpportunityCard`**
+- [x] **Step 1: Write the failing test for `OpportunityCard`**
 
 Create `frontend/components/OpportunityCard.test.tsx`:
 
@@ -1701,12 +1701,12 @@ describe("OpportunityCard", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/OpportunityCard.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `OpportunityCard`**
+- [x] **Step 3: Write `OpportunityCard`**
 
 Create `frontend/components/OpportunityCard.tsx`:
 
@@ -1735,12 +1735,12 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- components/OpportunityCard.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Write the opportunities list page**
+- [x] **Step 5: Write the opportunities list page**
 
 Create `frontend/app/opportunities/page.tsx`:
 
@@ -1786,7 +1786,7 @@ export default async function OpportunitiesPage() {
 
 `organizationName` now comes from `vms/backend`'s own local `organizations` mirror table (backend plan Task 24) — a second query against the same local Supabase project, not a cross-project call into `platform`. This replaces an earlier draft of this page that hardcoded the name and planned to add a live `GET /internal/organizations` call into `platform`; that approach was rejected in favor of `platform` pushing org data into each module backend on create/rename, specifically so `vms/frontend`'s request path never depends on `platform` being up (see the `platform`/`tmp-partner-admin` spec §2, and the vms design spec's `organizations` mirror section, §3).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/components/OpportunityCard.tsx frontend/components/OpportunityCard.test.tsx frontend/app/opportunities/page.tsx
@@ -1804,7 +1804,7 @@ git commit -m "feat(frontend): add public opportunities list page"
 - Consumes: `getServerSupabaseClient()` (Task 4).
 - Produces: a server-rendered detail page with `generateMetadata()` for Open Graph tags — the concrete realization of the Next.js-over-Vite decision from brainstorming.
 
-- [ ] **Step 1: Write the page with metadata generation**
+- [x] **Step 1: Write the page with metadata generation**
 
 Create `frontend/app/opportunities/[id]/page.tsx`:
 
@@ -1868,11 +1868,11 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
 }
 ```
 
-- [ ] **Step 2: Manually verify metadata rendering**
+- [x] **Step 2: Manually verify metadata rendering**
 
 Run: `cd frontend && npm run dev`, visit `http://localhost:3000/opportunities/<a-real-id-from-your-local-db>`, then view page source (not the rendered DOM) and confirm `<meta property="og:title" ...>` and `<meta property="og:description" ...>` are present. `generateMetadata` is a Next.js server API without a lightweight unit-test seam — this manual check is the appropriate verification for it, not a gap.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/app/opportunities/\[id\]/page.tsx
@@ -1892,7 +1892,7 @@ git commit -m "feat(frontend): add opportunity detail page with Open Graph metad
 - Consumes: `applyToOpportunity()` (Task 3).
 - Produces: `<ApplyForm opportunityId organizationId accessToken onSuccess />`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/components/ApplyForm.test.tsx`:
 
@@ -1946,12 +1946,12 @@ describe("ApplyForm", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/ApplyForm.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `ApplyForm`**
+- [x] **Step 3: Write `ApplyForm`**
 
 Create `frontend/components/ApplyForm.tsx`:
 
@@ -2011,12 +2011,12 @@ export function ApplyForm({
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `cd frontend && npm test -- components/ApplyForm.test.tsx`
 Expected: PASS on both tests.
 
-- [ ] **Step 5: Write the apply page**
+- [x] **Step 5: Write the apply page**
 
 Create `frontend/app/apply/[opportunityId]/page.tsx`:
 
@@ -2068,7 +2068,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/components/ApplyForm.tsx frontend/components/ApplyForm.test.tsx frontend/app/apply/
@@ -2088,7 +2088,7 @@ git commit -m "feat(frontend): add apply flow"
 - Consumes: `getBrowserSupabaseClient()` (Task 4).
 - Produces: `<ApplicationStatusBadge status="submitted" | "under_review" | "selected" | "rejected" | "withdrawn" />`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/components/ApplicationStatusBadge.test.tsx`:
 
@@ -2110,12 +2110,12 @@ describe("ApplicationStatusBadge", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/ApplicationStatusBadge.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `ApplicationStatusBadge`**
+- [x] **Step 3: Write `ApplicationStatusBadge`**
 
 Create `frontend/components/ApplicationStatusBadge.tsx`:
 
@@ -2147,12 +2147,12 @@ export function ApplicationStatusBadge({ status }: { status: ApplicationStatus }
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- components/ApplicationStatusBadge.test.tsx`
 Expected: PASS on both tests.
 
-- [ ] **Step 5: Write the applications page**
+- [x] **Step 5: Write the applications page**
 
 Create `frontend/app/applications/page.tsx`:
 
@@ -2203,7 +2203,7 @@ export default function ApplicationsPage() {
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/components/ApplicationStatusBadge.tsx frontend/components/ApplicationStatusBadge.test.tsx frontend/app/applications/page.tsx
@@ -2222,7 +2222,7 @@ git commit -m "feat(frontend): add My Applications page"
 - Consumes: `submitHours()` (Task 3).
 - Produces: `<SubmitHoursForm participationId opportunityId organizationId accessToken onSubmitted />`. Rendered inline on the portfolio page (Task 14) per participation row.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/components/SubmitHoursForm.test.tsx`:
 
@@ -2270,12 +2270,12 @@ describe("SubmitHoursForm", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/SubmitHoursForm.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `SubmitHoursForm`**
+- [x] **Step 3: Write `SubmitHoursForm`**
 
 Create `frontend/components/SubmitHoursForm.tsx`:
 
@@ -2345,12 +2345,12 @@ export function SubmitHoursForm({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- components/SubmitHoursForm.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/components/SubmitHoursForm.tsx frontend/components/SubmitHoursForm.test.tsx
@@ -2370,7 +2370,7 @@ git commit -m "feat(frontend): add submit-hours form"
 - Consumes: `SubmitHoursForm` (Task 13), `getBrowserSupabaseClient()` (Task 4), the backend's `volunteer_total_verified_hours` RPC (backend plan Task 7).
 - Produces: `<PortfolioSummary totalVerifiedHours memberSince />`. The U6 page — chronological history grouped by org, total verified hours, member-since date.
 
-- [ ] **Step 1: Write the failing test for `PortfolioSummary`**
+- [x] **Step 1: Write the failing test for `PortfolioSummary`**
 
 Create `frontend/components/PortfolioSummary.test.tsx`:
 
@@ -2388,12 +2388,12 @@ describe("PortfolioSummary", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- components/PortfolioSummary.test.tsx`
 Expected: FAIL — component does not exist.
 
-- [ ] **Step 3: Write `PortfolioSummary`**
+- [x] **Step 3: Write `PortfolioSummary`**
 
 Create `frontend/components/PortfolioSummary.tsx`:
 
@@ -2419,12 +2419,12 @@ export function PortfolioSummary({
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- components/PortfolioSummary.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Write the portfolio page**
+- [x] **Step 5: Write the portfolio page**
 
 Create `frontend/app/portfolio/page.tsx`:
 
@@ -2510,7 +2510,7 @@ export default function PortfolioPage() {
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/components/PortfolioSummary.tsx frontend/components/PortfolioSummary.test.tsx frontend/app/portfolio/page.tsx
@@ -2521,10 +2521,10 @@ git commit -m "feat(frontend): add portfolio dashboard with hours submission"
 
 ## Post-plan checklist (not a task — verify before deployment)
 
-- [ ] `cd frontend && npm test` passes in full.
-- [ ] `cd frontend && npm run build` succeeds with no type errors.
-- [ ] Manually walk the golden path against a local `backend` instance: sign up → register (as an adult) → browse opportunities → apply → (manually mark "selected" via a direct SQL update or the future `platform` admin UI) → submit hours → see them reflected once verified (again via direct SQL until `platform`'s verify-hours UI exists) → portfolio shows the hour count.
-- [ ] Repeat registration with a DOB under 18 and confirm the guardian fields are required and submission is blocked without them.
-- [ ] Resize the browser below 640px (Tailwind's `sm` breakpoint) and confirm the mobile nav toggle works and no page requires horizontal scrolling.
-- [ ] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_FUNCTIONS_URL` are documented in `frontend/.env.local.example` and set in the Vercel project.
-- [ ] Confirm `backend`'s local `organizations` table (backend plan Task 24) has at least one synced row (Rizq) before relying on Task 9's opportunity list page — org names render as "Unknown organization" rather than erroring if the mirror is empty, since `platform` pushes this data on org create/rename rather than `vms/frontend` pulling it live.
+- [x] `cd frontend && npm test` passes in full. (31/31 tests across 14 files, verified independently at the final task.)
+- [x] `cd frontend && npm run build` succeeds with no type errors. (Verified independently at the final task, and spot-checked after most tasks from Task 9 onward — see the ledger for one real build-breaking defect found and fixed along the way, in Task 6's login page.)
+- [ ] Manually walk the golden path against a local `backend` instance: sign up → register (as an adult) → browse opportunities → apply → (manually mark "selected" via a direct SQL update or the future `platform` admin UI) → submit hours → see them reflected once verified (again via direct SQL until `platform`'s verify-hours UI exists) → portfolio shows the hour count. **NOT DONE** — this session was never given `NEXT_PUBLIC_SUPABASE_*` credentials for `frontend/`. Attempted anyway via `npm run dev`: every route 404s because `middleware.ts` (correct, as specified) throws without real Supabase credentials. Needs a `frontend/.env.local` pointed at the now-complete `execution/vms-backend` project.
+- [ ] Repeat registration with a DOB under 18 and confirm the guardian fields are required and submission is blocked without them. **NOT DONE** — same missing prerequisite as above. The unit-level behavior (guardian fields render conditionally on a minor DOB, submission includes guardian fields when shown) is covered by `RegisterForm.test.tsx`, but that's not a substitute for the real end-to-end walkthrough this item asks for.
+- [ ] Resize the browser below 640px (Tailwind's `sm` breakpoint) and confirm the mobile nav toggle works and no page requires horizontal scrolling. **NOT DONE** — attempted via a real browser at 375px width against the dev server; blocked by the same credentials gap (every route 404s before any layout is visible). `AppShell.test.tsx` covers the toggle's open/close *logic* at the DOM level, but jsdom doesn't evaluate the `sm:` media-query breakpoints this item is actually asking about.
+- [x] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_FUNCTIONS_URL` are documented in `frontend/.env.local.example` — confirmed present. The "and set in the Vercel project" half is **not applicable**: no Vercel project exists yet for this branch.
+- [ ] Confirm `backend`'s local `organizations` table (backend plan Task 24) has at least one synced row (Rizq) before relying on Task 9's opportunity list page — org names render as "Unknown organization" rather than erroring if the mirror is empty, since `platform` pushes this data on org create/rename rather than `vms/frontend` pulling it live. **NOT DONE** — already flagged as outstanding in `execution/vms-backend`'s own post-plan checklist (item 5: `organizations` table has 0 rows, needs a real `platform`-originated sync call). Unchanged since that report; this item is the frontend-side restatement of the same open dependency.
