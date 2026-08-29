@@ -39,6 +39,12 @@ export async function verifyStaffToken(authHeader: string | null): Promise<Staff
       // as an opaque DB error instead of a clean 401.
       throw new Error("unauthorized");
     }
+    if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
+      // djwt's verify() only rejects a malformed exp claim, not a missing
+      // one — a hand-crafted (but correctly-signed) token that omits exp
+      // entirely would otherwise verify successfully and never expire.
+      throw new Error("unauthorized");
+    }
     return {
       actorType: String(payload.actor_type ?? "staff"),
       staffId: payload.staff_id,

@@ -60,6 +60,25 @@ Deno.test("verifyStaffToken rejects a well-signed token with no staff_id claim",
   await assertRejects(() => verifyStaffToken(`Bearer ${token}`), Error, "unauthorized");
 });
 
+Deno.test("verifyStaffToken rejects a well-signed token with no exp claim at all", async () => {
+  Deno.env.set("STAFF_JWT_SECRET", secret);
+  // djwt's verify() does not itself require exp to be present -- only
+  // rejects it when present but malformed -- so a hand-crafted token that
+  // omits exp entirely would otherwise verify successfully and never
+  // expire. Passing exp: undefined here overrides signStaffToken's default
+  // getNumericDate(60) and is dropped by JSON.stringify, producing a
+  // correctly-signed token with no exp claim in its payload at all.
+  const token = await signStaffToken({
+    actor_type: "staff",
+    staff_id: "staff-1",
+    platform_owner: false,
+    org_roles: [],
+    module_access: [],
+    exp: undefined,
+  });
+  await assertRejects(() => verifyStaffToken(`Bearer ${token}`), Error, "unauthorized");
+});
+
 const baseClaims = (overrides: Partial<StaffClaims> = {}): StaffClaims => ({
   actorType: "staff",
   staffId: "staff-1",
