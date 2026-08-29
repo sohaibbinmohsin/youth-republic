@@ -2,7 +2,14 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 function csvEscape(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
+  // Quoting (below) is a CSV-syntax concern -- it does not stop Excel/
+  // Sheets from executing a cell whose actual content starts with =, +, -,
+  // or @ as a formula when the file is opened. Prefix those with a single
+  // quote first: spreadsheet apps treat a leading `'` as "force this cell
+  // to be text," neutralizing the formula while leaving the value's real
+  // content (and the CSV data itself) unchanged.
+  const neutralized = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return `"${neutralized.replace(/"/g, '""')}"`;
 }
 
 export async function exportApplicationsCsv(

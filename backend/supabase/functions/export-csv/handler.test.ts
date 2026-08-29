@@ -43,6 +43,39 @@ Deno.test("exportApplicationsCsv includes a header row and one row per applicati
   assertEquals(lines[1].includes(volunteer!.volunteer_code), true);
 });
 
+Deno.test("exportApplicationsCsv neutralizes a leading formula character in an exported field", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    email: `auth-${crypto.randomUUID()}@example.com`,
+    email_confirm: true,
+  });
+  if (authError) throw authError;
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: authUser.user!.id, full_name: "=cmd|'/c calc'!A0", email: `csv-${crypto.randomUUID()}@example.com`,
+    phone: `0300-${Math.floor(Math.random() * 10000000)}`, dob: "1999-01-01", gender: "male",
+    city: "Lahore", province: "Punjab", country: "Pakistan", institution: "Test Uni", degree_program: "BSCS",
+  }).select("id, volunteer_code").single();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "+1+cmd|'/c calc'!A0", type: "event",
+  }).select("id, name").single();
+  await supabase.from("applications").insert({
+    volunteer_id: volunteer!.id, opportunity_id: opportunity!.id, organization_id: orgId,
+  });
+
+  const csv = await exportApplicationsCsv(supabase, staffClaims(orgId), orgId);
+  const lines = csv.trim().split("\n");
+
+  // Opening a CSV where a cell's actual content starts with =, +, -, or @
+  // in Excel/Sheets executes it as a formula. Quoting the field (the
+  // pre-existing CSV escaping) does not prevent this -- neutralizing it
+  // requires prefixing the value itself, e.g. with a leading single quote.
+  assertEquals(lines[1].includes('"=cmd'), false);
+  assertEquals(lines[1].includes('"\'=cmd'), true);
+  assertEquals(lines[1].includes('"+1+cmd'), false);
+  assertEquals(lines[1].includes('"\'+1+cmd'), true);
+});
+
 Deno.test("exportApplicationsCsv rejects staff without applications:read for the org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
@@ -80,6 +113,30 @@ Deno.test("exportVolunteersCsv includes a header row and one row per volunteer l
   assertEquals(lines[0], "volunteer_code,full_name,email,phone,city,province,institution,status");
   assertEquals(lines.length, 2);
   assertEquals(lines[1].includes(volunteer!.volunteer_code), true);
+});
+
+Deno.test("exportVolunteersCsv neutralizes a leading formula character in an exported field", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+    email: `auth-${crypto.randomUUID()}@example.com`,
+    email_confirm: true,
+  });
+  if (authError) throw authError;
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: authUser.user!.id, full_name: "@SUM(1+1)", email: `csv-vol-${crypto.randomUUID()}@example.com`,
+    phone: `0300-${Math.floor(Math.random() * 10000000)}`, dob: "1999-01-01", gender: "male",
+    city: "-1+1", province: "Punjab", country: "Pakistan", institution: "Test Uni", degree_program: "BSCS",
+  }).select("id, volunteer_code").single();
+  await supabase.rpc("touch_org_volunteer_index", { p_org_id: orgId, p_volunteer_id: volunteer!.id });
+
+  const csv = await exportVolunteersCsv(supabase, volunteersReadClaims(orgId), orgId);
+  const lines = csv.trim().split("\n");
+
+  assertEquals(lines[1].includes('"@SUM'), false);
+  assertEquals(lines[1].includes('"\'@SUM'), true);
+  assertEquals(lines[1].includes('"-1+1'), false);
+  assertEquals(lines[1].includes('"\'-1+1'), true);
 });
 
 Deno.test("exportVolunteersCsv rejects staff without volunteers:read for the org", async () => {
