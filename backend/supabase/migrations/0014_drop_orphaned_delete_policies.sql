@@ -1,0 +1,48 @@
+-- Drops three RLS delete policies from 0010_rls_org_scoped.sql that were
+-- never paired with an Edge Function: opportunities_staff_delete,
+-- chapters_staff_delete, and volunteer_chapter_link_staff_delete were
+-- authored against Task 10's brief, but no delete-opportunity, delete-
+-- chapter, or unlink-chapter Edge Function was ever specified by the plan
+-- (Tasks 14-28) to be the documented write path for them — leaving them
+-- reachable only via a direct PostgREST DELETE from a sufficiently-
+-- permissioned staff token, bypassing admin_action_log entirely and
+-- performing a real hard delete. That conflicts with this project's own
+-- constraint of no hard deletes outside append-only logs (deactivated_at is
+-- the supported path). Decision: accept Edge-Function-only as the real
+-- architecture (that's already how every actual write happens today) and
+-- drop the orphaned policies rather than build three delete Edge Functions
+-- with no brief to build them from.
+--
+-- RLS is deny-by-default per command: dropping a `for delete` policy with
+-- nothing replacing it means DELETE is denied outright for every role
+-- except the service-role client (which bypasses RLS entirely and is
+-- unaffected). No other policy on these tables changes.
+--
+-- Broader landmine, documented here but NOT remediated by this migration:
+-- this hosted project's PostgREST does not currently verify a staff JWT
+-- signed with STAFF_JWT_SECRET at all. Confirmed empirically: a real,
+-- correctly-shaped staff JWT (HS256, claim shape per spec §4) minted with
+-- STAFF_JWT_SECRET and sent as `Authorization: Bearer` directly to this
+-- project's PostgREST (`/rest/v1/opportunities`) was rejected outright with
+-- PGRST301 ("No suitable key or wrong key type") — a signature-verification
+-- failure that happens before RLS is ever evaluated. The same call with the
+-- project's own anon key succeeded normally (200, real row data), confirming
+-- the probe itself was sound and isolating the failure to the staff-signed
+-- token specifically: this project's configured JWT secret is not
+-- STAFF_JWT_SECRET.
+--
+-- That means *every* RLS policy in this schema gated on
+-- staff_has_permission()/staff_has_org_role()/is_platform_owner() — not just
+-- the three dropped below — is currently unreachable via a direct PostgREST
+-- call carrying a staff JWT, because PostgREST rejects the token before any
+-- policy runs, for any table. This is not a live vulnerability today: every
+-- real staff-driven write already goes through an Edge Function using the
+-- service-role client (which bypasses RLS entirely) — the actual, intended
+-- path per spec §4 ("verified through a single verifyStaffToken() module").
+-- This is awareness for whoever next touches this project's JWT/PostgREST
+-- configuration, not a remediation task for the other policies — only the
+-- three delete policies below get an actual behavior change today.
+
+drop policy opportunities_staff_delete on opportunities;
+drop policy chapters_staff_delete on chapters;
+drop policy volunteer_chapter_link_staff_delete on volunteer_chapter_link;

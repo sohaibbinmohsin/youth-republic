@@ -188,6 +188,35 @@ touches one file, not every call site.
   `org_super_admin`" role-name check that was never actually implemented
   (every existing RLS test calls `staff_has_org_role(org_id, null)`,
   never filtering by role name).
+- **Post-implementation finding (2026-08-29):** this hosted project's
+  PostgREST does not currently verify a staff JWT signed with
+  `STAFF_JWT_SECRET` at all. Confirmed empirically — a real, correctly-shaped
+  staff JWT was minted with `STAFF_JWT_SECRET` and sent as `Authorization:
+  Bearer` directly to this project's PostgREST (`/rest/v1/opportunities`);
+  it was rejected with `PGRST301` ("No suitable key or wrong key type"), a
+  signature-verification failure that happens before RLS is ever evaluated.
+  The same call with the project's own anon key succeeded normally,
+  confirming the probe was sound. So every RLS policy in this schema gated
+  on `staff_has_permission()`/`staff_has_org_role()`/`is_platform_owner()` is
+  currently unreachable via a direct PostgREST call carrying a staff JWT —
+  not a live vulnerability today, since every real staff-driven write
+  already goes through an Edge Function using the service-role client (the
+  paragraph above, "verified through a single `verifyStaffToken()` module",
+  is the path actually in effect), but it means this project's PostgREST
+  does not yet implement the "admin hub calls PostgREST directly with the
+  staff JWT" architecture the `vms-backend` plan's Task 11 notes assume is
+  already wired up. Closing that gap would require configuring this
+  project's custom JWT secret to match `STAFF_JWT_SECRET`, which is a live
+  security-setting change outside the scope of this repo's own migrations —
+  left as a documented decision point, not fixed here. One concrete
+  consequence already acted on: three RLS delete policies
+  (`opportunities_staff_delete`, `chapters_staff_delete`,
+  `volunteer_chapter_link_staff_delete`) had no matching Edge Function and
+  were reachable only via this (currently inert) direct-PostgREST path;
+  since Edge-Function-only is the architecture actually in effect, they were
+  dropped in `0014_drop_orphaned_delete_policies.sql` as defense-in-depth
+  rather than paired with new delete Edge Functions — hard deletes on these
+  tables are not a supported path (`deactivated_at` is).
 
 **Key functions / Edge Functions** (every meaningful write goes through
 one of these — never a direct frontend-to-DB write):
