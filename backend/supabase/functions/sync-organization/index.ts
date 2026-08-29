@@ -1,8 +1,12 @@
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
+import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 import { syncOrganization } from "./handler.ts";
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   try {
     const claims = await verifyStaffToken(req.headers.get("Authorization"));
     if (!claims.platformOwner) {
@@ -11,10 +15,17 @@ Deno.serve(async (req) => {
     const supabase = getAdminClient();
     const input = await req.json();
     const result = await syncOrganization(supabase, input);
-    return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
     const status = message === "unauthorized" ? 401 : 400;
-    return new Response(JSON.stringify({ error: message }), { status });
+    return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}

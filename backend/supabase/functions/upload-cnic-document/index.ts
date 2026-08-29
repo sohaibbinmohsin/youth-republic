@@ -2,6 +2,7 @@ import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
 import { verifyStaffToken, staffHasPermission } from "../_shared/verifyStaffToken.ts";
+import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 import { createCnicUploadUrl, getCnicReadUrl, R2Client } from "./handler.ts";
 
 function buildR2Client(): R2Client {
@@ -27,7 +28,10 @@ function buildR2Client(): R2Client {
   };
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   try {
     const { action, objectKey } = await req.json();
     const supabase = getAdminClient();
@@ -36,7 +40,10 @@ Deno.serve(async (req) => {
     if (action === "upload") {
       const { volunteerId } = await verifyVolunteerToken(supabase, req.headers.get("Authorization"));
       const result = await createCnicUploadUrl(r2Client, volunteerId);
-      return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
     if (action === "read") {
       const claims = await verifyStaffToken(req.headers.get("Authorization"));
@@ -50,12 +57,19 @@ Deno.serve(async (req) => {
       );
       if (!canRead) throw new Error("forbidden");
       const result = await getCnicReadUrl(r2Client, objectKey);
-      return new Response(JSON.stringify(result), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
-    return new Response(JSON.stringify({ error: "unknown_action" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "unknown_action" }), { status: 400, headers: corsHeaders });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
     const status = message === "unauthorized" ? 401 : message === "forbidden" ? 403 : 400;
-    return new Response(JSON.stringify({ error: message }), { status });
+    return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}
