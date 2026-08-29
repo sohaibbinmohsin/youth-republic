@@ -8,6 +8,8 @@ const NAV_LINKS = [
   { href: "/applications", label: "My Applications" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/profile", label: "Profile" },
+  { href: "/login", label: "Log in" },
+  { href: "/register", label: "Create account" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
