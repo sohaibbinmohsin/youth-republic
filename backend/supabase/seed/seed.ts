@@ -707,6 +707,13 @@ async function resolveVolunteerAuthUser(
         `createUser reported "${createErr.message}" but no user with email ${email} was found`,
       );
     }
+    // Re-run without a preceding reset.sql: the user already exists but with an
+    // old password. Apply the freshly generated one so runSeed still returns a
+    // credential that authenticates.
+    const { error: pwErr } = await clients.yr.auth.admin.updateUserById(found.id, {
+      password,
+    });
+    ok(pwErr, "update existing seed volunteer password");
     return { authUserId: found.id, created: false };
   }
   throw new Error(`createUser failed: ${createErr?.message ?? "unknown error"}`);

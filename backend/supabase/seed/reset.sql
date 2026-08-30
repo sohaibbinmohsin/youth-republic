@@ -25,6 +25,12 @@ restart identity cascade;
 -- sequence (migration 0001). Reset it so re-seeded volunteers start at VOL-YYYY-000001.
 alter sequence volunteer_code_seq restart with 1;
 
+-- `truncate volunteers ... cascade` does not reach `auth.users` (the FK cascades
+-- the other way). Clear it unconditionally so the seed's `auth.admin.createUser`
+-- is repeatable: the YR project has no kept staff auth rows (staff auth lives on
+-- the admin project), so per spec §"Reset & seed" every auth user is disposable.
+delete from auth.users;
+
 -- Storage objects (buckets `identity-docs`, `application-files`, `session-photos`)
 -- are NOT deleted here: SQL cannot portably remove rows from `storage.objects`
 -- across managed Supabase projects. The seed / deploy step empties the buckets
