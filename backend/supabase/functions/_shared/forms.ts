@@ -190,7 +190,7 @@ export function validateAnswers(
         break;
       }
       case "checkbox":
-        if (v !== true) fieldErrors[field.id] = "You must accept this to continue.";
+        if (field.required && v !== true) fieldErrors[field.id] = "You must accept this to continue.";
         break;
       case "file": {
         if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) { fieldErrors[field.id] = "Invalid attachments."; break; }

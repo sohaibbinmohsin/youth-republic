@@ -67,17 +67,17 @@ function seedDb() {
       {
         id: "a1", volunteer_id: "v1", status: "submitted",
         opportunities: { name: "Tree Plantation", type: "environment", location: "Lahore" },
-        organizations: { name: "Green Org" },
+        organizations: { name: "Green Org", logo_url: "https://cdn/green.png", brand_color: "#1F7A1F" },
       },
       {
         id: "a2", volunteer_id: "v1", status: "rejected",
         opportunities: { name: "Blood Drive", type: "health", location: "Karachi" },
-        organizations: { name: "Health Org" },
+        organizations: { name: "Health Org", logo_url: null, brand_color: null },
       },
       {
         id: "a3", volunteer_id: "v1", status: "selected",
         opportunities: { name: "Coding Camp", type: "education", location: null },
-        organizations: { name: "Ed Org" },
+        organizations: { name: "Ed Org", logo_url: "https://cdn/ed.png", brand_color: "#8A7A10" },
       },
     ],
     participation: [
@@ -87,22 +87,22 @@ function seedDb() {
           name: "Tree Plantation", type: "environment",
           activity_start_at: "2025-08-01T00:00:00Z", activity_end_at: "2025-08-10T00:00:00Z",
         },
-        organizations: { name: "Green Org", logo_url: "https://cdn/green.png" },
+        organizations: { name: "Green Org", logo_url: "https://cdn/green.png", brand_color: "#1F7A1F" },
       },
       {
         id: "p2", volunteer_id: "v1", status: "completed",
         opportunities: { name: "River Cleanup", type: "environment", activity_start_at: null, activity_end_at: null },
-        organizations: { name: "Green Org", logo_url: "https://cdn/green.png" },
+        organizations: { name: "Green Org", logo_url: "https://cdn/green.png", brand_color: "#1F7A1F" },
       },
       {
         id: "p3", volunteer_id: "v1", status: "participating",
         opportunities: { name: "Coding Camp", type: "education", activity_start_at: null, activity_end_at: null },
-        organizations: { name: "Ed Org", logo_url: null },
+        organizations: { name: "Ed Org", logo_url: null, brand_color: null },
       },
       {
         id: "p4", volunteer_id: "v1", status: "selected",
         opportunities: { name: "Food Bank", type: "community", activity_start_at: null, activity_end_at: null },
-        organizations: { name: "Rizq", logo_url: "https://cdn/rizq.png" },
+        organizations: { name: "Rizq", logo_url: "https://cdn/rizq.png", brand_color: "#C0392B" },
       },
     ],
     activity_hours: [
@@ -145,6 +145,14 @@ Deno.test("getVolunteerPortfolio assembles the whole impact screen", async () =>
 
   assertEquals(p.applications.length, 3);
   assertEquals(p.programmes.length, 4);
+
+  // Org branding rides on applications and programmes (A2).
+  const a1 = p.applications.find((x) => x.id === "a1")!;
+  assertEquals(a1.orgLogoUrl, "https://cdn/green.png");
+  assertEquals(a1.orgBrandColor, "#1F7A1F");
+  const prog1 = p.programmes.find((x) => x.participationId === "p1")!;
+  assertEquals(prog1.orgLogoUrl, "https://cdn/green.png");
+  assertEquals(prog1.orgBrandColor, "#1F7A1F");
 });
 
 Deno.test("getVolunteerPortfolio totals.verifiedHours sums verified hours_verified client-side", async () => {

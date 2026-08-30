@@ -4,6 +4,8 @@ export interface PortfolioApplication {
   id: string;
   opportunityName: string;
   orgName: string;
+  orgLogoUrl: string | null;
+  orgBrandColor: string | null;
   type: string;
   location: string | null;
   status: string;
@@ -24,6 +26,7 @@ export interface PortfolioProgramme {
   opportunityName: string;
   orgName: string;
   orgLogoUrl: string | null;
+  orgBrandColor: string | null;
   type: string;
   status: string;
   role: string | null;
@@ -93,17 +96,20 @@ export async function getVolunteerPortfolio(
   // 2. Applications + opportunity / org names.
   const { data: applicationRows, error: applicationsError } = await supabase
     .from("applications")
-    .select("id, status, opportunities(name, type, location), organizations(name)")
+    .select("id, status, opportunities(name, type, location), organizations(name, logo_url, brand_color)")
     .eq("volunteer_id", volunteerId);
   if (applicationsError) throw applicationsError;
 
   const applications: PortfolioApplication[] = ((applicationRows ?? []) as unknown as Record<string, unknown>[])
     .map((r) => {
       const opp = embedded(r, "opportunities");
+      const org = embedded(r, "organizations");
       return {
         id: r.id as string,
         opportunityName: (opp.name ?? "") as string,
-        orgName: (embedded(r, "organizations").name ?? "") as string,
+        orgName: (org.name ?? "") as string,
+        orgLogoUrl: (org.logo_url ?? null) as string | null,
+        orgBrandColor: (org.brand_color ?? null) as string | null,
         type: (opp.type ?? "") as string,
         location: (opp.location ?? null) as string | null,
         status: r.status as string,
@@ -114,7 +120,7 @@ export async function getVolunteerPortfolio(
   const { data: participationRows, error: participationError } = await supabase
     .from("participation")
     .select(
-      "id, status, opportunities(name, type, activity_start_at, activity_end_at), organizations(name, logo_url)",
+      "id, status, opportunities(name, type, activity_start_at, activity_end_at), organizations(name, logo_url, brand_color)",
     )
     .eq("volunteer_id", volunteerId);
   if (participationError) throw participationError;
@@ -194,6 +200,7 @@ export async function getVolunteerPortfolio(
       opportunityName: (opp.name ?? "") as string,
       orgName: (org.name ?? "") as string,
       orgLogoUrl: (org.logo_url ?? null) as string | null,
+      orgBrandColor: (org.brand_color ?? null) as string | null,
       type: (opp.type ?? "") as string,
       status: p.status as string,
       role,

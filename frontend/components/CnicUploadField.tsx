@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { requestCnicUploadUrl } from "@/lib/edgeFunctions";
+import { requestAttachmentUpload, finalizeAttachment } from "@/lib/edgeFunctions";
 
 export function CnicUploadField({
   accessToken,
+  ownerId,
   onUploaded,
 }: {
   accessToken: string;
-  onUploaded: (objectKey: string) => void;
+  ownerId?: string;
+  onUploaded: (attachmentId: string) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -20,9 +22,20 @@ export function CnicUploadField({
     setError(null);
     setUploading(true);
     try {
-      const { uploadUrl, objectKey } = await requestCnicUploadUrl(accessToken);
+      const { uploadUrl, attachmentId } = await requestAttachmentUpload(
+        {
+          domain: "identity_doc",
+          ownerType: "volunteer",
+          ownerId: ownerId || "00000000-0000-0000-0000-000000000000",
+          mimeType: file.type,
+          sizeBytes: file.size,
+          originalFilename: file.name,
+        },
+        accessToken,
+      );
       await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-      onUploaded(objectKey);
+      await finalizeAttachment({ attachmentId }, accessToken);
+      onUploaded(attachmentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "unknown_error");
     } finally {

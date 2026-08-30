@@ -35,7 +35,7 @@ export async function verifyHours(
     .from("activity_hours")
     .update({
       verification_status: input.decision,
-      hours_verified: input.decision === "verified" ? input.hoursVerified ?? null : null,
+      hours_verified: input.decision === "verified" ? input.hoursVerified ?? Number(row.hours_submitted) : null,
       rejection_reason: input.decision === "rejected" ? input.rejectionReason ?? null : null,
       verified_by: staffClaims.staffId,
       verified_at: new Date().toISOString(),

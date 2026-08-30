@@ -57,9 +57,9 @@ export interface RegisterVolunteerPayload {
   country: string;
   institution: string;
   degreeProgram: string;
-  idDocType: "cnic" | "b_form";
-  idDocNumber: string;
-  idDocAttachmentId: string;
+  idDocType?: "cnic" | "b_form";
+  idDocNumber?: string;
+  idDocAttachmentId?: string;
   guardianName?: string;
   guardianContact?: string;
   guardianConsent?: boolean;
@@ -74,7 +74,9 @@ export function registerVolunteer(payload: RegisterVolunteerPayload, accessToken
 
 export interface ApplyToOpportunityPayload {
   opportunityId: string;
-  answers: Record<string, unknown>;
+  organizationId?: string;
+  motivationStatement?: string;
+  answers?: Record<string, unknown>;
   attachmentIds?: string[];
 }
 export interface ApplyToOpportunityResponse {
@@ -170,6 +172,8 @@ export interface PortfolioApplication {
   id: string;
   opportunityName: string;
   orgName: string;
+  orgLogoUrl: string | null;
+  orgBrandColor: string | null;
   type: string;
   location: string | null;
   status: string;
@@ -188,6 +192,7 @@ export interface PortfolioProgramme {
   opportunityName: string;
   orgName: string;
   orgLogoUrl: string | null;
+  orgBrandColor: string | null;
   type: string;
   status: string;
   role: string | null;

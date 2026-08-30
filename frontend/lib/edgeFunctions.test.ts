@@ -257,7 +257,7 @@ describe("getVolunteerPortfolio", () => {
       },
       totals: { verifiedHours: 12, activeApplications: 1, completedProgrammes: 2 },
       applications: [
-        { id: "a1", opportunityName: "Beach Cleanup", orgName: "GreenOrg", type: "environment", location: "Karachi", status: "selected" },
+        { id: "a1", opportunityName: "Beach Cleanup", orgName: "GreenOrg", orgLogoUrl: "https://cdn/green.png", orgBrandColor: "#1F7A1F", type: "environment", location: "Karachi", status: "selected" },
       ],
       programmes: [
         {
@@ -265,6 +265,7 @@ describe("getVolunteerPortfolio", () => {
           opportunityName: "Beach Cleanup",
           orgName: "GreenOrg",
           orgLogoUrl: null,
+          orgBrandColor: "#1F7A1F",
           type: "environment",
           status: "active",
           role: "Lead",

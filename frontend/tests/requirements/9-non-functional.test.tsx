@@ -19,10 +19,16 @@ describe("§9 Clean internal APIs — every write goes through a named function 
     const exported = Object.keys(edgeFunctions).filter((k) => typeof (edgeFunctions as Record<string, unknown>)[k] === "function");
     expect(new Set(exported)).toEqual(
       new Set([
+        "ValidationError",
         "registerVolunteer",
         "applyToOpportunity",
         "submitHours",
-        "requestCnicUploadUrl",
+        "requestAttachmentUpload",
+        "finalizeAttachment",
+        "getAttachment",
+        "getOpportunityDetail",
+        "listOpportunities",
+        "getVolunteerPortfolio",
         "updateSensitiveField",
         "updateProfileField",
       ]),
