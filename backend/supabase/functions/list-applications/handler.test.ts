@@ -54,6 +54,52 @@ Deno.test("listApplications filters by opportunity and status together", async (
   assertEquals(result.applications[0].opportunityName, "Opp 1");
 });
 
+Deno.test("listApplications projects applicant contact fields, answers, formSnapshot and attachmentIdsByField", async () => {
+  const supabase = testClient();
+  const { data: org } = await supabase.from("organizations").insert({
+    id: crypto.randomUUID(), name: "List Applications Projection Org", slug: `list-apps-proj-${crypto.randomUUID()}`,
+  }).select("id").single();
+  const orgId = org!.id as string;
+  const { data: opp } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Projection Opp", type: "environment",
+  }).select("id").single();
+  const volunteerId = await makeVolunteer(supabase);
+
+  const formSnapshot = {
+    version: 1,
+    fields: [
+      { id: "why", type: "long_text", label: "Why?" },
+      { id: "cv", type: "file", label: "CV" },
+      { id: "extra_docs", type: "file", label: "Extra docs" },
+    ],
+  };
+  const answers = {
+    why: "I care about the cause",
+    cv: "att-cv-1",
+    extra_docs: ["att-doc-1", "att-doc-2"],
+  };
+
+  await supabase.from("applications").insert({
+    volunteer_id: volunteerId, opportunity_id: opp!.id, organization_id: orgId, status: "submitted",
+    applicant_name: "Ayesha Khan", applicant_email: "ayesha@example.com", applicant_phone: "0300-1234567",
+    answers, form_snapshot: formSnapshot,
+  });
+
+  const result = await listApplications(supabase, claims(orgId), { organizationId: orgId, opportunityId: opp!.id as string });
+
+  assertEquals(result.applications.length, 1);
+  const row = result.applications[0];
+  assertEquals(row.applicantName, "Ayesha Khan");
+  assertEquals(row.applicantEmail, "ayesha@example.com");
+  assertEquals(row.applicantPhone, "0300-1234567");
+  assertEquals(row.answers, answers);
+  assertEquals(row.formSnapshot, formSnapshot);
+  assertEquals(row.attachmentIdsByField, {
+    cv: ["att-cv-1"],
+    extra_docs: ["att-doc-1", "att-doc-2"],
+  });
+});
+
 Deno.test("listApplications rejects a caller without applications:read for this org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

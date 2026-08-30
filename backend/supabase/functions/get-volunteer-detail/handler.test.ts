@@ -37,8 +37,15 @@ async function setup(supabase: ReturnType<typeof testClient>) {
   }).select("id").single();
   const opportunityId = opportunity!.id as string;
 
+  const formSnapshot = {
+    version: 1,
+    fields: [{ id: "why", type: "long_text", label: "Why?" }],
+  };
+  const answers = { why: "Because I want to help" };
+
   const { data: application } = await supabase.from("applications").insert({
     volunteer_id: volunteerId, opportunity_id: opportunityId, organization_id: orgId, status: "selected",
+    answers, form_snapshot: formSnapshot,
   }).select("id").single();
 
   const { data: participation } = await supabase.from("participation").insert({
@@ -46,13 +53,22 @@ async function setup(supabase: ReturnType<typeof testClient>) {
     organization_id: orgId, status: "completed",
   }).select("id").single();
 
-  await supabase.from("activity_hours").insert({
+  const { data: hours } = await supabase.from("activity_hours").insert({
     participation_id: participation!.id, volunteer_id: volunteerId, opportunity_id: opportunityId,
-    organization_id: orgId, activity_date: "2026-02-01", hours_submitted: 5, hours_verified: 5,
-    verification_status: "verified", admin_notes: "Internal-only note",
-  });
+    organization_id: orgId, activity_date: "2026-02-01", hours_submitted: 5, hours_verified: 3,
+    verification_status: "verified", admin_notes: "Internal-only note", note: "Left early",
+  }).select("id").single();
 
-  return { orgId, volunteerId };
+  const { data: authUser2 } = await supabase.auth.admin.createUser({
+    email: `vol-detail-uploader-${crypto.randomUUID()}@example.com`, email_confirm: true,
+  });
+  const { data: photo } = await supabase.from("attachments").insert({
+    organization_id: orgId, domain: "session_photo", owner_type: "activity_hours", owner_id: hours!.id,
+    bucket: "session-photos", storage_path: `p/${crypto.randomUUID()}`, mime_type: "image/jpeg",
+    size_bytes: 1234, status: "ready", uploaded_by: authUser2!.user!.id,
+  }).select("id").single();
+
+  return { orgId, volunteerId, formSnapshot, answers, photoId: photo!.id as string };
 }
 
 Deno.test("getVolunteerDetail returns the volunteer plus every application, participation, and activity row, including admin_notes", async () => {
@@ -68,7 +84,22 @@ Deno.test("getVolunteerDetail returns the volunteer plus every application, part
   assertEquals(result.participations[0].status, "completed");
   assertEquals(result.activity.length, 1);
   assertEquals(result.activity[0].adminNotes, "Internal-only note");
-  assertEquals(result.activity[0].hoursVerified, 5);
+  assertEquals(result.activity[0].hoursVerified, 3);
+});
+
+Deno.test("getVolunteerDetail carries answers/formSnapshot on applications and note/adjusted/photoAttachmentIds on activity", async () => {
+  const supabase = testClient();
+  const { orgId, volunteerId, formSnapshot, answers, photoId } = await setup(supabase);
+
+  const result = await getVolunteerDetail(supabase, claimsWithPermission(orgId), { organizationId: orgId, volunteerId });
+
+  assertEquals(result.applications[0].answers, answers);
+  assertEquals(result.applications[0].formSnapshot, formSnapshot);
+
+  const activity = result.activity[0];
+  assertEquals(activity.note, "Left early");
+  assertEquals(activity.adjusted, true); // hours_verified 3 != hours_submitted 5
+  assertEquals(activity.photoAttachmentIds, [photoId]);
 });
 
 Deno.test("getVolunteerDetail rejects a caller without volunteers:read for this org", async () => {
