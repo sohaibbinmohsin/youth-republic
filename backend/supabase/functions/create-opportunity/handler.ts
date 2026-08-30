@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { validateFormDefinition } from "../_shared/forms.ts";
 
 export interface CreateOpportunityInput {
   organizationId: string;
@@ -12,7 +13,11 @@ export interface CreateOpportunityInput {
   applicationDeadline?: string;
   activityStartAt?: string;
   activityEndAt?: string;
-  eligibilityCriteria?: string;
+  about?: string;
+  duties?: string[];
+  eligibility?: string[];
+  whatToBring?: string[];
+  applicationForm?: unknown;
   capacity?: number;
 }
 
@@ -25,22 +30,35 @@ export async function createOpportunity(
     throw new Error("forbidden");
   }
 
+  const row: Record<string, unknown> = {
+    organization_id: input.organizationId,
+    name: input.name,
+    type: input.type,
+    description: input.description ?? null,
+    location: input.location ?? null,
+    is_online: input.isOnline ?? false,
+    application_open_at: input.applicationOpenAt ?? null,
+    application_deadline: input.applicationDeadline ?? null,
+    activity_start_at: input.activityStartAt ?? null,
+    activity_end_at: input.activityEndAt ?? null,
+    about: input.about ?? null,
+    duties: input.duties ?? [],
+    eligibility: input.eligibility ?? [],
+    what_to_bring: input.whatToBring ?? [],
+    capacity: input.capacity ?? null,
+  };
+
+  // Omit application_form entirely when the caller doesn't send one so the
+  // column default ({"version":1,"fields":[]}) applies.
+  if (input.applicationForm !== undefined) {
+    const v = validateFormDefinition(input.applicationForm);
+    if (!v.ok) throw new Error("invalid_form");
+    row.application_form = v.def;
+  }
+
   const { data, error } = await supabase
     .from("opportunities")
-    .insert({
-      organization_id: input.organizationId,
-      name: input.name,
-      type: input.type,
-      description: input.description ?? null,
-      location: input.location ?? null,
-      is_online: input.isOnline ?? false,
-      application_open_at: input.applicationOpenAt ?? null,
-      application_deadline: input.applicationDeadline ?? null,
-      activity_start_at: input.activityStartAt ?? null,
-      activity_end_at: input.activityEndAt ?? null,
-      eligibility_criteria: input.eligibilityCriteria ?? null,
-      capacity: input.capacity ?? null,
-    })
+    .insert(row)
     .select("id")
     .single();
   if (error) throw error;

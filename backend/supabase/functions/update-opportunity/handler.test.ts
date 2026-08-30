@@ -127,6 +127,92 @@ Deno.test("updateOpportunity rejects staff with only opportunities:update trying
   assertEquals(unchanged!.deactivated_at, null);
 });
 
+Deno.test("updateOpportunity persists about, duties, eligibility and whatToBring", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Content Target", type: "event",
+  }).select("id").single();
+
+  await updateOpportunity(supabase, staffClaims(orgId, "opportunities:update"), {
+    opportunityId: opportunity!.id,
+    organizationId: orgId,
+    about: "Rewritten prose.",
+    duties: ["Set up chairs"],
+    eligibility: ["Any age"],
+    whatToBring: ["ID card", "Pen"],
+  });
+
+  const { data: updated } = await supabase
+    .from("opportunities")
+    .select("about, duties, eligibility, what_to_bring")
+    .eq("id", opportunity!.id)
+    .single();
+  assertEquals(updated!.about, "Rewritten prose.");
+  assertEquals(updated!.duties, ["Set up chairs"]);
+  assertEquals(updated!.eligibility, ["Any age"]);
+  assertEquals(updated!.what_to_bring, ["ID card", "Pen"]);
+});
+
+Deno.test("updateOpportunity validates applicationForm and rejects an invalid one with invalid_form", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Form Target", type: "event",
+  }).select("id").single();
+
+  await assertRejects(
+    () => updateOpportunity(supabase, staffClaims(orgId, "opportunities:update"), {
+      opportunityId: opportunity!.id,
+      organizationId: orgId,
+      applicationForm: { version: 1, fields: [{ type: "bogus" }] },
+    }),
+    Error,
+    "invalid_form",
+  );
+});
+
+Deno.test("updateOpportunity writes a valid applicationForm definition", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Form Target", type: "event",
+  }).select("id").single();
+  const form = {
+    version: 1,
+    fields: [{ id: "q1", type: "short_text", label: "Full name" }],
+  };
+
+  await updateOpportunity(supabase, staffClaims(orgId, "opportunities:update"), {
+    opportunityId: opportunity!.id,
+    organizationId: orgId,
+    applicationForm: form,
+  });
+
+  const { data: updated } = await supabase
+    .from("opportunities")
+    .select("application_form")
+    .eq("id", opportunity!.id)
+    .single();
+  assertEquals(updated!.application_form, form);
+});
+
+Deno.test("updateOpportunity gates the new content fields on opportunities:update", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Guard Target", type: "event",
+  }).select("id").single();
+
+  await assertRejects(
+    () => updateOpportunity(supabase, staffClaims(orgId, "opportunities:read"), {
+      opportunityId: opportunity!.id, organizationId: orgId, about: "sneaky edit",
+    }),
+    Error,
+    "forbidden",
+  );
+});
+
 Deno.test("updateOpportunity lets staff with opportunities:delete reactivate an opportunity by setting deactivatedAt to null", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
