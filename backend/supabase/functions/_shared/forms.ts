@@ -120,3 +120,91 @@ export function validateFormDefinition(
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, def: def as unknown as FormDefinition };
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_RE = /^https?:\/\/\S+$/i;
+
+function isBlank(v: unknown): boolean {
+  return v === undefined || v === null || v === "" ||
+    (Array.isArray(v) && v.length === 0);
+}
+
+export function validateAnswers(
+  def: FormDefinition,
+  raw: unknown,
+): { ok: true } | { ok: false; fieldErrors: FieldErrors } {
+  const fieldErrors: FieldErrors = {};
+  const answers = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+
+  for (const field of def.fields) {
+    const v = answers[field.id];
+
+    if (isBlank(v)) {
+      if (field.required) {
+        fieldErrors[field.id] = field.type === "checkbox"
+          ? "You must accept this to continue."
+          : "This field is required.";
+      }
+      continue;
+    }
+
+    switch (field.type) {
+      case "email":
+        if (typeof v !== "string" || !EMAIL_RE.test(v)) fieldErrors[field.id] = "Enter a valid email address.";
+        break;
+      case "url":
+        if (typeof v !== "string" || !URL_RE.test(v)) fieldErrors[field.id] = "Enter a valid URL starting with http.";
+        break;
+      case "phone":
+      case "short_text":
+      case "long_text": {
+        if (typeof v !== "string") { fieldErrors[field.id] = "Invalid value."; break; }
+        if (typeof field.minLength === "number" && v.length < field.minLength) fieldErrors[field.id] = `Must be at least ${field.minLength} characters.`;
+        if (typeof field.maxLength === "number" && v.length > field.maxLength) fieldErrors[field.id] = `Must be at most ${field.maxLength} characters.`;
+        break;
+      }
+      case "number": {
+        const n = typeof v === "number" ? v : Number(v);
+        if (!Number.isFinite(n)) { fieldErrors[field.id] = "Enter a number."; break; }
+        if (typeof field.min === "number" && n < field.min) fieldErrors[field.id] = `Must be at least ${field.min}.`;
+        if (typeof field.max === "number" && n > field.max) fieldErrors[field.id] = `Must be at most ${field.max}.`;
+        break;
+      }
+      case "date": {
+        if (typeof v !== "string" || !ISO_DATE_RE.test(v)) { fieldErrors[field.id] = "Enter a valid date."; break; }
+        if (field.minDate && v < field.minDate) fieldErrors[field.id] = `Must be on or after ${field.minDate}.`;
+        if (field.maxDate && v > field.maxDate) fieldErrors[field.id] = `Must be on or before ${field.maxDate}.`;
+        break;
+      }
+      case "select":
+      case "radio": {
+        const allowed = (field.options ?? []).map((o) => o.value);
+        if (typeof v !== "string" || !allowed.includes(v)) fieldErrors[field.id] = "Choose one of the options.";
+        break;
+      }
+      case "multiselect": {
+        const allowed = (field.options ?? []).map((o) => o.value);
+        if (!Array.isArray(v) || !v.every((x) => typeof x === "string" && allowed.includes(x))) {
+          fieldErrors[field.id] = "Choose from the options.";
+        }
+        break;
+      }
+      case "checkbox":
+        if (v !== true) fieldErrors[field.id] = "You must accept this to continue.";
+        break;
+      case "file": {
+        if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) { fieldErrors[field.id] = "Invalid attachments."; break; }
+        const max = field.maxFiles ?? 1;
+        if (v.length > max) fieldErrors[field.id] = `Attach at most ${max} file${max === 1 ? "" : "s"}.`;
+        break;
+      }
+    }
+  }
+
+  return Object.keys(fieldErrors).length === 0 ? { ok: true } : { ok: false, fieldErrors };
+}
+
+export function resolveConsent(def: FormDefinition, answers: Record<string, unknown>): boolean {
+  const consent = def.fields.find((f) => f.type === "checkbox" && f.required);
+  return consent ? answers[consent.id] === true : false;
+}
