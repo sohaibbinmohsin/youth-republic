@@ -10,9 +10,9 @@ select touch_org_volunteer_index('22222222-2222-2222-2222-222222222222', :'vol_i
 
 select set_config('request.jwt.claims', format('{"sub": "%s"}', (select auth_user_id from volunteers where id = :'vol_id')), true);
 select set_config('role', 'authenticated', true);
-update volunteers set cnic_number = '00000000000' where id = :'vol_id';
+update volunteers set id_doc_number = '00000000000' where id = :'vol_id';
 select is(
-  (select cnic_number from volunteers where id = :'vol_id'),
+  (select id_doc_number from volunteers where id = :'vol_id'),
   null,
   'a volunteer cannot update their own row directly via RLS — with no self-update policy, the UPDATE silently matches zero rows (RLS filters rows for UPDATE, it does not raise); only updateSensitiveField() and registerVolunteer() (service-role Edge Functions) may write volunteers'
 );
