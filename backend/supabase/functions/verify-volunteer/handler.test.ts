@@ -135,6 +135,36 @@ Deno.test("verifyVolunteer reject without a reason throws reason_required", asyn
   );
 });
 
+Deno.test("verifyVolunteer throws bad_decision for an unrecognized decision without touching the DB", async () => {
+  const capture = newCapture();
+  await assertRejects(
+    () =>
+      verifyVolunteer(sb({ capture }), claims(), {
+        volunteerId: "vol1",
+        decision: "bogus",
+      } as unknown as Parameters<typeof verifyVolunteer>[2]),
+    Error,
+    "bad_decision",
+  );
+  assertEquals(capture.deletes.length, 0);
+  assertEquals(capture.logs.length, 0);
+  assertEquals(capture.update, undefined);
+
+  // Empty string must not fall through to the reject path either.
+  const capture2 = newCapture();
+  await assertRejects(
+    () =>
+      verifyVolunteer(sb({ capture: capture2 }), claims(), {
+        volunteerId: "vol1",
+        decision: "",
+      } as unknown as Parameters<typeof verifyVolunteer>[2]),
+    Error,
+    "bad_decision",
+  );
+  assertEquals(capture2.deletes.length, 0);
+  assertEquals(capture2.logs.length, 0);
+});
+
 Deno.test("verifyVolunteer throws not_found for an unknown volunteerId", async () => {
   await assertRejects(
     () => verifyVolunteer(sb({ volunteer: null }), claims(), { volunteerId: "missing", decision: "verify" }),

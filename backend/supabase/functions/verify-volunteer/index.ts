@@ -34,7 +34,7 @@ export async function handler(req: Request): Promise<Response> {
       ? 403
       : message === "not_found"
       ? 404
-      : message === "reason_required"
+      : message === "reason_required" || message === "bad_decision"
       ? 422
       : 400;
     return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });

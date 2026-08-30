@@ -21,6 +21,13 @@ export async function verifyVolunteer(
 ): Promise<VerifyVolunteerResult> {
   if (staffClaims.canVerifyIdentity !== true) throw new Error("forbidden");
 
+  // Validate the enum before any DB read or mutation: without this, an
+  // unexpected value ("", a typo, a client bug) would fall through to the
+  // reject branch and silently hard-delete the identity_doc attachment.
+  if (input.decision !== "verify" && input.decision !== "reject") {
+    throw new Error("bad_decision");
+  }
+
   if (input.decision === "reject" && !input.reason) {
     throw new Error("reason_required");
   }
@@ -40,7 +47,7 @@ export async function verifyVolunteer(
       .eq("id", input.volunteerId);
     if (updateError) throw updateError;
 
-    await supabase.from("admin_action_log").insert({
+    const { error: logError } = await supabase.from("admin_action_log").insert({
       staff_id: staffClaims.staffId,
       actor_type: staffClaims.actorType,
       action: "volunteer_identity_verified",
@@ -49,6 +56,7 @@ export async function verifyVolunteer(
       organization_id: null,
       metadata: {},
     });
+    if (logError) throw logError;
 
     return { status: "active" };
   }
@@ -56,14 +64,15 @@ export async function verifyVolunteer(
   // Reject: the volunteer stays pending_verification. Hard-delete their
   // identity_doc attachment row so a corrected document can be re-uploaded;
   // storage-object cleanup is out of scope here.
-  await supabase
+  const { error: deleteError } = await supabase
     .from("attachments")
     .delete()
     .eq("owner_type", "volunteer")
     .eq("owner_id", input.volunteerId)
     .eq("domain", "identity_doc");
+  if (deleteError) throw deleteError;
 
-  await supabase.from("admin_action_log").insert({
+  const { error: logError } = await supabase.from("admin_action_log").insert({
     staff_id: staffClaims.staffId,
     actor_type: staffClaims.actorType,
     action: "volunteer_identity_rejected",
@@ -72,6 +81,7 @@ export async function verifyVolunteer(
     organization_id: null,
     metadata: { reason: input.reason },
   });
+  if (logError) throw logError;
 
   return { status: "pending_verification" };
 }
