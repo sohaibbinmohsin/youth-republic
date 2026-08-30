@@ -9,7 +9,7 @@ function testClient() {
 
 function claims(orgId: string): StaffClaims {
   return {
-    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["hours:read"] }],
   };
 }
@@ -51,7 +51,7 @@ Deno.test("listActivityHours filters by activity type (from opportunities) and p
   await supabase.from("activity_hours").insert([
     {
       participation_id: participatingParticipation!.id, volunteer_id: volunteerId, opportunity_id: envOpp!.id,
-      organization_id: orgId, activity_date: "2026-02-01", hours_submitted: 5, verification_status: "recorded",
+      organization_id: orgId, activity_date: "2026-02-01", hours_submitted: 5, verification_status: "pending",
     },
     {
       participation_id: completedParticipation!.id, volunteer_id: volunteerId, opportunity_id: healthOpp!.id,
@@ -71,7 +71,7 @@ Deno.test("listActivityHours filters by activity type (from opportunities) and p
 Deno.test("listActivityHours rejects a caller without hours:read for this org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
-  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(() => listActivityHours(supabase, noPerm, { organizationId: orgId }), Error, "forbidden");
 });

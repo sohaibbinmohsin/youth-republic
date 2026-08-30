@@ -11,6 +11,7 @@ const staffClaims = (orgId: string): StaffClaims => ({
   actorType: "staff",
   staffId: crypto.randomUUID(),
   platformOwner: false,
+  canVerifyIdentity: false,
   orgRoles: [{ organizationId: orgId }],
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["applications:read"] }],
 });
@@ -88,6 +89,7 @@ const volunteersReadClaims = (orgId: string): StaffClaims => ({
   actorType: "staff",
   staffId: crypto.randomUUID(),
   platformOwner: false,
+  canVerifyIdentity: false,
   orgRoles: [{ organizationId: orgId }],
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["volunteers:read"] }],
 });
@@ -157,7 +159,7 @@ Deno.test("exportOpportunitiesCsv includes name, type, and computed capacity for
     organization_id: orgId, name: "Export Test Opp", type: "environment", capacity: 20,
   });
   const claims: StaffClaims = {
-    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["opportunities:read"] }],
   };
 
@@ -171,7 +173,7 @@ Deno.test("exportOpportunitiesCsv includes name, type, and computed capacity for
 Deno.test("exportOpportunitiesCsv rejects a caller without opportunities:read", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
-  const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+  const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(() => exportOpportunitiesCsv(supabase, claims, orgId), Error, "forbidden");
 });
@@ -202,7 +204,7 @@ Deno.test("exportActivityHoursCsv includes volunteer, opportunity, hours, and st
     activity_date: "2026-02-01", hours_submitted: 5, hours_verified: 5, verification_status: "verified",
   });
   const claims: StaffClaims = {
-    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["hours:read"] }],
   };
 

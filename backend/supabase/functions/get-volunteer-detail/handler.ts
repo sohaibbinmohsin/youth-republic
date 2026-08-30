@@ -16,7 +16,14 @@ export interface VolunteerDetail {
   province: string;
   institution: string;
   status: string;
-  applications: Array<{ id: string; status: string; opportunityName: string; appliedAt: string }>;
+  applications: Array<{
+    id: string;
+    status: string;
+    opportunityName: string;
+    appliedAt: string;
+    answers: Record<string, unknown>;
+    formSnapshot: unknown;
+  }>;
   participations: Array<{ id: string; status: string; opportunityName: string }>;
   activity: Array<{
     id: string;
@@ -26,6 +33,9 @@ export interface VolunteerDetail {
     hoursVerified: number | null;
     verificationStatus: string;
     adminNotes: string | null;
+    note: string | null;
+    adjusted: boolean;
+    photoAttachmentIds: string[];
     opportunityName: string;
   }>;
 }
@@ -48,7 +58,7 @@ export async function getVolunteerDetail(
 
   const { data: applicationRows, error: applicationsError } = await supabase
     .from("applications")
-    .select("id, status, applied_at, opportunities(name)")
+    .select("id, status, applied_at, answers, form_snapshot, opportunities(name)")
     .eq("volunteer_id", input.volunteerId)
     .eq("organization_id", input.organizationId);
   if (applicationsError) throw applicationsError;
@@ -62,11 +72,28 @@ export async function getVolunteerDetail(
 
   const { data: activityRows, error: activityError } = await supabase
     .from("activity_hours")
-    .select("id, role, activity_date, hours_submitted, hours_verified, verification_status, admin_notes, opportunities(name)")
+    .select("id, role, activity_date, hours_submitted, hours_verified, verification_status, admin_notes, note, opportunities(name)")
     .eq("volunteer_id", input.volunteerId)
     .eq("organization_id", input.organizationId)
     .order("activity_date", { ascending: true });
   if (activityError) throw activityError;
+
+  const activityIds = (activityRows ?? []).map((r) => r.id as string);
+  const photosByHour: Record<string, string[]> = {};
+  if (activityIds.length > 0) {
+    const { data: photoRows, error: photoError } = await supabase
+      .from("attachments")
+      .select("id, owner_id")
+      .eq("owner_type", "activity_hours")
+      .in("owner_id", activityIds)
+      .eq("domain", "session_photo")
+      .eq("status", "ready");
+    if (photoError) throw photoError;
+    for (const p of photoRows ?? []) {
+      const owner = p.owner_id as string;
+      (photosByHour[owner] ??= []).push(p.id as string);
+    }
+  }
 
   return {
     id: volunteer!.id as string,
@@ -83,21 +110,30 @@ export async function getVolunteerDetail(
       status: r.status as string,
       opportunityName: (r.opportunities as unknown as { name: string })?.name ?? "",
       appliedAt: r.applied_at as string,
+      answers: (r.answers && typeof r.answers === "object" ? r.answers : {}) as Record<string, unknown>,
+      formSnapshot: r.form_snapshot ?? null,
     })),
     participations: (participationRows ?? []).map((r) => ({
       id: r.id as string,
       status: r.status as string,
       opportunityName: (r.opportunities as unknown as { name: string })?.name ?? "",
     })),
-    activity: (activityRows ?? []).map((r) => ({
-      id: r.id as string,
-      role: r.role as string | null,
-      activityDate: r.activity_date as string,
-      hoursSubmitted: r.hours_submitted as number,
-      hoursVerified: r.hours_verified as number | null,
-      verificationStatus: r.verification_status as string,
-      adminNotes: r.admin_notes as string | null,
-      opportunityName: (r.opportunities as unknown as { name: string })?.name ?? "",
-    })),
+    activity: (activityRows ?? []).map((r) => {
+      const submitted = r.hours_submitted as number;
+      const verified = r.hours_verified as number | null;
+      return {
+        id: r.id as string,
+        role: r.role as string | null,
+        activityDate: r.activity_date as string,
+        hoursSubmitted: submitted,
+        hoursVerified: verified,
+        verificationStatus: r.verification_status as string,
+        adminNotes: r.admin_notes as string | null,
+        note: r.note as string | null,
+        adjusted: verified != null && Number(verified) !== Number(submitted),
+        photoAttachmentIds: photosByHour[r.id as string] ?? [],
+        opportunityName: (r.opportunities as unknown as { name: string })?.name ?? "",
+      };
+    }),
   };
 }

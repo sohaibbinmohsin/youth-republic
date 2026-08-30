@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { validateFormDefinition } from "../_shared/forms.ts";
 
 export interface UpdateOpportunityInput {
   opportunityId: string;
@@ -12,7 +13,11 @@ export interface UpdateOpportunityInput {
   applicationDeadline?: string;
   activityStartAt?: string;
   activityEndAt?: string;
-  eligibilityCriteria?: string;
+  about?: string;
+  duties?: string[];
+  eligibility?: string[];
+  whatToBring?: string[];
+  applicationForm?: unknown;
   capacity?: number;
   statusOverride?: string;
   deactivatedAt?: string | null;
@@ -48,7 +53,11 @@ export async function updateOpportunity(
     || input.applicationDeadline !== undefined
     || input.activityStartAt !== undefined
     || input.activityEndAt !== undefined
-    || input.eligibilityCriteria !== undefined
+    || input.about !== undefined
+    || input.duties !== undefined
+    || input.eligibility !== undefined
+    || input.whatToBring !== undefined
+    || input.applicationForm !== undefined
     || input.capacity !== undefined
     || input.statusOverride !== undefined;
 
@@ -69,7 +78,15 @@ export async function updateOpportunity(
   if (input.applicationDeadline !== undefined) patch.application_deadline = input.applicationDeadline;
   if (input.activityStartAt !== undefined) patch.activity_start_at = input.activityStartAt;
   if (input.activityEndAt !== undefined) patch.activity_end_at = input.activityEndAt;
-  if (input.eligibilityCriteria !== undefined) patch.eligibility_criteria = input.eligibilityCriteria;
+  if (input.about !== undefined) patch.about = input.about;
+  if (input.duties !== undefined) patch.duties = input.duties;
+  if (input.eligibility !== undefined) patch.eligibility = input.eligibility;
+  if (input.whatToBring !== undefined) patch.what_to_bring = input.whatToBring;
+  if (input.applicationForm !== undefined) {
+    const v = validateFormDefinition(input.applicationForm);
+    if (!v.ok) throw new Error("invalid_form");
+    patch.application_form = v.def;
+  }
   if (input.capacity !== undefined) patch.capacity = input.capacity;
   if (input.statusOverride !== undefined) patch.status_override = input.statusOverride;
   if (input.deactivatedAt !== undefined) patch.deactivated_at = input.deactivatedAt;

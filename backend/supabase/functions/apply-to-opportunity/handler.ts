@@ -1,61 +1,76 @@
+// backend/supabase/functions/apply-to-opportunity/handler.ts
 import { SupabaseClient } from "@supabase/supabase-js";
+import { validateAnswers, resolveConsent, type FormDefinition } from "../_shared/forms.ts";
 
 export interface ApplyToOpportunityInput {
   volunteerId: string;
+  authUserId: string;
   opportunityId: string;
-  organizationId: string;
-  motivationStatement?: string;
+  answers: Record<string, unknown>;
+  attachmentIds?: string[];
 }
-
-export interface ApplyToOpportunityResult {
-  applicationId: string;
-}
+export interface ApplyToOpportunityResult { applicationId: string; }
 
 export async function applyToOpportunity(
   supabase: SupabaseClient,
   input: ApplyToOpportunityInput,
 ): Promise<ApplyToOpportunityResult> {
-  const { data: volunteer, error: volunteerError } = await supabase
-    .from("volunteers")
-    .select("cnic_number")
-    .eq("id", input.volunteerId)
-    .single();
-  if (volunteerError) throw volunteerError;
-  if (!volunteer.cnic_number) {
-    throw new Error("cnic_required");
+  const { data: volunteer, error: vErr } = await supabase.from("volunteers")
+    .select("id, full_name, email, phone, id_doc_number").eq("id", input.volunteerId).single();
+  if (vErr || !volunteer) throw new Error("not_found");
+  if (!volunteer.id_doc_number) throw new Error("id_doc_required");
+
+  const { data: opp, error: oErr } = await supabase.from("opportunities")
+    .select("id, organization_id, deactivated_at, application_form").eq("id", input.opportunityId).single();
+  if (oErr || !opp) throw new Error("not_found");
+  if (opp.deactivated_at !== null) throw new Error("opportunity_unavailable");
+
+  const form = opp.application_form as FormDefinition;
+  const result = validateAnswers(form, input.answers);
+  if (!result.ok) {
+    const e = new Error("validation") as Error & { fieldErrors: Record<string, string> };
+    e.fieldErrors = result.fieldErrors;
+    throw e;
   }
 
-  // Derive organization_id from the opportunity row itself, never from
-  // client-supplied input: a mismatched org would corrupt every org-scoped
-  // application query and mint an org_volunteer_index link (and therefore
-  // staff PII read access) to an arbitrary org.
-  const { data: opportunity, error: opportunityError } = await supabase
-    .from("opportunities")
-    .select("id, organization_id, deactivated_at")
-    .eq("id", input.opportunityId)
-    .single();
-  if (opportunityError) throw opportunityError;
-  if (opportunity.deactivated_at !== null) {
-    throw new Error("opportunity_unavailable");
+  // Verify referenced attachments: ready application_file rows this user uploaded,
+  // not yet linked to another application.
+  const attachmentIds = input.attachmentIds ?? [];
+  if (attachmentIds.length > 0) {
+    const { data: atts, error: aErr } = await supabase.from("attachments")
+      .select("id, domain, owner_type, status, uploaded_by")
+      .in("id", attachmentIds);
+    if (aErr) throw aErr;
+    const ok = (atts ?? []).length === attachmentIds.length &&
+      (atts ?? []).every((a) =>
+        a.domain === "application_file" && a.owner_type === "application" &&
+        a.status === "ready" && a.uploaded_by === input.authUserId);
+    if (!ok) throw new Error("bad_attachment");
   }
 
-  const { data, error } = await supabase
-    .from("applications")
-    .insert({
-      volunteer_id: input.volunteerId,
-      opportunity_id: opportunity.id,
-      organization_id: opportunity.organization_id,
-      motivation_statement: input.motivationStatement ?? null,
-    })
-    .select("id")
-    .single();
+  const { data: app, error: iErr } = await supabase.from("applications").insert({
+    volunteer_id: volunteer.id,
+    opportunity_id: opp.id,
+    organization_id: opp.organization_id,
+    answers: input.answers,
+    form_snapshot: form,
+    applicant_name: volunteer.full_name,
+    applicant_email: volunteer.email,
+    applicant_phone: volunteer.phone,
+    consent_accepted: resolveConsent(form, input.answers),
+  }).select("id").single();
+  if (iErr) throw iErr;
 
-  if (error) throw error;
+  if (attachmentIds.length > 0) {
+    await supabase.from("attachments")
+      .update({ owner_id: app.id, organization_id: opp.organization_id })
+      .in("id", attachmentIds);
+  }
 
   await supabase.rpc("touch_org_volunteer_index", {
-    p_org_id: opportunity.organization_id,
-    p_volunteer_id: input.volunteerId,
+    p_org_id: opp.organization_id,
+    p_volunteer_id: volunteer.id,
   });
 
-  return { applicationId: data.id };
+  return { applicationId: app.id };
 }

@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
-export type SensitiveFieldName = "dob" | "cnic_number" | "phone" | "emergency_contact" | "guardian_name" | "guardian_contact";
+export type SensitiveFieldName = "dob" | "id_doc_number" | "phone" | "emergency_contact" | "guardian_name" | "guardian_contact";
 
 export interface UpdateSensitiveFieldInput {
   volunteerId: string;
@@ -21,7 +21,7 @@ export interface UpdateSensitiveFieldResult {
 // with no audit row.
 const ALLOWED_FIELDS: readonly SensitiveFieldName[] = [
   "dob",
-  "cnic_number",
+  "id_doc_number",
   "phone",
   "emergency_contact",
   "guardian_name",

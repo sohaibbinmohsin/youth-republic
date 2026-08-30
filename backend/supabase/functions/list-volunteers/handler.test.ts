@@ -55,6 +55,7 @@ function claimsWithPermission(orgId: string, permission: string): StaffClaims {
     actorType: "staff",
     staffId: "staff-1",
     platformOwner: false,
+    canVerifyIdentity: false,
     orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
   };
@@ -131,7 +132,7 @@ Deno.test("listVolunteers paginates with limit/offset and reports total across a
 Deno.test("listVolunteers rejects a caller without volunteers:read for this org", async () => {
   const supabase = testClient();
   const orgId = await makeOrg(supabase);
-  const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+  const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(() => listVolunteers(supabase, claims, { organizationId: orgId }), Error, "forbidden");
 });

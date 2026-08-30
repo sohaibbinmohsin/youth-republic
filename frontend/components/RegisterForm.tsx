@@ -5,7 +5,9 @@ import { registerVolunteer, type RegisterVolunteerPayload, type RegisterVoluntee
 import { isMinor } from "@/lib/ageUtils";
 import { GuardianConsentFields, type GuardianConsentValue } from "./GuardianConsentFields";
 
-const initialForm: Omit<RegisterVolunteerPayload, "guardianName" | "guardianContact" | "guardianConsent"> = {
+type InitialFormKeys = "fullName" | "email" | "phone" | "dob" | "gender" | "city" | "province" | "country" | "institution" | "degreeProgram";
+
+const initialForm: Record<InitialFormKeys, string> = {
   fullName: "",
   email: "",
   phone: "",
@@ -18,7 +20,7 @@ const initialForm: Omit<RegisterVolunteerPayload, "guardianName" | "guardianCont
   degreeProgram: "",
 };
 
-const MANDATORY_FIELD_LABELS: Record<keyof typeof initialForm, string> = {
+const MANDATORY_FIELD_LABELS: Record<InitialFormKeys, string> = {
   fullName: "Full name",
   email: "Email",
   phone: "Phone",
@@ -53,8 +55,8 @@ export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: s
   }
 
   function missingMandatoryLabels(): string[] {
-    return (Object.keys(MANDATORY_FIELD_LABELS) as Array<keyof typeof form>)
-      .filter((key) => form[key].trim() === "")
+    return (Object.keys(MANDATORY_FIELD_LABELS) as Array<keyof typeof initialForm>)
+      .filter((key) => !form[key] || (typeof form[key] === "string" && form[key].trim() === ""))
       .map((key) => MANDATORY_FIELD_LABELS[key]);
   }
 

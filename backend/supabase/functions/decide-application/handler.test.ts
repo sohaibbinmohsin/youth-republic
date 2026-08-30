@@ -73,6 +73,7 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   actorType: "staff",
   staffId,
   platformOwner: false,
+  canVerifyIdentity: false,
   orgRoles: [{ organizationId: orgId }],
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["applications:update"] }],
 });

@@ -9,7 +9,7 @@ function testClient() {
 
 function claims(orgId: string): StaffClaims {
   return {
-    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["volunteers:read"] }],
   };
 }
@@ -84,7 +84,7 @@ Deno.test("getKpiSummary computes every metric scoped to the given org only", as
 Deno.test("getKpiSummary rejects a caller without volunteers:read for this org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
-  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(() => getKpiSummary(supabase, noPerm, { organizationId: orgId }), Error, "forbidden");
 });

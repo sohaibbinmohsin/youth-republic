@@ -1,123 +1,126 @@
-import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { createClient } from "@supabase/supabase-js";
+import { assertEquals, assertRejects } from "jsr:@std/assert";
 import { applyToOpportunity } from "./handler.ts";
 
-function testClient() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+const form = {
+  version: 1,
+  fields: [
+    { id: "why", type: "long_text", label: "Why", required: true },
+    { id: "consent", type: "checkbox", label: "I confirm", required: true },
+    { id: "cv", type: "file", label: "CV", maxFiles: 1 },
+  ],
+};
+
+interface SbOpts {
+  oppForm?: unknown;
+  volunteer?: Record<string, unknown>;
+  deactivatedAt?: string | null;
+  capture?: { application?: Record<string, unknown> };
+}
+
+function sb(opts: SbOpts = {}) {
+  const volunteer = opts.volunteer ??
+    { id: "v1", full_name: "Ayesha", email: "a@b.com", phone: "123", id_doc_number: "35202-1" };
+  return {
+    from(table: string) {
+      const api = {
+        select() { return api; },
+        eq() { return api; },
+        in() { return api; },
+        is() { return api; },
+        async single() {
+          if (table === "opportunities") {
+            return {
+              data: {
+                id: "opp1",
+                organization_id: "org1",
+                deactivated_at: opts.deactivatedAt ?? null,
+                application_form: opts.oppForm ?? form,
+              },
+              error: null,
+            };
+          }
+          if (table === "volunteers") return { data: volunteer, error: null };
+          return { data: null, error: null };
+        },
+        insert(payload: Record<string, unknown>) {
+          if (table === "applications" && opts.capture) opts.capture.application = payload;
+          return { select() { return { async single() { return { data: { id: "app-new" }, error: null }; } }; } };
+        },
+        update() { return api; },
+        async then(res: (v: unknown) => void) { res({ error: null }); },
+      };
+      return api;
+    },
+    async rpc() { return { error: null }; },
+  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+}
+
+Deno.test("422 with fieldErrors when a required answer is missing", async () => {
+  const err = await assertRejects(
+    () => applyToOpportunity(sb(), { volunteerId: "v1", authUserId: "u1", opportunityId: "opp1", answers: {} }),
+    Error,
+    "validation",
   );
-}
-
-async function makeVolunteer(supabase: ReturnType<typeof testClient>, overrides: Record<string, unknown> = {}) {
-  const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email: `auth-${crypto.randomUUID()}@example.com`,
-    email_confirm: true,
-  });
-  if (authError) throw authError;
-  const { data } = await supabase.from("volunteers").insert({
-    auth_user_id: authUser.user!.id,
-    full_name: "Apply Test",
-    email: `apply-${crypto.randomUUID()}@example.com`,
-    phone: `0300-${Math.floor(Math.random() * 10000000)}`,
-    dob: "1999-01-01",
-    gender: "male",
-    city: "Lahore",
-    province: "Punjab",
-    country: "Pakistan",
-    institution: "Test Uni",
-    degree_program: "BSCS",
-    cnic_number: `${Math.floor(Math.random() * 100000000000)}`,
-    ...overrides,
-  }).select("id").single();
-  return data!.id as string;
-}
-
-async function makeOpportunity(supabase: ReturnType<typeof testClient>, organizationId: string) {
-  const { data } = await supabase.from("opportunities").insert({
-    organization_id: organizationId,
-    name: "Test Opp",
-    type: "event",
-  }).select("id").single();
-  return data!.id as string;
-}
-
-Deno.test("applyToOpportunity creates an application", async () => {
-  const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const volunteerId = await makeVolunteer(supabase);
-  const opportunityId = await makeOpportunity(supabase, orgId);
-
-  const result = await applyToOpportunity(supabase, {
-    volunteerId,
-    opportunityId,
-    organizationId: orgId,
-  });
-
-  assertEquals(typeof result.applicationId, "string");
+  assertEquals(typeof (err as Error & { fieldErrors: Record<string, string> }).fieldErrors.why, "string");
 });
 
-Deno.test("applyToOpportunity records the opportunity's real organization_id, not a mismatched client-supplied one", async () => {
-  const supabase = testClient();
-  const realOrgId = crypto.randomUUID();
-  const spoofedOrgId = crypto.randomUUID();
-  const volunteerId = await makeVolunteer(supabase);
-  const opportunityId = await makeOpportunity(supabase, realOrgId);
-
-  const result = await applyToOpportunity(supabase, {
-    volunteerId,
-    opportunityId,
-    organizationId: spoofedOrgId,
-  });
-
-  const { data: application } = await supabase
-    .from("applications")
-    .select("organization_id")
-    .eq("id", result.applicationId)
-    .single();
-  assertEquals(application!.organization_id, realOrgId);
-
-  // The org_volunteer_index link (which grants staff PII read access) must
-  // likewise be minted only for the opportunity's real org.
-  const { data: indexRows } = await supabase
-    .from("org_volunteer_index")
-    .select("organization_id")
-    .eq("volunteer_id", volunteerId);
-  assertEquals(indexRows?.length, 1);
-  assertEquals(indexRows![0].organization_id, realOrgId);
-});
-
-Deno.test("applyToOpportunity rejects an application to a deactivated opportunity", async () => {
-  const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const volunteerId = await makeVolunteer(supabase);
-  const opportunityId = await makeOpportunity(supabase, orgId);
-  await supabase.from("opportunities")
-    .update({ deactivated_at: new Date().toISOString() })
-    .eq("id", opportunityId);
-
+Deno.test("requires the volunteer to have an id doc on file", async () => {
   await assertRejects(
-    () => applyToOpportunity(supabase, { volunteerId, opportunityId, organizationId: orgId }),
+    () =>
+      applyToOpportunity(
+        sb({ volunteer: { id: "v1", full_name: "A", email: "a@b.com", phone: "1", id_doc_number: null } }),
+        { volunteerId: "v1", authUserId: "u1", opportunityId: "opp1", answers: { why: "x", consent: true } },
+      ),
+    Error,
+    "id_doc_required",
+  );
+});
+
+Deno.test("rejects an application to a deactivated opportunity", async () => {
+  await assertRejects(
+    () =>
+      applyToOpportunity(sb({ deactivatedAt: "2026-01-01T00:00:00Z" }), {
+        volunteerId: "v1",
+        authUserId: "u1",
+        opportunityId: "opp1",
+        answers: { why: "I care", consent: true },
+      }),
     Error,
     "opportunity_unavailable",
   );
-
-  const { data: applications } = await supabase
-    .from("applications")
-    .select("id")
-    .eq("volunteer_id", volunteerId);
-  assertEquals(applications?.length, 0);
 });
 
-Deno.test("applyToOpportunity rejects when the volunteer has no cnic_number on file", async () => {
-  const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const volunteerId = await makeVolunteer(supabase, { cnic_number: null });
-  const opportunityId = await makeOpportunity(supabase, orgId);
-
+Deno.test("rejects referenced attachments that are not this user's ready application files", async () => {
   await assertRejects(
-    () => applyToOpportunity(supabase, { volunteerId, opportunityId, organizationId: orgId }),
+    () =>
+      applyToOpportunity(sb(), {
+        volunteerId: "v1",
+        authUserId: "u1",
+        opportunityId: "opp1",
+        answers: { why: "I care", consent: true },
+        attachmentIds: ["att-1"],
+      }),
     Error,
-    "cnic_required",
+    "bad_attachment",
   );
+});
+
+Deno.test("happy path snapshots the form and promotes the applicant columns", async () => {
+  const capture: { application?: Record<string, unknown> } = {};
+  const r = await applyToOpportunity(sb({ capture }), {
+    volunteerId: "v1",
+    authUserId: "u1",
+    opportunityId: "opp1",
+    answers: { why: "I care", consent: true },
+  });
+  assertEquals(r.applicationId, "app-new");
+
+  const app = capture.application!;
+  assertEquals(app.organization_id, "org1");
+  assertEquals(app.answers, { why: "I care", consent: true });
+  assertEquals(app.form_snapshot, form);
+  assertEquals(app.applicant_name, "Ayesha");
+  assertEquals(app.applicant_email, "a@b.com");
+  assertEquals(app.applicant_phone, "123");
+  assertEquals(app.consent_accepted, true);
 });

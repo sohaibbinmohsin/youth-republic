@@ -6,7 +6,7 @@ select has_table('public', 'volunteers', 'volunteers table exists');
 select has_column('public', 'volunteers', 'email', 'has email column');
 select col_is_unique('public', 'volunteers', 'email', 'email is unique');
 select col_is_unique('public', 'volunteers', 'phone', 'phone is unique');
-select col_is_unique('public', 'volunteers', 'cnic_number', 'cnic_number is unique');
+select col_is_unique('public', 'volunteers', 'id_doc_number', 'id_doc_number is unique');
 select ok(
   not exists (
     select 1 from information_schema.columns
