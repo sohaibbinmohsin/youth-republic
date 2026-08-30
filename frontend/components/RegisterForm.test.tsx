@@ -8,7 +8,6 @@ vi.mock("@/lib/edgeFunctions");
 
 async function fillBaseFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Full name"), "Test Volunteer");
-  await user.type(screen.getByLabelText("Email"), "test@example.com");
   await user.type(screen.getByLabelText("Phone"), "0300-1111111");
   await user.type(screen.getByLabelText("City"), "Lahore");
   await user.type(screen.getByLabelText("Province"), "Punjab");
@@ -27,14 +26,14 @@ describe("RegisterForm", () => {
 
   it("does not show guardian fields for an adult DOB", async () => {
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={accessToken} />);
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
     expect(screen.queryByLabelText("Guardian name")).not.toBeInTheDocument();
   });
 
   it("shows guardian fields for a minor DOB", async () => {
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={accessToken} />);
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
     await user.type(screen.getByLabelText("Date of birth"), "2015-01-01");
     expect(screen.getByLabelText("Guardian name")).toBeInTheDocument();
   });
@@ -42,7 +41,7 @@ describe("RegisterForm", () => {
   it("submits the form and calls registerVolunteer with the access token", async () => {
     vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v1", volunteerCode: "VOL-2026-000001" });
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={accessToken} />);
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
 
     await fillBaseFields(user);
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
@@ -50,16 +49,28 @@ describe("RegisterForm", () => {
 
     await waitFor(() => {
       expect(edgeFunctions.registerVolunteer).toHaveBeenCalledWith(
-        expect.objectContaining({ fullName: "Test Volunteer", dob: "1999-01-01" }),
+        expect.objectContaining({ fullName: "Test Volunteer", email: "test@example.com", dob: "1999-01-01" }),
         accessToken,
       );
     });
   });
 
+  it("pre-fills Email from the authenticated account and does not let it be edited", async () => {
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="signedup@example.com" />);
+
+    const emailField = screen.getByLabelText("Email");
+    expect(emailField).toHaveValue("signedup@example.com");
+    expect(emailField).toHaveAttribute("readonly");
+
+    await user.type(emailField, "someone-else@example.com");
+    expect(emailField).toHaveValue("signedup@example.com");
+  });
+
   it("shows the server error message when registration fails", async () => {
     vi.mocked(edgeFunctions.registerVolunteer).mockRejectedValue(new Error("minor_consent_required"));
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={accessToken} />);
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
 
     await fillBaseFields(user);
     await user.type(screen.getByLabelText("Date of birth"), "2015-01-01");
@@ -72,7 +83,7 @@ describe("RegisterForm", () => {
     vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v1", volunteerCode: "VOL-2026-000001" });
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={accessToken} onSuccess={onSuccess} />);
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" onSuccess={onSuccess} />);
 
     await fillBaseFields(user);
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
@@ -87,7 +98,7 @@ describe("RegisterForm", () => {
 
   it("blocks submit and shows which fields are missing when mandatory fields are left blank", async () => {
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={accessToken} />);
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
 
     await user.click(screen.getByRole("button", { name: "Register" }));
 

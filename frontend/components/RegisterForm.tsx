@@ -31,8 +31,11 @@ const MANDATORY_FIELD_LABELS: Record<keyof typeof initialForm, string> = {
   degreeProgram: "Degree program",
 };
 
-export function RegisterForm({ accessToken, onSuccess }: { accessToken: string; onSuccess?: () => void }) {
-  const [form, setForm] = useState(initialForm);
+export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: string; email: string; onSuccess?: () => void }) {
+  // Email is fixed to the account the volunteer just signed up with — it is
+  // never a free-text field here, so there is no way to register a profile
+  // under an email that doesn't match the authenticated session.
+  const [form, setForm] = useState({ ...initialForm, email });
   const [guardian, setGuardian] = useState<GuardianConsentValue>({
     guardianName: "",
     guardianContact: "",
@@ -108,7 +111,7 @@ export function RegisterForm({ accessToken, onSuccess }: { accessToken: string; 
       </div>
       <div>
         <label htmlFor="email" className="block text-sm">Email</label>
-        <input id="email" type="email" required className="mt-1 w-full rounded border px-3 py-2" value={form.email} onChange={(e) => updateField("email", e.target.value)} />
+        <input id="email" type="email" required readOnly className="mt-1 w-full rounded border px-3 py-2 bg-gray-100 text-gray-600" value={form.email} />
       </div>
       <div>
         <label htmlFor="phone" className="block text-sm">Phone</label>

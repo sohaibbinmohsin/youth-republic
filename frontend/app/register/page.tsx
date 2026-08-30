@@ -15,7 +15,13 @@ export default function RegisterPage() {
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setAccessToken(data.session.access_token);
+      if (data.session) {
+        setAccessToken(data.session.access_token);
+        // An already-signed-in visitor lands here with a restored session, not
+        // a freshly-typed signup form — pull the email from the session itself
+        // so it still matches the authenticated account.
+        setEmail(data.session.user.email ?? "");
+      }
     });
   }, []);
 
@@ -54,7 +60,7 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto max-w-lg">
       <h1 className="mb-4 text-xl font-semibold">Volunteer registration</h1>
-      <RegisterForm accessToken={accessToken} onSuccess={() => router.push("/profile")} />
+      <RegisterForm accessToken={accessToken} email={email} onSuccess={() => router.push("/profile")} />
     </div>
   );
 }

@@ -29,7 +29,6 @@ beforeEach(() => {
 
 async function fillMandatory(user: ReturnType<typeof userEvent.setup>, dob = "1999-01-01") {
   await user.type(screen.getByLabelText("Full name"), "Aisha Khan");
-  await user.type(screen.getByLabelText("Email"), "aisha@example.com");
   await user.type(screen.getByLabelText("Phone"), "0300-1234567");
   await user.type(screen.getByLabelText("Date of birth"), dob);
   await user.selectOptions(screen.getByLabelText("Gender"), "female");
@@ -42,7 +41,7 @@ async function fillMandatory(user: ReturnType<typeof userEvent.setup>, dob = "19
 
 describe("§5A Registration — mandatory identity, contact & matching fields", () => {
   it("[5A] renders every field the doc marks Mandatory at registration", () => {
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
     for (const label of MANDATORY_REGISTRATION_FIELDS) {
       expect(screen.getByLabelText(label), `mandatory field "${label}"`).toBeInTheDocument();
     }
@@ -54,7 +53,7 @@ describe("§5A Registration — mandatory identity, contact & matching fields", 
       volunteerCode: "YR-2026-00142",
     });
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await fillMandatory(user);
     await user.click(screen.getByRole("button", { name: "Register" }));
@@ -79,19 +78,19 @@ describe("§5A Registration — mandatory identity, contact & matching fields", 
   });
 
   it("[5A] never asks for CNIC/B-Form at registration (doc: collected later, before an opportunity confirms)", () => {
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
     expect(screen.queryByLabelText(/cnic|b-?form/i)).not.toBeInTheDocument();
   });
 
   it("[5A] never asks for Emergency Contact at registration (doc: required once selected for an in-person activity)", () => {
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
     expect(screen.queryByLabelText(/emergency contact/i)).not.toBeInTheDocument();
   });
 
   it("[5A] surfaces the server's rejection reason without losing the entered data", async () => {
     vi.mocked(edgeFunctions.registerVolunteer).mockRejectedValue(new Error("email_already_registered"));
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await fillMandatory(user);
     await user.click(screen.getByRole("button", { name: "Register" }));
@@ -102,7 +101,7 @@ describe("§5A Registration — mandatory identity, contact & matching fields", 
 
   it("[5A] blocks submit on the client until every mandatory field is filled", async () => {
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await user.click(screen.getByRole("button", { name: "Register" }));
 
@@ -140,7 +139,7 @@ describe("§5A Registration — unique, human-readable Volunteer ID", () => {
       volunteerCode: "YR-2026-00142",
     });
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await fillMandatory(user);
     await user.click(screen.getByRole("button", { name: "Register" }));
@@ -159,7 +158,7 @@ describe("§5A Registration — minors (safeguarding on youth programs)", () => 
 
   it("[5A] shows guardian name + contact + consent only when the DOB is a minor", async () => {
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
     expect(screen.queryByLabelText("Guardian name")).not.toBeInTheDocument();
@@ -177,7 +176,7 @@ describe("§5A Registration — minors (safeguarding on youth programs)", () => 
       volunteerCode: "YR-2026-00200",
     });
     const user = userEvent.setup();
-    render(<RegisterForm accessToken={ACCESS_TOKEN} />);
+    render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await fillMandatory(user, "2015-01-01");
     await user.type(screen.getByLabelText("Guardian name"), "Sara Khan");
