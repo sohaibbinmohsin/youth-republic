@@ -1,7 +1,7 @@
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
 import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
-import { exportApplicationsCsv, exportVolunteersCsv } from "./handler.ts";
+import { exportApplicationsCsv, exportVolunteersCsv, exportOpportunitiesCsv, exportActivityHoursCsv } from "./handler.ts";
 
 export async function handler(req: Request): Promise<Response> {
   const preflight = handleCorsPreflight(req);
@@ -12,9 +12,16 @@ export async function handler(req: Request): Promise<Response> {
     const supabase = getAdminClient();
     const { organizationId, entity } = await req.json();
 
-    const csv = entity === "volunteers"
-      ? await exportVolunteersCsv(supabase, claims, organizationId)
-      : await exportApplicationsCsv(supabase, claims, organizationId);
+    let csv: string;
+    if (entity === "volunteers") {
+      csv = await exportVolunteersCsv(supabase, claims, organizationId);
+    } else if (entity === "opportunities") {
+      csv = await exportOpportunitiesCsv(supabase, claims, organizationId);
+    } else if (entity === "activity_hours") {
+      csv = await exportActivityHoursCsv(supabase, claims, organizationId);
+    } else {
+      csv = await exportApplicationsCsv(supabase, claims, organizationId);
+    }
 
     return new Response(csv, { status: 200, headers: { "Content-Type": "text/csv", ...corsHeaders } });
   } catch (err) {

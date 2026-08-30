@@ -1,6 +1,6 @@
-import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertRejects, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createClient } from "@supabase/supabase-js";
-import { exportApplicationsCsv, exportVolunteersCsv } from "./handler.ts";
+import { exportApplicationsCsv, exportVolunteersCsv, exportOpportunitiesCsv, exportActivityHoursCsv } from "./handler.ts";
 import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 function testClient() {
@@ -145,4 +145,70 @@ Deno.test("exportVolunteersCsv rejects staff without volunteers:read for the org
   const otherOrgId = crypto.randomUUID();
 
   await assertRejects(() => exportVolunteersCsv(supabase, volunteersReadClaims(otherOrgId), orgId), Error, "forbidden");
+});
+
+Deno.test("exportOpportunitiesCsv includes name, type, and computed capacity for the org's opportunities", async () => {
+  const supabase = testClient();
+  const { data: org } = await supabase.from("organizations").insert({
+    id: crypto.randomUUID(), name: "Export Opportunities Test Org", slug: `export-opps-${crypto.randomUUID()}`,
+  }).select("id").single();
+  const orgId = org!.id as string;
+  await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Export Test Opp", type: "environment", capacity: 20,
+  });
+  const claims: StaffClaims = {
+    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["opportunities:read"] }],
+  };
+
+  const csv = await exportOpportunitiesCsv(supabase, claims, orgId);
+
+  assertStringIncludes(csv, "name,type,capacity");
+  assertStringIncludes(csv, "Export Test Opp");
+  assertStringIncludes(csv, "environment");
+});
+
+Deno.test("exportOpportunitiesCsv rejects a caller without opportunities:read", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+
+  await assertRejects(() => exportOpportunitiesCsv(supabase, claims, orgId), Error, "forbidden");
+});
+
+Deno.test("exportActivityHoursCsv includes volunteer, opportunity, hours, and status for the org's activity", async () => {
+  const supabase = testClient();
+  const { data: org } = await supabase.from("organizations").insert({
+    id: crypto.randomUUID(), name: "Export Hours Test Org", slug: `export-hours-${crypto.randomUUID()}`,
+  }).select("id").single();
+  const orgId = org!.id as string;
+  const { data: authUser } = await supabase.auth.admin.createUser({
+    email: `export-hours-${crypto.randomUUID()}@example.com`, email_confirm: true,
+  });
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: authUser!.user!.id, full_name: "Export Hours Volunteer",
+    email: `export-hours-${crypto.randomUUID()}@example.com`, phone: `0300-${Math.floor(Math.random() * 10000000)}`,
+    dob: "1999-01-01", gender: "female", city: "Lahore", province: "Punjab", country: "Pakistan",
+    institution: "LUMS", degree_program: "BSCS",
+  }).select("id").single();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Export Hours Opp", type: "environment",
+  }).select("id").single();
+  const { data: participation } = await supabase.from("participation").insert({
+    volunteer_id: volunteer!.id, opportunity_id: opportunity!.id, organization_id: orgId, status: "completed",
+  }).select("id").single();
+  await supabase.from("activity_hours").insert({
+    participation_id: participation!.id, volunteer_id: volunteer!.id, opportunity_id: opportunity!.id, organization_id: orgId,
+    activity_date: "2026-02-01", hours_submitted: 5, hours_verified: 5, verification_status: "verified",
+  });
+  const claims: StaffClaims = {
+    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["hours:read"] }],
+  };
+
+  const csv = await exportActivityHoursCsv(supabase, claims, orgId);
+
+  assertStringIncludes(csv, "Export Hours Volunteer");
+  assertStringIncludes(csv, "Export Hours Opp");
+  assertStringIncludes(csv, "verified");
 });
