@@ -54,6 +54,38 @@ Deno.test("volunteer requester cannot target owner_type application for another 
     Error, "forbidden");
 });
 
+Deno.test("pre-registration requester can request an identity_doc/volunteer upload", async () => {
+  const r = await requestAttachmentUpload(
+    fakeSupabase(),
+    { authUserId: "auth-user-1", preRegistration: true },
+    {
+      domain: "identity_doc",
+      ownerType: "volunteer",
+      ownerId: "client-chosen-uuid",
+      mimeType: "image/png",
+      sizeBytes: 12345,
+      originalFilename: "cnic.png",
+    },
+  );
+  assertEquals(r.attachmentId, "att-new");
+  assertEquals(r.uploadUrl, "https://upload");
+  assertEquals(r.storagePath.startsWith("volunteer/client-chosen-uuid/"), true);
+});
+
+Deno.test("pre-registration requester cannot request a session_photo upload", async () => {
+  await assertRejects(
+    () => requestAttachmentUpload(fakeSupabase(), { authUserId: "auth-user-1", preRegistration: true },
+      { domain: "session_photo", ownerType: "activity_hours", ownerId: "o", mimeType: "image/png", sizeBytes: 100 }),
+    Error, "forbidden");
+});
+
+Deno.test("pre-registration requester cannot request an application_file upload", async () => {
+  await assertRejects(
+    () => requestAttachmentUpload(fakeSupabase(), { authUserId: "auth-user-1", preRegistration: true },
+      { domain: "application_file", ownerType: "application", ownerId: "app-1", mimeType: "application/pdf", sizeBytes: 100 }),
+    Error, "forbidden");
+});
+
 Deno.test("happy path returns attachmentId, uploadUrl, storagePath", async () => {
   const r = await requestAttachmentUpload(fakeSupabase(), { authUserId: "u", volunteerId: "v" },
     { domain: "session_photo", ownerType: "activity_hours", ownerId: "own-1", mimeType: "image/png", sizeBytes: 100 });

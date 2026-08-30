@@ -19,6 +19,11 @@ export interface AttachmentRequester {
   authUserId: string;
   volunteerId?: string;
   staffOrgIds?: string[];
+  // A bare authenticated Supabase user with no `volunteers` row yet (register
+  // step 2). Security boundary: a preRegistration requester can ONLY create an
+  // `identity_doc` + `ownerType='volunteer'` attachment tied to its own
+  // `authUserId` — no other domain, no other owner type, no other owner.
+  preRegistration?: boolean;
 }
 
 export async function requestAttachmentUpload(
@@ -37,7 +42,16 @@ export async function requestAttachmentUpload(
   let organizationId: string | null = null;
 
   if (input.domain === "identity_doc") {
-    if (!isVolunteer || input.ownerType !== "volunteer") throw new Error("forbidden");
+    // An existing volunteer re-uploading, OR a pre-registration user uploading
+    // their ID doc before `register-volunteer` runs. Both still require
+    // ownerType='volunteer'. A preRegistration requester has neither volunteerId
+    // nor staffOrgIds, so the session_photo / application_file branches below
+    // reject it via their isVolunteer / isStaff guards — it can reach nothing but
+    // this branch. `uploaded_by` is set to requester.authUserId on insert;
+    // `register-volunteer` (Task 14) re-points owner_id and re-verifies
+    // uploaded_by === input.authUserId after it creates the volunteer row.
+    const mayUploadIdentityDoc = isVolunteer || requester.preRegistration === true;
+    if (!mayUploadIdentityDoc || input.ownerType !== "volunteer") throw new Error("forbidden");
     // owner_id is a client-chosen uuid for the volunteer row about to be created,
     // or the volunteer's own id for a re-upload. Accept both; re-point happens later.
   } else if (input.domain === "session_photo") {

@@ -1,6 +1,6 @@
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
-import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
+import { verifyVolunteerAuthUser, verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
 import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
 import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 import { type AttachmentRequester, requestAttachmentUpload } from "./handler.ts";
@@ -15,14 +15,33 @@ async function resolveRequester(
   } catch (err) {
     if (!(err instanceof Error) || err.message !== "unauthorized") throw err;
   }
-  const claims = await verifyStaffToken(authHeader);
-  const staffOrgIds = Array.from(
-    new Set([
-      ...claims.orgRoles.map((r) => r.organizationId),
-      ...claims.moduleAccess.map((m) => m.organizationId),
-    ]),
-  );
-  return { authUserId: claims.staffId, staffOrgIds };
+
+  try {
+    const claims = await verifyStaffToken(authHeader);
+    const staffOrgIds = Array.from(
+      new Set([
+        ...claims.orgRoles.map((r) => r.organizationId),
+        ...claims.moduleAccess.map((m) => m.organizationId),
+      ]),
+    );
+    return { authUserId: claims.staffId, staffOrgIds };
+  } catch (err) {
+    if (!(err instanceof Error) || err.message !== "unauthorized") throw err;
+  }
+
+  // Third fallback: a pre-registration user. During register step 2 the user has a
+  // Supabase Auth account (from step 1) but no `volunteers` row yet, so neither
+  // verifyVolunteerToken nor verifyStaffToken can place them — yet they must
+  // upload their CNIC/B-Form before `register-volunteer` runs. Verify the bearer
+  // JWT directly (verifyVolunteerAuthUser extracts the raw token from the
+  // `Authorization: Bearer <token>` header and calls `supabase.auth.getUser`).
+  // On success this requester is marked `preRegistration`; handler.ts confines it
+  // to exactly one capability: creating an `identity_doc` + `ownerType='volunteer'`
+  // attachment whose `uploaded_by` is its own authUserId — no other domain, no
+  // other owner type, no other owner. If the JWT is also invalid this throws
+  // `unauthorized`, exactly as before.
+  const { authUserId } = await verifyVolunteerAuthUser(supabase, authHeader);
+  return { authUserId, preRegistration: true };
 }
 
 export async function handler(req: Request): Promise<Response> {
