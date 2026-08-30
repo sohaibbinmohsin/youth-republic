@@ -12,7 +12,7 @@ export async function enrollParticipant(
   staffClaims: StaffClaims,
   input: EnrollParticipantInput,
 ): Promise<{ participationId: string }> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "participation:write")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "participation:write")) {
     throw new Error("forbidden");
   }
 

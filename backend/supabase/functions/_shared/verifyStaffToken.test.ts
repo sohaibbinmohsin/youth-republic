@@ -22,7 +22,7 @@ Deno.test("verifyStaffToken accepts a well-formed staff token", async () => {
     staff_id: "staff-1",
     platform_owner: false,
     org_roles: [{ organization_id: "org-1" }],
-    module_access: [{ organization_id: "org-1", module: "vms", permissions: ["applications:read"] }],
+    module_access: [{ organization_id: "org-1", module: "youth-republic", permissions: ["applications:read"] }],
   });
   const claims = await verifyStaffToken(`Bearer ${token}`);
   assertEquals(claims.actorType, "staff");
@@ -84,22 +84,22 @@ const baseClaims = (overrides: Partial<StaffClaims> = {}): StaffClaims => ({
   staffId: "staff-1",
   platformOwner: false,
   orgRoles: [{ organizationId: "org-1" }],
-  moduleAccess: [{ organizationId: "org-1", module: "vms", permissions: ["applications:read"] }],
+  moduleAccess: [{ organizationId: "org-1", module: "youth-republic", permissions: ["applications:read"] }],
   ...overrides,
 });
 
 Deno.test("staffHasPermission is true when the permission is granted for that org and module", () => {
-  assertEquals(staffHasPermission(baseClaims(), "org-1", "vms", "applications:read"), true);
+  assertEquals(staffHasPermission(baseClaims(), "org-1", "youth-republic", "applications:read"), true);
 });
 
 Deno.test("staffHasPermission is false when the permission isn't granted", () => {
-  assertEquals(staffHasPermission(baseClaims(), "org-1", "vms", "applications:write"), false);
+  assertEquals(staffHasPermission(baseClaims(), "org-1", "youth-republic", "applications:write"), false);
 });
 
 Deno.test("staffHasPermission is false for a different organization", () => {
-  assertEquals(staffHasPermission(baseClaims(), "org-2", "vms", "applications:read"), false);
+  assertEquals(staffHasPermission(baseClaims(), "org-2", "youth-republic", "applications:read"), false);
 });
 
 Deno.test("staffHasPermission bypasses everything for platform_owner", () => {
-  assertEquals(staffHasPermission(baseClaims({ platformOwner: true, moduleAccess: [] }), "org-9", "vms", "applications:write"), true);
+  assertEquals(staffHasPermission(baseClaims({ platformOwner: true, moduleAccess: [] }), "org-9", "youth-republic", "applications:write"), true);
 });

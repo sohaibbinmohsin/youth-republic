@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-gray-200">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link href="/" className="font-semibold">
-            VMS
+            Youth Republic
           </Link>
           <nav className="hidden gap-6 sm:flex">
             {NAV_LINKS.map((link) => (

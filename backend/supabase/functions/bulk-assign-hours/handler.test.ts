@@ -36,7 +36,7 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   staffId,
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["hours:write"] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["hours:write"] }],
 });
 
 Deno.test("bulkAssignHours creates one activity_hours row per participant", async () => {

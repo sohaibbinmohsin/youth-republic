@@ -18,7 +18,7 @@ export async function updateParticipationStatus(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, participation.organization_id, "vms", "participation:update")) {
+  if (!staffHasPermission(staffClaims, participation.organization_id, "youth-republic", "participation:update")) {
     throw new Error("forbidden");
   }
 

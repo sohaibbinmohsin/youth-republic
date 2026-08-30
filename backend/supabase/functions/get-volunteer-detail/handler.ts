@@ -35,7 +35,7 @@ export async function getVolunteerDetail(
   staffClaims: StaffClaims,
   input: GetVolunteerDetailInput,
 ): Promise<VolunteerDetail> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "volunteers:read")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "volunteers:read")) {
     throw new Error("forbidden");
   }
 

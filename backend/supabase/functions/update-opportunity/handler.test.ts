@@ -12,7 +12,7 @@ const staffClaims = (orgId: string, permission: string, staffId = crypto.randomU
   staffId,
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
 });
 
 Deno.test("updateOpportunity publishes by setting status_override and logs the action", async () => {

@@ -32,7 +32,7 @@ export async function listActivityHours(
   staffClaims: StaffClaims,
   input: ListActivityHoursInput,
 ): Promise<ListActivityHoursResult> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "hours:read")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "hours:read")) {
     throw new Error("forbidden");
   }
 

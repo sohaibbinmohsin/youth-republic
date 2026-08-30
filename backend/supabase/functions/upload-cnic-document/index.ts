@@ -53,7 +53,7 @@ export async function handler(req: Request): Promise<Response> {
         .select("organization_id")
         .eq("volunteer_id", volunteerId);
       const canRead = claims.platformOwner || (links ?? []).some(
-        (link) => staffHasPermission(claims, link.organization_id, "vms", "volunteers:read"),
+        (link) => staffHasPermission(claims, link.organization_id, "youth-republic", "volunteers:read"),
       );
       if (!canRead) throw new Error("forbidden");
       const result = await getCnicReadUrl(r2Client, objectKey);

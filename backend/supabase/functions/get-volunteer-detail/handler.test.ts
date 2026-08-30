@@ -10,7 +10,7 @@ function testClient() {
 function claimsWithPermission(orgId: string): StaffClaims {
   return {
     actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
-    moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["volunteers:read"] }],
+    moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["volunteers:read"] }],
   };
 }
 

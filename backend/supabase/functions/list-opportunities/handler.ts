@@ -51,7 +51,7 @@ export async function listOpportunities(
   staffClaims: StaffClaims,
   input: ListOpportunitiesInput,
 ): Promise<ListOpportunitiesResult> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "opportunities:read")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "opportunities:read")) {
     throw new Error("forbidden");
   }
 

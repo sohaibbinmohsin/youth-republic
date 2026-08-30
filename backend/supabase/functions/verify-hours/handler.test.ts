@@ -64,7 +64,7 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   staffId,
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["hours:update"] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["hours:update"] }],
 });
 
 Deno.test("verifyHours verifying sets hours_verified and status", async () => {

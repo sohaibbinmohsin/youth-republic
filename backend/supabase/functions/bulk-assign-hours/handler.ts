@@ -18,7 +18,7 @@ export async function bulkAssignHours(
   staffClaims: StaffClaims,
   input: BulkAssignHoursInput,
 ): Promise<BulkAssignHoursResult> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "hours:write")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "hours:write")) {
     throw new Error("forbidden");
   }
 

@@ -14,7 +14,7 @@ export async function createChapter(
   staffClaims: StaffClaims,
   input: CreateChapterInput,
 ): Promise<{ chapterId: string }> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "chapters:write")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "chapters:write")) {
     throw new Error("forbidden");
   }
 

@@ -26,7 +26,7 @@ export async function listParticipationForOpportunity(
   staffClaims: StaffClaims,
   input: ListParticipationForOpportunityInput,
 ): Promise<{ applicants: ApplicantRow[]; participants: ParticipantRow[] }> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "participation:read")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "participation:read")) {
     throw new Error("forbidden");
   }
 

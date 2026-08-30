@@ -29,7 +29,7 @@ export async function listApplications(
   staffClaims: StaffClaims,
   input: ListApplicationsInput,
 ): Promise<ListApplicationsResult> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "applications:read")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "applications:read")) {
     throw new Error("forbidden");
   }
 

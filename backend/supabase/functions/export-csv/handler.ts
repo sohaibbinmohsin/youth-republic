@@ -17,7 +17,7 @@ export async function exportApplicationsCsv(
   staffClaims: StaffClaims,
   organizationId: string,
 ): Promise<string> {
-  if (!staffHasPermission(staffClaims, organizationId, "vms", "applications:read")) {
+  if (!staffHasPermission(staffClaims, organizationId, "youth-republic", "applications:read")) {
     throw new Error("forbidden");
   }
 
@@ -49,7 +49,7 @@ export async function exportVolunteersCsv(
   staffClaims: StaffClaims,
   organizationId: string,
 ): Promise<string> {
-  if (!staffHasPermission(staffClaims, organizationId, "vms", "volunteers:read")) {
+  if (!staffHasPermission(staffClaims, organizationId, "youth-republic", "volunteers:read")) {
     throw new Error("forbidden");
   }
 
@@ -85,7 +85,7 @@ export async function exportOpportunitiesCsv(
   staffClaims: StaffClaims,
   organizationId: string,
 ): Promise<string> {
-  if (!staffHasPermission(staffClaims, organizationId, "vms", "opportunities:read")) {
+  if (!staffHasPermission(staffClaims, organizationId, "youth-republic", "opportunities:read")) {
     throw new Error("forbidden");
   }
 
@@ -108,7 +108,7 @@ export async function exportActivityHoursCsv(
   staffClaims: StaffClaims,
   organizationId: string,
 ): Promise<string> {
-  if (!staffHasPermission(staffClaims, organizationId, "vms", "hours:read")) {
+  if (!staffHasPermission(staffClaims, organizationId, "youth-republic", "hours:read")) {
     throw new Error("forbidden");
   }
 

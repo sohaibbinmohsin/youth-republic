@@ -12,7 +12,7 @@ const staffClaims = (orgId: string, permission: string, staffId = crypto.randomU
   staffId,
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
 });
 
 Deno.test("createChapter creates a row and logs the action under the caller's own staffId", async () => {

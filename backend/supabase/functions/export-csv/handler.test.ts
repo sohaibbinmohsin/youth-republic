@@ -12,7 +12,7 @@ const staffClaims = (orgId: string): StaffClaims => ({
   staffId: crypto.randomUUID(),
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["applications:read"] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["applications:read"] }],
 });
 
 Deno.test("exportApplicationsCsv includes a header row and one row per application", async () => {
@@ -89,7 +89,7 @@ const volunteersReadClaims = (orgId: string): StaffClaims => ({
   staffId: crypto.randomUUID(),
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["volunteers:read"] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["volunteers:read"] }],
 });
 
 Deno.test("exportVolunteersCsv includes a header row and one row per volunteer linked to the org", async () => {
@@ -158,7 +158,7 @@ Deno.test("exportOpportunitiesCsv includes name, type, and computed capacity for
   });
   const claims: StaffClaims = {
     actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
-    moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["opportunities:read"] }],
+    moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["opportunities:read"] }],
   };
 
   const csv = await exportOpportunitiesCsv(supabase, claims, orgId);
@@ -203,7 +203,7 @@ Deno.test("exportActivityHoursCsv includes volunteer, opportunity, hours, and st
   });
   const claims: StaffClaims = {
     actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
-    moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["hours:read"] }],
+    moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["hours:read"] }],
   };
 
   const csv = await exportActivityHoursCsv(supabase, claims, orgId);

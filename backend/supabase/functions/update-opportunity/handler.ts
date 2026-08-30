@@ -52,11 +52,11 @@ export async function updateOpportunity(
     || input.capacity !== undefined
     || input.statusOverride !== undefined;
 
-  if (touchesOtherFields && !staffHasPermission(staffClaims, opportunity.organization_id, "vms", "opportunities:update")) {
+  if (touchesOtherFields && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:update")) {
     throw new Error("forbidden");
   }
 
-  if (input.deactivatedAt !== undefined && !staffHasPermission(staffClaims, opportunity.organization_id, "vms", "opportunities:delete")) {
+  if (input.deactivatedAt !== undefined && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:delete")) {
     throw new Error("forbidden");
   }
 

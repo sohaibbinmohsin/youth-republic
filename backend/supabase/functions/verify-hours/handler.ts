@@ -27,7 +27,7 @@ export async function verifyHours(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, row.organization_id, "vms", "hours:update")) {
+  if (!staffHasPermission(staffClaims, row.organization_id, "youth-republic", "hours:update")) {
     throw new Error("forbidden");
   }
 

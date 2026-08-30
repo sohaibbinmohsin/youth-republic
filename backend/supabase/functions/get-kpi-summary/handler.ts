@@ -33,7 +33,7 @@ export async function getKpiSummary(
   staffClaims: StaffClaims,
   input: GetKpiSummaryInput,
 ): Promise<KpiSummary> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "volunteers:read")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "volunteers:read")) {
     throw new Error("forbidden");
   }
 

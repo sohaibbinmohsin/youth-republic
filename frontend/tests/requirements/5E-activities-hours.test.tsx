@@ -107,7 +107,7 @@ describe("§5E/§6 Verification workflow (Recorded → Pending → Verified / Re
 });
 
 describe("§5E Admin activities & hours workflow", () => {
-  // GAP — no VMS admin UI. Belongs in tmp-partner-admin/tests/requirements/.
+  // GAP — no Youth Republic admin UI. Belongs in tmp-partner-admin/tests/requirements/.
   it.todo("[5E→admin] admin records / verifies hours and can bulk-assign standard hours");
   it.todo("[5E→admin] admin list filters by Activity Type and Participation Status");
   it.todo("[5E→admin] Admin Notes are internal — never shown in any volunteer-facing view");

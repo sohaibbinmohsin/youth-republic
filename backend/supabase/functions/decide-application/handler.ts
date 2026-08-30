@@ -26,7 +26,7 @@ export async function decideApplication(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, application.organization_id, "vms", "applications:update")) {
+  if (!staffHasPermission(staffClaims, application.organization_id, "youth-republic", "applications:update")) {
     throw new Error("forbidden");
   }
 

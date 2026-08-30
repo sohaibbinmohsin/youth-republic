@@ -56,7 +56,7 @@ function claimsWithPermission(orgId: string, permission: string): StaffClaims {
     staffId: "staff-1",
     platformOwner: false,
     orgRoles: [],
-    moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+    moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
   };
 }
 

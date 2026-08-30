@@ -50,7 +50,7 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   staffId,
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["participation:update"] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["participation:update"] }],
 });
 
 Deno.test("updateParticipationStatus moves selected to participating", async () => {

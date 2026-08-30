@@ -3,7 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VMS — Volunteer Management System",
+  title: "Youth Republic",
   description: "One profile. Every organization.",
 };
 

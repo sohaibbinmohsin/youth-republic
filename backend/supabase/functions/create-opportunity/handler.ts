@@ -21,7 +21,7 @@ export async function createOpportunity(
   staffClaims: StaffClaims,
   input: CreateOpportunityInput,
 ): Promise<{ opportunityId: string }> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "vms", "opportunities:write")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "opportunities:write")) {
     throw new Error("forbidden");
   }
 

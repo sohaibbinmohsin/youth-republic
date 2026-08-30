@@ -121,8 +121,8 @@ describe("§5D Participation — a stage distinct from application", () => {
 });
 
 describe("§5D Admin review workflow", () => {
-  // GAP — the entire VMS admin UI is unbuilt in tmp-partner-admin. These belong to
-  // tmp-partner-admin/tests/requirements/admin-vms-portal.test.tsx once it exists.
+  // GAP — the entire Youth Republic admin UI is unbuilt in tmp-partner-admin. These belong to
+  // tmp-partner-admin/tests/requirements/admin-youth-republic-portal.test.tsx once it exists.
   it.todo("[5D→admin] admin lists applications and filters by Opportunity and Application Status");
   it.todo("[5D→admin] admin decides an application (selected / waitlisted / rejected / under_review) via decideApplication");
   it.todo("[5D→admin] admin promotes a waitlisted application to selected when a spot opens");

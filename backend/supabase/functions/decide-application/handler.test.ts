@@ -74,7 +74,7 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   staffId,
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: ["applications:update"] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["applications:update"] }],
 });
 
 Deno.test("decideApplication selecting an applicant auto-creates participation", async () => {

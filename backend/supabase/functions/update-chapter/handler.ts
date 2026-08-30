@@ -26,7 +26,7 @@ export async function updateChapter(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, chapter.organization_id, "vms", "chapters:update")) {
+  if (!staffHasPermission(staffClaims, chapter.organization_id, "youth-republic", "chapters:update")) {
     throw new Error("forbidden");
   }
 

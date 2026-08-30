@@ -12,7 +12,7 @@ const staffClaims = (orgId: string, permission: string): StaffClaims => ({
   staffId: crypto.randomUUID(),
   platformOwner: false,
   orgRoles: [{ organizationId: orgId }],
-  moduleAccess: [{ organizationId: orgId, module: "vms", permissions: [permission] }],
+  moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
 });
 
 Deno.test("updateChapter renames a chapter and logs the action", async () => {
