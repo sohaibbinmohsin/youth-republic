@@ -79,3 +79,58 @@ export async function exportVolunteersCsv(
 
   return [header, ...lines].join("\n") + "\n";
 }
+
+export async function exportOpportunitiesCsv(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  organizationId: string,
+): Promise<string> {
+  if (!staffHasPermission(staffClaims, organizationId, "vms", "opportunities:read")) {
+    throw new Error("forbidden");
+  }
+
+  const { data: rows, error } = await supabase
+    .from("opportunities")
+    .select("name, type, capacity")
+    .eq("organization_id", organizationId);
+  if (error) throw error;
+
+  const header = "name,type,capacity";
+  const lines = (rows ?? []).map((r: Record<string, unknown>) =>
+    [csvEscape(String(r.name)), csvEscape(String(r.type)), csvEscape(String(r.capacity ?? ""))].join(",")
+  );
+
+  return [header, ...lines].join("\n") + "\n";
+}
+
+export async function exportActivityHoursCsv(
+  supabase: SupabaseClient,
+  staffClaims: StaffClaims,
+  organizationId: string,
+): Promise<string> {
+  if (!staffHasPermission(staffClaims, organizationId, "vms", "hours:read")) {
+    throw new Error("forbidden");
+  }
+
+  const { data: rows, error } = await supabase
+    .from("activity_hours")
+    .select("activity_date, hours_submitted, hours_verified, verification_status, volunteers(full_name), opportunities(name)")
+    .eq("organization_id", organizationId);
+  if (error) throw error;
+
+  const header = "volunteer_name,opportunity_name,activity_date,hours_submitted,hours_verified,verification_status";
+  const lines = (rows ?? []).map((r: Record<string, unknown>) => {
+    const volunteer = r.volunteers as { full_name: string };
+    const opportunity = r.opportunities as { name: string };
+    return [
+      csvEscape(volunteer.full_name),
+      csvEscape(opportunity.name),
+      csvEscape(String(r.activity_date)),
+      csvEscape(String(r.hours_submitted)),
+      csvEscape(String(r.hours_verified ?? "")),
+      csvEscape(String(r.verification_status)),
+    ].join(",");
+  });
+
+  return [header, ...lines].join("\n") + "\n";
+}
