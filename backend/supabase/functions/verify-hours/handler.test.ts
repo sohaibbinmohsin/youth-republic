@@ -110,8 +110,65 @@ Deno.test("verifyHours sets verified_by and admin_action_log.staff_id from the c
     .from("admin_action_log")
     .select("staff_id")
     .eq("target_id", activityHoursId)
-    .eq("action", "hours_decided");
+    .eq("action", "hours_verified");
   assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("verifyHours logs hours_verified with metadata.hours when hoursVerified equals hoursSubmitted", async () => {
+  const supabase = testClient();
+  const { activityHoursId, orgId } = await makeActivityHours(supabase);
+  const realStaffId = crypto.randomUUID();
+
+  await verifyHours(supabase, staffClaims(orgId, realStaffId), {
+    activityHoursId, decision: "verified", hoursVerified: 5,
+  }, new FakeEmailClient());
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("staff_id, actor_type, action, target_type, target_id, organization_id, metadata")
+    .eq("target_id", activityHoursId);
+  assertEquals(logRows!.length, 1);
+  const log = logRows![0];
+  assertEquals(log.action, "hours_verified");
+  assertEquals(log.target_type, "activity_hours");
+  assertEquals(log.target_id, activityHoursId);
+  assertEquals(log.organization_id, orgId);
+  assertEquals(log.staff_id, realStaffId);
+  assertEquals(log.metadata, { hours: 5 });
+});
+
+Deno.test("verifyHours logs hours_adjusted with metadata.submitted/verified when the verified value differs", async () => {
+  const supabase = testClient();
+  const { activityHoursId, orgId } = await makeActivityHours(supabase);
+
+  await verifyHours(supabase, staffClaims(orgId), {
+    activityHoursId, decision: "verified", hoursVerified: 3,
+  }, new FakeEmailClient());
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("action, metadata")
+    .eq("target_id", activityHoursId);
+  assertEquals(logRows!.length, 1);
+  assertEquals(logRows![0].action, "hours_adjusted");
+  assertEquals(logRows![0].metadata, { submitted: 5, verified: 3 });
+});
+
+Deno.test("verifyHours logs hours_rejected with metadata.reason on a rejection", async () => {
+  const supabase = testClient();
+  const { activityHoursId, orgId } = await makeActivityHours(supabase);
+
+  await verifyHours(supabase, staffClaims(orgId), {
+    activityHoursId, decision: "rejected", rejectionReason: "No proof of attendance",
+  }, new FakeEmailClient());
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("action, metadata")
+    .eq("target_id", activityHoursId);
+  assertEquals(logRows!.length, 1);
+  assertEquals(logRows![0].action, "hours_rejected");
+  assertEquals(logRows![0].metadata, { reason: "No proof of attendance" });
 });
 
 Deno.test("verifyHours sends a status-change email to the volunteer", async () => {
@@ -170,6 +227,6 @@ Deno.test("verifyHours completes successfully when the email send throws — the
     .from("admin_action_log")
     .select("id")
     .eq("target_id", activityHoursId)
-    .eq("action", "hours_decided");
+    .eq("action", "hours_verified");
   assertEquals(logRows?.length, 1);
 });

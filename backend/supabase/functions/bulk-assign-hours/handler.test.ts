@@ -141,10 +141,50 @@ Deno.test("bulkAssignHours attributes admin_action_log to the caller's own staff
     hoursSubmitted: 4, participationIds,
   });
 
+  const { data: hourRows } = await supabase
+    .from("activity_hours")
+    .select("id")
+    .in("participation_id", participationIds);
+  const hourIds = (hourRows ?? []).map((r) => r.id as string);
+
   const { data: logRows } = await supabase
     .from("admin_action_log")
     .select("staff_id")
-    .eq("target_id", opportunity!.id)
+    .in("target_id", hourIds)
     .eq("action", "bulk_hours_assigned");
+  assertEquals(logRows!.length, 1);
   assertEquals(logRows![0].staff_id, realStaffId);
+});
+
+Deno.test("bulkAssignHours logs one bulk_hours_assigned row per created activity_hours row", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Bulk Opp 4", type: "event",
+  }).select("id").single();
+  const participationIds = await makeParticipants(supabase, orgId, opportunity!.id, 3);
+
+  await bulkAssignHours(supabase, staffClaims(orgId), {
+    organizationId: orgId, opportunityId: opportunity!.id, activityDate: "2026-08-01",
+    hoursSubmitted: 4, participationIds,
+  });
+
+  const { data: hourRows } = await supabase
+    .from("activity_hours")
+    .select("id")
+    .in("participation_id", participationIds);
+  const hourIds = (hourRows ?? []).map((r) => r.id as string);
+  assertEquals(hourIds.length, 3);
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("target_type, target_id, organization_id, metadata, action")
+    .in("target_id", hourIds)
+    .eq("action", "bulk_hours_assigned");
+  assertEquals(logRows!.length, 3);
+  for (const log of logRows!) {
+    assertEquals(log.target_type, "activity_hours");
+    assertEquals(log.organization_id, orgId);
+    assertEquals(log.metadata, { activity_date: "2026-08-01", hours_submitted: 4 });
+  }
 });

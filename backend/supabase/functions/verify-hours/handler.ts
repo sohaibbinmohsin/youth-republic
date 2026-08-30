@@ -22,7 +22,7 @@ export async function verifyHours(
 ): Promise<VerifyHoursResult> {
   const { data: row, error: fetchError } = await supabase
     .from("activity_hours")
-    .select("id, organization_id, volunteer_id")
+    .select("id, organization_id, volunteer_id, hours_submitted")
     .eq("id", input.activityHoursId)
     .single();
   if (fetchError) throw fetchError;
@@ -43,14 +43,31 @@ export async function verifyHours(
     .eq("id", input.activityHoursId);
   if (updateError) throw updateError;
 
+  // Branch the audit action on what actually changed: a clean verification
+  // (verified == submitted), an adjustment (verified differs), or a rejection.
+  const submitted = Number(row.hours_submitted);
+  const verified = input.hoursVerified ?? submitted;
+  let action: string;
+  let metadata: Record<string, unknown>;
+  if (input.decision === "rejected") {
+    action = "hours_rejected";
+    metadata = { reason: input.rejectionReason ?? null };
+  } else if (verified === submitted) {
+    action = "hours_verified";
+    metadata = { hours: verified };
+  } else {
+    action = "hours_adjusted";
+    metadata = { submitted, verified };
+  }
+
   await supabase.from("admin_action_log").insert({
     staff_id: staffClaims.staffId,
     actor_type: staffClaims.actorType,
-    action: "hours_decided",
+    action,
     target_type: "activity_hours",
     target_id: input.activityHoursId,
     organization_id: row.organization_id,
-    metadata: { decision: input.decision },
+    metadata,
   });
 
   const { data: volunteer } = await supabase

@@ -54,18 +54,27 @@ export async function bulkAssignHours(
     hours_submitted: input.hoursSubmitted,
   }));
 
-  const { error: insertError } = await supabase.from("activity_hours").insert(rows);
+  const { data: created, error: insertError } = await supabase
+    .from("activity_hours")
+    .insert(rows)
+    .select("id");
   if (insertError) throw insertError;
 
-  await supabase.from("admin_action_log").insert({
+  // One audit row per created activity_hours row, keyed to that row — the
+  // T23 brief only specifies verify-hours' branch actions, so bulk assignment
+  // keeps its own action name but now logs per affected row for parity.
+  const logRows = (created ?? []).map((r) => ({
     staff_id: staffClaims.staffId,
     actor_type: staffClaims.actorType,
     action: "bulk_hours_assigned",
-    target_type: "opportunity",
-    target_id: input.opportunityId,
+    target_type: "activity_hours",
+    target_id: r.id,
     organization_id: input.organizationId,
-    metadata: { participation_count: rows.length },
-  });
+    metadata: { activity_date: input.activityDate, hours_submitted: input.hoursSubmitted },
+  }));
+  if (logRows.length > 0) {
+    await supabase.from("admin_action_log").insert(logRows);
+  }
 
   return { createdCount: rows.length };
 }
