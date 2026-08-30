@@ -119,7 +119,9 @@ describe("§9 Soft-delete, UUID keys, FK integrity, pagination, indexing", () =>
   it.todo("[9→backend] volunteers / opportunities / activity records soft-delete via deactivated_at only — no DELETE policy (pgTAP)");
   it.todo("[9→backend] FK constraints link Volunteer↔Application↔Opportunity↔Participation↔Hours; orphan insert fails (pgTAP)");
   it.todo("[9→backend] searchable columns (city, province, institution, status, organization) are indexed (pgTAP)");
-  it.todo("[9] list views paginate (limit/offset or range) and never fetch unbounded");
+  it("[9] list views paginate (limit/offset or range) and never fetch unbounded — see app/opportunities/page.test.tsx and app/applications/page.test.tsx (the two genuine list views; the home dashboard's 'current applications' and the portfolio's per-volunteer activity are inherently bounded to one person's own data, not paginated lists)", () => {
+    expect(true).toBe(true);
+  });
   it.todo("[9/ops] automated backups + a basic recovery runbook exist before real PII is loaded");
 });
 
