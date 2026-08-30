@@ -26,7 +26,11 @@ export async function handler(req: Request): Promise<Response> {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
-    const status = message === "unauthorized" ? 401 : message === "minor_consent_required" ? 422 : 400;
+    const status = message === "unauthorized"
+      ? 401
+      : ["minor_consent_required", "b_form_required_for_minor", "id_doc_attachment_required"].includes(message)
+      ? 422
+      : 400;
     return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });
   }
 }

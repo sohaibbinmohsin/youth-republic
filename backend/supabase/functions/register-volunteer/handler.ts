@@ -12,6 +12,9 @@ export interface RegisterVolunteerInput {
   country: string;
   institution: string;
   degreeProgram: string;
+  idDocType: "cnic" | "b_form";
+  idDocNumber: string;
+  idDocAttachmentId: string;
   guardianName?: string;
   guardianContact?: string;
   guardianConsent?: boolean;
@@ -56,11 +59,31 @@ export async function registerVolunteer(
     .rpc("volunteer_is_minor", { v_dob: input.dob });
   if (minorCheckError) throw minorCheckError;
 
-  if (minorCheck === true) {
+  const isMinor = minorCheck === true;
+
+  if (isMinor) {
     const hasConsent = Boolean(input.guardianName && input.guardianContact && input.guardianConsent);
     if (!hasConsent) {
       throw new Error("minor_consent_required");
     }
+    if (input.idDocType !== "b_form") {
+      throw new Error("b_form_required_for_minor");
+    }
+  }
+
+  const { data: attachment, error: attachmentError } = await supabase
+    .from("attachments")
+    .select("id, domain, owner_type, status, uploaded_by")
+    .eq("id", input.idDocAttachmentId)
+    .single();
+  if (
+    attachmentError || !attachment ||
+    attachment.domain !== "identity_doc" ||
+    attachment.owner_type !== "volunteer" ||
+    attachment.status !== "ready" ||
+    attachment.uploaded_by !== input.authUserId
+  ) {
+    throw new Error("id_doc_attachment_required");
   }
 
   const { data, error } = await supabase
@@ -77,6 +100,8 @@ export async function registerVolunteer(
       country: input.country,
       institution: input.institution,
       degree_program: input.degreeProgram,
+      id_doc_type: input.idDocType,
+      id_doc_number: input.idDocNumber,
       guardian_name: input.guardianName ?? null,
       guardian_contact: input.guardianContact ?? null,
       guardian_consent_at: input.guardianConsent ? new Date().toISOString() : null,
@@ -85,6 +110,11 @@ export async function registerVolunteer(
     .single();
 
   if (error) throw error;
+
+  await supabase
+    .from("attachments")
+    .update({ owner_id: data.id })
+    .eq("id", input.idDocAttachmentId);
 
   await flagNearDuplicatesIfAny(supabase, data.id, input.fullName, input.city, input.email);
 
