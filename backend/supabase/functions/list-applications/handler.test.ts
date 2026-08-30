@@ -9,7 +9,7 @@ function testClient() {
 
 function claims(orgId: string): StaffClaims {
   return {
-    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["applications:read"] }],
   };
 }
@@ -57,7 +57,7 @@ Deno.test("listApplications filters by opportunity and status together", async (
 Deno.test("listApplications rejects a caller without applications:read for this org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
-  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(() => listApplications(supabase, noPerm, { organizationId: orgId }), Error, "forbidden");
 });

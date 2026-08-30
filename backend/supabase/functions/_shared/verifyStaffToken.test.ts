@@ -79,10 +79,51 @@ Deno.test("verifyStaffToken rejects a well-signed token with no exp claim at all
   await assertRejects(() => verifyStaffToken(`Bearer ${token}`), Error, "unauthorized");
 });
 
+Deno.test("verifyStaffToken surfaces canVerifyIdentity from the can_verify_identity claim", async () => {
+  Deno.env.set("STAFF_JWT_SECRET", secret);
+  const token = await signStaffToken({
+    actor_type: "staff",
+    staff_id: "staff-1",
+    platform_owner: false,
+    can_verify_identity: true,
+    org_roles: [],
+    module_access: [],
+  });
+  const claims = await verifyStaffToken(`Bearer ${token}`);
+  assertEquals(claims.canVerifyIdentity, true);
+});
+
+Deno.test("verifyStaffToken defaults canVerifyIdentity to false when the claim is absent", async () => {
+  Deno.env.set("STAFF_JWT_SECRET", secret);
+  const token = await signStaffToken({
+    actor_type: "staff",
+    staff_id: "staff-1",
+    platform_owner: false,
+    org_roles: [],
+    module_access: [],
+  });
+  const claims = await verifyStaffToken(`Bearer ${token}`);
+  assertEquals(claims.canVerifyIdentity, false);
+});
+
+Deno.test("verifyStaffToken treats a platform_owner token as able to verify identity", async () => {
+  Deno.env.set("STAFF_JWT_SECRET", secret);
+  const token = await signStaffToken({
+    actor_type: "staff",
+    staff_id: "staff-1",
+    platform_owner: true,
+    org_roles: [],
+    module_access: [],
+  });
+  const claims = await verifyStaffToken(`Bearer ${token}`);
+  assertEquals(claims.canVerifyIdentity, true);
+});
+
 const baseClaims = (overrides: Partial<StaffClaims> = {}): StaffClaims => ({
   actorType: "staff",
   staffId: "staff-1",
   platformOwner: false,
+  canVerifyIdentity: false,
   orgRoles: [{ organizationId: "org-1" }],
   moduleAccess: [{ organizationId: "org-1", module: "youth-republic", permissions: ["applications:read"] }],
   ...overrides,

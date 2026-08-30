@@ -9,7 +9,7 @@ function testClient() {
 
 function claimsWithPermission(orgId: string): StaffClaims {
   return {
-    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["volunteers:read"] }],
   };
 }
@@ -75,7 +75,7 @@ Deno.test("getVolunteerDetail rejects a caller without volunteers:read for this 
   const supabase = testClient();
   const { volunteerId } = await setup(supabase);
   const otherOrgId = crypto.randomUUID();
-  const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+  const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(
     () => getVolunteerDetail(supabase, claims, { organizationId: otherOrgId, volunteerId }),

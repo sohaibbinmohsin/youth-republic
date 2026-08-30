@@ -10,6 +10,7 @@ export interface StaffClaims {
   actorType: string;
   staffId: string;
   platformOwner: boolean;
+  canVerifyIdentity: boolean;
   orgRoles: { organizationId: string }[];
   moduleAccess: ModuleAccessEntry[];
 }
@@ -49,6 +50,7 @@ export async function verifyStaffToken(authHeader: string | null): Promise<Staff
       actorType: String(payload.actor_type ?? "staff"),
       staffId: payload.staff_id,
       platformOwner: Boolean(payload.platform_owner),
+      canVerifyIdentity: Boolean(payload.can_verify_identity) || Boolean(payload.platform_owner),
       orgRoles: Array.isArray(payload.org_roles)
         ? (payload.org_roles as Array<Record<string, unknown>>).map((r) => ({
           organizationId: String(r.organization_id),

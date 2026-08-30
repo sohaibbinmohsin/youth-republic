@@ -9,7 +9,7 @@ function testClient() {
 
 function claims(orgId: string): StaffClaims {
   return {
-    actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [],
+    actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
     moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["participation:read"] }],
   };
 }
@@ -59,7 +59,7 @@ Deno.test("listParticipationForOpportunity returns applicants (from applications
 Deno.test("listParticipationForOpportunity rejects a caller without participation:read for this org", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();
-  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, orgRoles: [], moduleAccess: [] };
+  const noPerm: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(
     () => listParticipationForOpportunity(supabase, noPerm, { organizationId: orgId, opportunityId: crypto.randomUUID() }),
