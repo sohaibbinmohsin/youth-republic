@@ -7,10 +7,12 @@ Deno.test("list-opportunities index handles an OPTIONS preflight with CORS heade
   assertEquals(res.headers.get("Access-Control-Allow-Origin"), "*");
 });
 
-Deno.test("list-opportunities index carries CORS headers on an error response", async () => {
+Deno.test("list-opportunities index carries CORS headers on an error response (invalid staff token)", async () => {
   const res = await handler(
     new Request("https://example.com/fn", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ organizationId: "x" }),
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer not-a-real-token" },
+      body: JSON.stringify({ organizationId: "x" }),
     }),
   );
   assertEquals(res.status, 401);
