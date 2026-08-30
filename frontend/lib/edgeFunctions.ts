@@ -86,11 +86,22 @@ export function requestCnicUploadUrl(accessToken: string) {
 export type SensitiveFieldName = "dob" | "cnic_number" | "phone" | "emergency_contact" | "guardian_name" | "guardian_contact";
 export interface UpdateSensitiveFieldPayload {
   fieldName: SensitiveFieldName;
-  newValue: string;
+  newValue: unknown;
 }
 export interface UpdateSensitiveFieldResponse {
   volunteerId: string;
 }
 export function updateSensitiveField(payload: UpdateSensitiveFieldPayload, accessToken: string) {
   return callFunction<UpdateSensitiveFieldResponse>("update-sensitive-field", payload, accessToken);
+}
+
+export interface UpdateProfileFieldPayload {
+  fieldName: "city" | "institution" | "graduation_year" | "availability" | "skills" | "interests";
+  newValue: string | number | string[];
+}
+export interface UpdateProfileFieldResponse {
+  volunteerId: string;
+}
+export function updateProfileField(payload: UpdateProfileFieldPayload, accessToken: string) {
+  return callFunction<UpdateProfileFieldResponse>("update-profile-field", payload, accessToken);
 }

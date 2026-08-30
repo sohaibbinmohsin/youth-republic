@@ -75,3 +75,33 @@ Deno.test("updateSensitiveField updates the volunteer row and logs the change", 
   assertEquals(logRows![0].old_value, originalPhone);
   assertEquals(logRows![0].new_value, newPhone);
 });
+
+Deno.test("updateSensitiveField accepts a structured object for emergency_contact and logs it as JSON text", async () => {
+  const supabase = testClient();
+  const { data: authUser } = await supabase.auth.admin.createUser({
+    email: `emergency-contact-${crypto.randomUUID()}@example.com`, email_confirm: true,
+  });
+  const { data: volunteer } = await supabase.from("volunteers").insert({
+    auth_user_id: authUser!.user!.id, full_name: "Emergency Contact Test",
+    email: `emergency-contact-${crypto.randomUUID()}@example.com`, phone: `0300-${Math.floor(Math.random() * 10000000)}`,
+    dob: "1999-01-01", gender: "female", city: "Lahore", province: "Punjab", country: "Pakistan",
+    institution: "LUMS", degree_program: "BSCS",
+  }).select("id").single();
+
+  const result = await updateSensitiveField(supabase, {
+    volunteerId: volunteer!.id, fieldName: "emergency_contact",
+    newValue: { name: "Fatima Khan", phone: "0300-9999999" },
+  });
+
+  assertEquals(result.volunteerId, volunteer!.id);
+  const { data: updated } = await supabase.from("volunteers").select("emergency_contact").eq("id", volunteer!.id).single();
+  assertEquals(updated!.emergency_contact, { name: "Fatima Khan", phone: "0300-9999999" });
+
+  const { data: logRow } = await supabase
+    .from("profile_field_changes")
+    .select("new_value")
+    .eq("volunteer_id", volunteer!.id)
+    .eq("field_name", "emergency_contact")
+    .single();
+  assertEquals(logRow!.new_value, JSON.stringify({ name: "Fatima Khan", phone: "0300-9999999" }));
+});

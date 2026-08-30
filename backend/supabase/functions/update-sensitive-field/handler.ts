@@ -5,7 +5,7 @@ export type SensitiveFieldName = "dob" | "cnic_number" | "phone" | "emergency_co
 export interface UpdateSensitiveFieldInput {
   volunteerId: string;
   fieldName: SensitiveFieldName;
-  newValue: string;
+  newValue: unknown;
 }
 
 export interface UpdateSensitiveFieldResult {
@@ -28,6 +28,14 @@ const ALLOWED_FIELDS: readonly SensitiveFieldName[] = [
   "guardian_contact",
 ];
 
+// profile_field_changes.old_value/new_value are text columns — anything
+// that isn't already a string (emergency_contact's object shape) is
+// serialized to JSON text for the audit row; the actual volunteers.update
+// call below still gets the real value, string or object, unchanged.
+function toAuditText(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 export async function updateSensitiveField(
   supabase: SupabaseClient,
   input: UpdateSensitiveFieldInput,
@@ -43,7 +51,7 @@ export async function updateSensitiveField(
     .single();
   if (fetchError) throw fetchError;
 
-  const oldValue = String((volunteer as Record<string, unknown>)[input.fieldName] ?? "");
+  const oldValue = (volunteer as Record<string, unknown>)[input.fieldName];
 
   const { error: updateError } = await supabase
     .from("volunteers")
@@ -54,8 +62,8 @@ export async function updateSensitiveField(
   const { error: logError } = await supabase.from("profile_field_changes").insert({
     volunteer_id: input.volunteerId,
     field_name: input.fieldName,
-    old_value: oldValue,
-    new_value: input.newValue,
+    old_value: toAuditText(oldValue),
+    new_value: toAuditText(input.newValue),
   });
   if (logError) throw logError;
 

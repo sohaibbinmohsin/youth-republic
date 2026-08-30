@@ -5,6 +5,7 @@ import {
   submitHours,
   requestCnicUploadUrl,
   updateSensitiveField,
+  updateProfileField,
 } from "./edgeFunctions";
 
 const FUNCTIONS_URL = "http://localhost:54321/functions/v1";
@@ -105,5 +106,39 @@ describe("updateSensitiveField", () => {
     );
 
     expect(result.volunteerId).toBe("v1");
+  });
+});
+
+describe("updateProfileField", () => {
+  it("posts to update-profile-field", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(JSON.stringify({ volunteerId: "vol-1" }), { status: 200 }),
+    );
+    const result = await updateProfileField({ fieldName: "institution", newValue: "IBA" }, "session-token");
+    expect(result.volunteerId).toBe("vol-1");
+  });
+
+  it("supports an array newValue for skills/interests", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(JSON.stringify({ volunteerId: "vol-1" }), { status: 200 }),
+    );
+    await updateProfileField({ fieldName: "skills", newValue: ["First Aid"] }, "session-token");
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/update-profile-field"),
+      expect.objectContaining({ body: JSON.stringify({ fieldName: "skills", newValue: ["First Aid"] }) }),
+    );
+  });
+});
+
+describe("updateSensitiveField with a structured value", () => {
+  it("accepts an object newValue for emergency_contact", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(JSON.stringify({ volunteerId: "vol-1" }), { status: 200 }),
+    );
+    const result = await updateSensitiveField(
+      { fieldName: "emergency_contact", newValue: { name: "Fatima Khan", phone: "0300-9999999" } },
+      "session-token",
+    );
+    expect(result.volunteerId).toBe("vol-1");
   });
 });

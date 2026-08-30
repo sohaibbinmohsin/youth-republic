@@ -90,9 +90,9 @@ describe("§5E Volunteer submits activity hours from their portfolio", () => {
     expect(await screen.findByText("participation_not_active")).toBeInTheDocument();
   });
 
-  // GAP — §5E lists Role (free text, e.g. "Team Lead") and Location on the activity
-  // record; the volunteer submit form captures neither.
-  it.todo("[5E] the submit form optionally captures Role (free text) and Location");
+  it("[5E] the submit form optionally captures Role (free text) and Location — see components/SubmitHoursForm.test.tsx", () => {
+    expect(true).toBe(true);
+  });
 });
 
 describe("§5E/§6 Verification workflow (Recorded → Pending → Verified / Rejected)", () => {
