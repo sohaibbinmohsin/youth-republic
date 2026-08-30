@@ -51,7 +51,7 @@ Deno.test("listActivityHours filters by activity type (from opportunities) and p
   await supabase.from("activity_hours").insert([
     {
       participation_id: participatingParticipation!.id, volunteer_id: volunteerId, opportunity_id: envOpp!.id,
-      organization_id: orgId, activity_date: "2026-02-01", hours_submitted: 5, verification_status: "recorded",
+      organization_id: orgId, activity_date: "2026-02-01", hours_submitted: 5, verification_status: "pending",
     },
     {
       participation_id: completedParticipation!.id, volunteer_id: volunteerId, opportunity_id: healthOpp!.id,
