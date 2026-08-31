@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { formatDobTyping, parseDateToIso, formatIsoToDisplay, isValidDate } from "./dobUtils";
 
 describe("dobUtils", () => {
-  it("formats typed digits as DD/MM/YYYY", () => {
+  it("formats typed digits as DD/MM/YYYY when starting with day", () => {
     expect(formatDobTyping("1")).toBe("1");
     expect(formatDobTyping("15")).toBe("15");
     expect(formatDobTyping("150")).toBe("15/0");
@@ -10,8 +10,15 @@ describe("dobUtils", () => {
     expect(formatDobTyping("15082000")).toBe("15/08/2000");
   });
 
+  it("formats typed digits as YYYY-MM-DD when starting with year", () => {
+    expect(formatDobTyping("1999")).toBe("1999");
+    expect(formatDobTyping("199901")).toBe("1999-01");
+    expect(formatDobTyping("19990101")).toBe("1999-01-01");
+    expect(formatDobTyping("1999-01-01")).toBe("1999-01-01");
+  });
+
   it("converts ISO YYYY-MM-DD input to DD/MM/YYYY display format", () => {
-    expect(formatDobTyping("1999-01-01")).toBe("01/01/1999");
+    expect(formatIsoToDisplay("1999-01-01")).toBe("01/01/1999");
     expect(formatIsoToDisplay("2005-12-31")).toBe("31/12/2005");
   });
 

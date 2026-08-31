@@ -63,7 +63,7 @@ describe("§5A Registration — mandatory identity, contact & matching fields", 
         expect.objectContaining({
           fullName: "Aisha Khan",
           email: "aisha@example.com",
-          phone: "0300-1234567",
+          phone: "0300 1234567",
           dob: "1999-01-01",
           gender: "female",
           city: "Lahore",

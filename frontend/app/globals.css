@@ -394,3 +394,170 @@ input[type="password"].dots-placeholder::placeholder,
 .idcard { margin-top: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 1.75rem; background: var(--bg-2); max-width: 460px; }
 .idcard .k { font: 600 .7rem/1 "Oswald", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 .idcard .v { font-family: "Oswald", sans-serif; font-weight: 700; font-size: 2rem; letter-spacing: .06em; margin: .4rem 0 .5rem; }
+
+/* ---------- Interactive Form Field UX: DOB, Gender Cards, Autocomplete ---------- */
+.dob-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.dob-text-input {
+  width: 100%;
+  padding-right: 2.75rem !important;
+}
+.dob-cal-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.dob-cal-btn:hover {
+  color: var(--blue-strong);
+  background-color: var(--bg-2);
+}
+.dob-cal-btn:focus-visible {
+  outline: 2px solid var(--blue);
+}
+.dob-native-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* Gender Selection Cards */
+.gender-container {
+  position: relative;
+  width: 100%;
+}
+.gender-select-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.gender-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+  width: 100%;
+}
+.gender-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.gender-card:hover {
+  border-color: var(--ink-3);
+  background: var(--bg-2);
+}
+.gender-card.selected {
+  border-color: var(--blue-strong);
+  background: rgba(148, 26, 128, 0.07);
+  color: var(--blue-strong);
+  font-weight: 600;
+}
+.gender-card__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.gender-card:hover .gender-card__dot {
+  border-color: var(--ink-3);
+}
+.gender-card.selected .gender-card__dot {
+  border-color: var(--blue-strong);
+  background: var(--blue-strong);
+  box-shadow: inset 0 0 0 2px #fff;
+}
+.gender-card__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Autocomplete Typeahead */
+.autocomplete-wrap {
+  position: relative;
+  width: 100%;
+}
+.autocomplete-input {
+  width: 100%;
+}
+.autocomplete-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 4px 16px -2px rgba(36, 38, 45, 0.15);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.autocomplete-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  transition: background-color 0.1s ease;
+}
+.autocomplete-item.highlighted,
+.autocomplete-item:hover {
+  background-color: rgba(148, 26, 128, 0.08);
+}
+.autocomplete-item__main {
+  font-weight: 500;
+  color: var(--ink);
+}
+.autocomplete-item__sub {
+  font-size: 0.76rem;
+  color: var(--ink-2);
+  margin-top: 0.1rem;
+}

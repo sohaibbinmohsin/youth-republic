@@ -1,7 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-
-const PROTECTED_PREFIXES = ["/profile", "/applications", "/portfolio", "/apply"];
+import { computeMiddlewareRedirect } from "@/lib/middlewareRedirect";
 
 const DEFAULT_SUPABASE_URL = "https://kbotpktgojpvkotigrjh.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY =
@@ -30,12 +29,14 @@ export async function middleware(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const isProtected = PROTECTED_PREFIXES.some((prefix) => request.nextUrl.pathname.startsWith(prefix));
 
-  if (isProtected && !user) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+  const redirectTo = computeMiddlewareRedirect({
+    pathname: request.nextUrl.pathname,
+    isAuthenticated: Boolean(user),
+  });
+
+  if (redirectTo) {
+    return NextResponse.redirect(new URL(redirectTo, request.url));
   }
 
   return response;

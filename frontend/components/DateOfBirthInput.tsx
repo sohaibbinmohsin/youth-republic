@@ -20,23 +20,27 @@ export function DateOfBirthInput({
   onChange,
   placeholder = "dd/mm/yyyy",
 }: DateOfBirthInputProps) {
-  // Local display text in DD/MM/YYYY format
-  const [displayValue, setDisplayValue] = useState(() => formatIsoToDisplay(value));
+  // Local display text
+  const [displayValue, setDisplayValue] = useState(() => (value ? formatIsoToDisplay(value) : ""));
   const hiddenDateRef = useRef<HTMLInputElement>(null);
+  const isTypingRef = useRef(false);
 
   useEffect(() => {
-    if (!value) {
-      setDisplayValue("");
-    } else {
-      const display = formatIsoToDisplay(value);
-      // Only update display if it's different to preserve typing flow
-      if (parseDateToIso(displayValue) !== value) {
-        setDisplayValue(display);
+    // Only synchronize from external value if user is not actively typing
+    if (!isTypingRef.current) {
+      if (!value) {
+        setDisplayValue("");
+      } else {
+        const isoFromDisplay = parseDateToIso(displayValue);
+        if (isoFromDisplay !== value) {
+          setDisplayValue(formatIsoToDisplay(value));
+        }
       }
     }
-  }, [value]);
+  }, [value, displayValue]);
 
   function handleTextChange(e: React.ChangeEvent<HTMLInputElement>) {
+    isTypingRef.current = true;
     const raw = e.target.value;
     const formatted = formatDobTyping(raw);
     setDisplayValue(formatted);
@@ -45,7 +49,6 @@ export function DateOfBirthInput({
     if (iso) {
       onChange(iso);
     } else {
-      // If user typed directly YYYY-MM-DD or incomplete
       if (/^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
         onChange(raw.trim());
       } else {
@@ -54,7 +57,17 @@ export function DateOfBirthInput({
     }
   }
 
+  function handleBlur() {
+    isTypingRef.current = false;
+    const iso = parseDateToIso(displayValue);
+    if (iso) {
+      setDisplayValue(formatIsoToDisplay(iso));
+      onChange(iso);
+    }
+  }
+
   function handleCalendarPickerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    isTypingRef.current = false;
     const pickerIso = e.target.value;
     if (pickerIso) {
       setDisplayValue(formatIsoToDisplay(pickerIso));
@@ -87,6 +100,7 @@ export function DateOfBirthInput({
         placeholder={placeholder}
         value={displayValue}
         onChange={handleTextChange}
+        onBlur={handleBlur}
         className="dob-text-input"
         autoComplete="bday"
       />

@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { registerVolunteer, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
 import { isMinor } from "@/lib/ageUtils";
+import { formatPhoneNumber } from "@/lib/phoneUtils";
+import { INSTITUTIONS, CITIES, PAKISTAN_PROVINCES, COUNTRIES } from "@/lib/formDatasets";
 import { GuardianConsentFields, type GuardianConsentValue } from "./GuardianConsentFields";
+import { DateOfBirthInput } from "./DateOfBirthInput";
+import { GenderCards } from "./GenderCards";
+import { AutocompleteInput } from "./AutocompleteInput";
 
 type InitialFormKeys = "fullName" | "email" | "phone" | "dob" | "gender" | "city" | "province" | "country" | "institution" | "degreeProgram";
 
@@ -140,7 +145,7 @@ export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: s
             inputMode="tel"
             required
             value={form.phone}
-            onChange={(e) => updateField("phone", e.target.value)}
+            onChange={(e) => updateField("phone", formatPhoneNumber(e.target.value))}
             placeholder="0300 1234567"
           />
         </div>
@@ -155,36 +160,30 @@ export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: s
       <div className="grid-3">
         <div className="field">
           <label htmlFor="dob">Date of birth</label>
-          <input
+          <DateOfBirthInput
             id="dob"
-            type="date"
             required
             value={form.dob}
-            onChange={(e) => updateField("dob", e.target.value)}
+            onChange={(val) => updateField("dob", val)}
           />
         </div>
         <div className="field">
           <label htmlFor="gender">Gender</label>
-          <select
+          <GenderCards
             id="gender"
             required
             value={form.gender}
-            onChange={(e) => updateField("gender", e.target.value)}
-          >
-            <option value="">Select gender</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-            <option value="other">Other</option>
-            <option value="prefer_not_to_say">Prefer not to say</option>
-          </select>
+            onChange={(val) => updateField("gender", val)}
+          />
         </div>
         <div className="field">
           <label htmlFor="institution">Institution</label>
-          <input
+          <AutocompleteInput
             id="institution"
             required
             value={form.institution}
-            onChange={(e) => updateField("institution", e.target.value)}
+            onChange={(val) => updateField("institution", val)}
+            dataset={INSTITUTIONS}
             placeholder="e.g. Punjab University"
           />
         </div>
@@ -193,31 +192,34 @@ export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: s
       <div className="grid-3">
         <div className="field">
           <label htmlFor="city">City</label>
-          <input
+          <AutocompleteInput
             id="city"
             required
             value={form.city}
-            onChange={(e) => updateField("city", e.target.value)}
+            onChange={(val) => updateField("city", val)}
+            dataset={CITIES}
             placeholder="e.g. Lahore"
           />
         </div>
         <div className="field">
           <label htmlFor="province">Province</label>
-          <input
+          <AutocompleteInput
             id="province"
             required
             value={form.province}
-            onChange={(e) => updateField("province", e.target.value)}
+            onChange={(val) => updateField("province", val)}
+            dataset={PAKISTAN_PROVINCES}
             placeholder="e.g. Punjab"
           />
         </div>
         <div className="field">
           <label htmlFor="country">Country</label>
-          <input
+          <AutocompleteInput
             id="country"
             required
             value={form.country}
-            onChange={(e) => updateField("country", e.target.value)}
+            onChange={(val) => updateField("country", val)}
+            dataset={COUNTRIES}
             placeholder="Pakistan"
           />
         </div>
