@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { registerVolunteer, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
 import { isMinor } from "@/lib/ageUtils";
 import { formatPhoneNumber } from "@/lib/phoneUtils";
@@ -41,16 +41,44 @@ export function RegisterForm({
   accessToken,
   email,
   initialFullName = "",
+  initialPhone = "",
+  initialCity = "",
+  initialInstitution = "",
+  initialCountry = "",
   onSuccess,
   onSkip,
 }: {
   accessToken: string;
   email: string;
   initialFullName?: string;
+  initialPhone?: string;
+  initialCity?: string;
+  initialInstitution?: string;
+  initialCountry?: string;
   onSuccess?: () => void;
   onSkip?: () => void;
 }) {
-  const [form, setForm] = useState({ ...initialForm, email, fullName: initialFullName });
+  const [form, setForm] = useState({
+    ...initialForm,
+    email: email || "",
+    fullName: initialFullName || "",
+    phone: initialPhone || "",
+    city: initialCity || "",
+    institution: initialInstitution || "",
+    country: initialCountry || "",
+  });
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      email: email || prev.email,
+      fullName: initialFullName || prev.fullName,
+      phone: initialPhone || prev.phone,
+      city: initialCity || prev.city,
+      institution: initialInstitution || prev.institution,
+      country: initialCountry || prev.country || "",
+    }));
+  }, [email, initialFullName, initialPhone, initialCity, initialInstitution, initialCountry]);
   const [guardian, setGuardian] = useState<GuardianConsentValue>({
     guardianName: "",
     guardianContact: "",
@@ -265,12 +293,12 @@ export function RegisterForm({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row items-center gap-3" style={{ marginTop: "1rem" }}>
+      <div className="flex flex-wrap items-center gap-3" style={{ marginTop: "1.25rem" }}>
         <button
           type="submit"
           aria-label="Save details"
           disabled={submitting}
-          className="btn btn--primary flex-1 w-full"
+          className="btn btn--primary"
         >
           {submitting ? "Saving details..." : "Save & build portfolio"}
         </button>
@@ -279,7 +307,7 @@ export function RegisterForm({
           <button
             type="button"
             onClick={onSkip}
-            className="btn btn--ghost w-full sm:w-auto"
+            className="btn btn--ghost"
             aria-label="Skip for now"
           >
             Skip for now

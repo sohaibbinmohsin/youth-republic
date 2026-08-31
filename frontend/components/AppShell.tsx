@@ -276,7 +276,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <h4>Directory</h4>
               <ul className="space-y-2 text-xs">
                 <li>
-                  <Link href="/opportunities">
+                  <Link href="/">
                     Explore Opportunities
                   </Link>
                 </li>

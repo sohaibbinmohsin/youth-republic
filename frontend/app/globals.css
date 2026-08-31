@@ -666,7 +666,13 @@ input[type="password"].dots-placeholder::placeholder,
   gap: 0;
   border-bottom: 1px solid var(--line);
   margin-bottom: 1.25rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.pf-tabs::-webkit-scrollbar {
+  display: none;
 }
 .pf-tabs button {
   border: 0;
@@ -679,6 +685,10 @@ input[type="password"].dots-placeholder::placeholder,
   font-size: .92rem;
   border-bottom: 2px solid transparent;
   transition: color .12s ease, border-color .12s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
 }
 .pf-tabs button[aria-current="page"] {
   color: var(--ink);

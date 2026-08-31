@@ -214,11 +214,10 @@ describe("PortfolioPage", () => {
     render(<PortfolioPage />);
     await waitFor(() => expect(screen.getByText("Aisha Khan")).toBeInTheDocument());
 
-    const detailsTab = screen.getByRole("button", { name: "Portfolio details" });
+    const detailsTab = screen.getByRole("button", { name: /portfolio details/i });
     await user.click(detailsTab);
 
-    expect(await screen.findByText("Portfolio & Account Details")).toBeInTheDocument();
-    expect(screen.getByLabelText("Phone number")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Phone number")).toBeInTheDocument();
     expect(screen.getByLabelText("City")).toBeInTheDocument();
     expect(screen.getByLabelText("Institution / University")).toBeInTheDocument();
   });

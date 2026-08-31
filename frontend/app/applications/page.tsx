@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { ApplicationStatusBadge, type ApplicationStatus } from "@/components/ApplicationStatusBadge";
+import ApplicationsLoading from "./loading";
 
 const PAGE_SIZE = 20;
 
@@ -34,7 +35,7 @@ export default function ApplicationsPage() {
     load();
   }, [page]);
 
-  if (!applications) return <p>Loading…</p>;
+  if (!applications) return <ApplicationsLoading />;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { SubmitHoursForm } from "@/components/SubmitHoursForm";
 import { RegisterForm } from "@/components/RegisterForm";
@@ -9,6 +10,7 @@ import { ProfileFieldEditor } from "@/components/ProfileFieldEditor";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
 import { getAvatarInitials } from "@/lib/coolNames";
+import PortfolioLoading from "./loading";
 
 interface VolunteerProfile {
   id: string;
@@ -330,11 +332,12 @@ export default function PortfolioPage() {
   }, []);
 
   if (totalVerifiedHours === null || volunteer === null || !accessToken) {
-    return <p className="p-8 text-center text-gray-500 font-medium font-['Jost']">Loading volunteer portfolio…</p>;
+    return <PortfolioLoading />;
   }
 
   const avatarInitials = getAvatarInitials(volunteer.full_name);
   const isVerified = volunteer.status === "active" || (!volunteer.is_unregistered && volunteer.status === "verified");
+  const isPending = !isVerified || volunteer.is_unregistered;
   const uniqueOrgCount = new Set(programmes.map((p) => p.orgName)).size;
   const showOrgLabel = uniqueOrgCount > 1;
 
@@ -401,6 +404,11 @@ export default function PortfolioPage() {
           onClick={() => setActiveTab("details")}
         >
           Portfolio details
+          {isPending && (
+            <span className="pill pill--pend" style={{ marginLeft: ".5rem", fontSize: ".7rem", padding: ".15rem .45rem" }}>
+              Pending
+            </span>
+          )}
         </button>
       </div>
 
@@ -423,8 +431,63 @@ export default function PortfolioPage() {
           )}
 
           {programmes.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "3rem 1rem", border: "1px dashed var(--line)", borderRadius: "var(--radius-card)", background: "var(--bg-2)", color: "var(--ink-2)", fontSize: ".9rem" }}>
-              No programmes joined yet.
+            /* Plain screen unboxed empty state matching opportunities style */
+            <div
+              style={{
+                width: "100%",
+                padding: "3.5rem 1rem",
+                border: "none",
+                background: "transparent",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ maxWidth: "480px", margin: "0 auto" }}>
+                <div
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "999px",
+                    background: "rgba(148,26,128,0.06)",
+                    color: "var(--blue)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "1.25rem",
+                  }}
+                >
+                  <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <h3
+                  style={{
+                    fontFamily: "'Oswald', sans-serif",
+                    fontSize: "1.6rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: ".02em",
+                    color: "var(--ink)",
+                    marginBottom: ".6rem",
+                  }}
+                >
+                  No Programmes Yet
+                </h3>
+                <p
+                  style={{
+                    fontSize: ".95rem",
+                    color: "var(--ink-2)",
+                    lineHeight: 1.6,
+                    marginBottom: "1.75rem",
+                  }}
+                >
+                  You haven't joined any volunteer programmes yet. Explore active drives on the noticeboard to get started.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: ".5rem" }}>
+                  <Link href="/" className="btn btn--primary">
+                    Explore opportunities
+                  </Link>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="pcards">
@@ -551,8 +614,63 @@ export default function PortfolioPage() {
       {activeTab === "apps" && (
         <div className="pf-panel">
           {applications.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "3rem 1rem", border: "1px dashed var(--line)", borderRadius: "var(--radius-card)", background: "var(--bg-2)", color: "var(--ink-2)", fontSize: ".9rem" }}>
-              No applications yet.
+            /* Plain screen unboxed empty state matching opportunities style */
+            <div
+              style={{
+                width: "100%",
+                padding: "3.5rem 1rem",
+                border: "none",
+                background: "transparent",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ maxWidth: "480px", margin: "0 auto" }}>
+                <div
+                  style={{
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "999px",
+                    background: "rgba(148,26,128,0.06)",
+                    color: "var(--blue)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: "1.25rem",
+                  }}
+                >
+                  <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3
+                  style={{
+                    fontFamily: "'Oswald', sans-serif",
+                    fontSize: "1.6rem",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: ".02em",
+                    color: "var(--ink)",
+                    marginBottom: ".6rem",
+                  }}
+                >
+                  No Applications Yet
+                </h3>
+                <p
+                  style={{
+                    fontSize: ".95rem",
+                    color: "var(--ink-2)",
+                    lineHeight: 1.6,
+                    marginBottom: "1.75rem",
+                  }}
+                >
+                  You haven't submitted any applications yet. Browse open opportunities to apply with your volunteer profile.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: ".5rem" }}>
+                  <Link href="/" className="btn btn--primary">
+                    Explore opportunities
+                  </Link>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="list">
@@ -600,18 +718,15 @@ export default function PortfolioPage() {
       {activeTab === "details" && (
         <div className="pf-panel">
           {volunteer.is_unregistered ? (
-            /* If user has not provided details yet: Show the Step 2 details form inline */
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-2)] p-6 shadow-sm max-w-2xl">
-              <div className="mb-6 pb-4 border-b border-[var(--line)]">
-                <h2 className="display text-2xl text-[var(--ink)]">Complete your portfolio details</h2>
-                <p className="text-sm text-[var(--ink-2)] mt-1">
-                  Enter your details once. Your national portfolio will carry your verified credentials across every organisation on Youth Republic.
-                </p>
-              </div>
-
+            /* If user has not provided details yet: Show Step 2 details form directly on plain screen taking full available width */
+            <div className="w-full">
               <RegisterForm
                 accessToken={accessToken}
                 email={volunteer.email}
+                initialFullName={volunteer.full_name !== "Volunteer" ? volunteer.full_name : ""}
+                initialPhone={volunteer.phone}
+                initialCity={volunteer.city !== "Pakistan" ? volunteer.city : ""}
+                initialInstitution={volunteer.institution !== "Youth Republic" ? volunteer.institution : ""}
                 onSuccess={() => {
                   loadAll();
                   setActiveTab("impact");
@@ -619,67 +734,73 @@ export default function PortfolioPage() {
               />
             </div>
           ) : (
-            /* If user has provided details: Show their account & portfolio details with inline field editors */
-            <div className="rounded-xl border border-[var(--line)] bg-white p-6 shadow-sm max-w-2xl space-y-6">
-              <div className="pb-4 border-b border-[var(--line)]">
-                <h2 className="display text-2xl text-[var(--ink)]">Portfolio &amp; Account Details</h2>
-                <p className="text-sm text-[var(--ink-2)] mt-1">
-                  Keep your education, contact, and identity records up to date.
-                </p>
+            /* If user has provided details: Show account details directly on plain screen taking full available width */
+            <div className="w-full space-y-4">
+              <div className="field">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="mb-0">Full name</label>
+                  <span className="pill pill--pos text-[0.7rem] py-0.5 px-2">Verified</span>
+                </div>
+                <input type="text" readOnly value={volunteer.full_name} className="bg-gray-50 cursor-not-allowed" />
+                <p className="hint">Name is bound to your Volunteer ID and verified documents.</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="field">
-                  <label>Full name</label>
-                  <input type="text" readOnly value={volunteer.full_name} className="bg-gray-50 cursor-not-allowed" />
-                  <p className="hint">Name is bound to your Volunteer ID and verified documents.</p>
+              <div className="field">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="mb-0">Email address</label>
+                  <span className="pill pill--pos text-[0.7rem] py-0.5 px-2">Verified</span>
                 </div>
+                <input type="email" readOnly value={volunteer.email} className="bg-gray-50 cursor-not-allowed" />
+              </div>
 
-                <div className="field">
-                  <label>Email address</label>
-                  <input type="email" readOnly value={volunteer.email} className="bg-gray-50 cursor-not-allowed" />
+              <SensitiveFieldEditor
+                fieldName="phone"
+                fieldLabel="Phone number"
+                currentValue={volunteer.phone}
+                accessToken={accessToken}
+                onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, phone: String(newValue) } : v))}
+              />
+
+              <ProfileFieldEditor
+                fieldName="city"
+                fieldLabel="City"
+                currentValue={volunteer.city}
+                accessToken={accessToken}
+                onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, city: String(newValue) } : v))}
+              />
+
+              <ProfileFieldEditor
+                fieldName="institution"
+                fieldLabel="Institution / University"
+                currentValue={volunteer.institution}
+                accessToken={accessToken}
+                onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, institution: String(newValue) } : v))}
+              />
+
+              <div className="field">
+                <label>Degree program</label>
+                <input type="text" readOnly value={volunteer.degree_program ?? "Not specified"} className="bg-gray-50 cursor-not-allowed" />
+              </div>
+
+              <EmergencyContactEditor
+                currentValue={volunteer.emergency_contact ?? null}
+                accessToken={accessToken}
+                onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, emergency_contact: newValue } : v))}
+              />
+
+              <div className="pt-4 border-t border-[var(--line)]">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-semibold text-[var(--ink)] mb-0">
+                    CNIC / B-Form Verification Document
+                  </label>
+                  {isPending ? (
+                    <span className="pill pill--pend text-[0.7rem] py-0.5 px-2">Pending verification</span>
+                  ) : (
+                    <span className="pill pill--pos text-[0.7rem] py-0.5 px-2">Verified</span>
+                  )}
                 </div>
-
-                <SensitiveFieldEditor
-                  fieldName="phone"
-                  fieldLabel="Phone number"
-                  currentValue={volunteer.phone}
-                  accessToken={accessToken}
-                  onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, phone: String(newValue) } : v))}
-                />
-
-                <ProfileFieldEditor
-                  fieldName="city"
-                  fieldLabel="City"
-                  currentValue={volunteer.city}
-                  accessToken={accessToken}
-                  onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, city: String(newValue) } : v))}
-                />
-
-                <ProfileFieldEditor
-                  fieldName="institution"
-                  fieldLabel="Institution / University"
-                  currentValue={volunteer.institution}
-                  accessToken={accessToken}
-                  onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, institution: String(newValue) } : v))}
-                />
-
-                <div className="field">
-                  <label>Degree program</label>
-                  <input type="text" readOnly value={volunteer.degree_program ?? "Not specified"} className="bg-gray-50 cursor-not-allowed" />
-                </div>
-
-                <EmergencyContactEditor
-                  currentValue={volunteer.emergency_contact ?? null}
-                  accessToken={accessToken}
-                  onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, emergency_contact: newValue } : v))}
-                />
-
-                <div className="pt-2 border-t border-[var(--line)]">
-                  <label className="block text-sm font-semibold text-[var(--ink)] mb-1">CNIC / B-Form Verification Document</label>
-                  <p className="text-xs text-[var(--ink-2)] mb-3">Upload your document scan to complete national verification standing.</p>
-                  <CnicUploadField accessToken={accessToken} onUploaded={() => loadAll()} />
-                </div>
+                <p className="text-xs text-[var(--ink-2)] mb-3">Upload your document scan to complete national verification standing.</p>
+                <CnicUploadField accessToken={accessToken} onUploaded={() => loadAll()} />
               </div>
             </div>
           )}
