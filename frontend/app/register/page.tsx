@@ -104,6 +104,8 @@ export default function RegisterPage() {
                     type={showPassword ? "text" : "password"}
                     required
                     autoComplete="new-password"
+                    className="dots-placeholder"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -128,6 +130,8 @@ export default function RegisterPage() {
                     type={showConfirmPassword ? "text" : "password"}
                     required
                     autoComplete="new-password"
+                    className="dots-placeholder"
+                    placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                   />

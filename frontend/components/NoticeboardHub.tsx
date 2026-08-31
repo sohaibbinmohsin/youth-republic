@@ -56,7 +56,7 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
       new Set(
         (initialOpportunities ?? [])
           .map((o) => o.location)
-          .filter((loc): loc is string => Boolean(loc) && loc.toLowerCase() !== "online")
+          .filter((loc): loc is string => loc != null && loc.toLowerCase() !== "online")
       )
     );
     return Array.from(new Set([...defaults, ...fromOpps]));

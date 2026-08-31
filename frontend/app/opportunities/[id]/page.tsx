@@ -459,9 +459,9 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                   viewBox="0 0 24 24"
                   fill="none"
                   className="shrink-0"
-                  title="Verified Organization"
                   aria-label="Verified Organization"
                 >
+                  <title>Verified Organization</title>
                   <path
                     d="M22.5 12.5c0-1.58-.88-2.95-2.15-3.6.15-.44.24-.91.24-1.4 0-2.21-1.79-4-4-4-.49 0-.96.09-1.4.24C14.55 2.48 13.18 1.6 11.6 1.6S8.65 2.48 8.01 3.74c-.44-.15-.91-.24-1.4-.24-2.21 0-4 1.79-4 4 0 .49.09.96.24 1.4C1.59 9.55.71 10.92.71 12.5s.88 2.95 2.14 3.6c-.15.44-.24.91-.24 1.4 0 2.21 1.79 4 4 4 .49 0 .96-.09 1.4-.24.64 1.26 2.01 2.14 3.59 2.14s2.95-.88 3.59-2.14c.44.15.91.24 1.4.24 2.21 0 4-1.79 4-4 0-.49-.09-.96-.24-1.4 1.27-.65 2.15-2.02 2.15-3.6z"
                     fill="#941A80"

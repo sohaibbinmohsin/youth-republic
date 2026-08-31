@@ -69,6 +69,8 @@ function LoginForm() {
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"
+                  className="dots-placeholder"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />

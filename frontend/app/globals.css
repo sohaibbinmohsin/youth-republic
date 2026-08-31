@@ -345,6 +345,26 @@ select {
 .field input[readonly] { background: var(--bg-2); color: var(--ink-2); }
 .field .hint { font-size: .8rem; color: var(--ink-2); margin-top: .3rem; }
 
+input[type="password"] {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  letter-spacing: 0.18em;
+}
+
+input[type="password"]::placeholder {
+  font-family: var(--font-body, "Jost", sans-serif) !important;
+  letter-spacing: normal !important;
+  color: var(--ink-2);
+  font-size: .85rem;
+}
+
+input[type="password"].dots-placeholder::placeholder,
+.dots-placeholder::placeholder {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  letter-spacing: 0.18em !important;
+  font-size: .85rem !important;
+  color: var(--ink-2) !important;
+}
+
 .pwd { position: relative; }
 .pwd input { padding-right: 3.7rem; }
 .pwd__toggle {
