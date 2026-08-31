@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { getCoolName, getAvatarInitials } from "@/lib/coolNames";
+import { recordReturnUrl, isValidReturnUrl } from "@/lib/returnUrl";
 
 const NAV_LINKS = [
   { href: "/", label: "Opportunities" },
@@ -61,6 +62,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    if (pathname && isValidReturnUrl(pathname)) {
+      const searchStr = typeof window !== "undefined" && window.location.search ? window.location.search : "";
+      recordReturnUrl(`${pathname}${searchStr}`);
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setUserDropdownOpen(false);
@@ -98,9 +106,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signInHref = pathname && pathname !== "/login" && pathname !== "/register"
-    ? `/login?redirectTo=${encodeURIComponent(pathname)}`
+  let effectiveRedirect: string | null = null;
+  if (typeof window !== "undefined") {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const r = searchParams.get("redirectTo");
+      if (isValidReturnUrl(r)) {
+        effectiveRedirect = r;
+      }
+    } catch {
+      // Ignore URL errors
+    }
+  }
+
+  const searchString = typeof window !== "undefined" && window.location.search ? window.location.search : "";
+  const currentJourney = isValidReturnUrl(pathname)
+    ? `${pathname}${searchString}`
+    : effectiveRedirect;
+
+  const signInHref = currentJourney
+    ? `/login?redirectTo=${encodeURIComponent(currentJourney)}`
     : "/login";
+
+  const registerHref = currentJourney
+    ? `/register?redirectTo=${encodeURIComponent(currentJourney)}`
+    : "/register";
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-[#24262D]">
@@ -119,15 +149,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="nav-actions" id="navActions">
             {userSession ? (
               <div className="usermenu" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="avatar-btn"
-                  aria-label="User menu"
-                  title={userSession.name}
-                >
-                  {userSession.initials}
-                </button>
+                {pathname.startsWith("/portfolio") ? (
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className="dots-menu-btn"
+                    aria-label="User menu"
+                    title={userSession.name}
+                  >
+                    <span className="dot" aria-hidden="true" />
+                    <span className="dot" aria-hidden="true" />
+                    <span className="dot" aria-hidden="true" />
+                    <span className="sr-only">{userSession.initials}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className="avatar-btn"
+                    aria-label="User menu"
+                    title={userSession.name}
+                  >
+                    {userSession.initials}
+                  </button>
+                )}
                 {userDropdownOpen && (
                   <div className="usermenu__pop open">
                     <div style={{ padding: ".55rem .75rem", borderBottom: "1px solid #f0eee6" }}>
@@ -180,7 +225,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               </div>
             ) : pathname === "/login" ? (
-              <Link href="/register" className="btn btn--primary btn--sm">
+              <Link href={registerHref} className="btn btn--primary btn--sm">
                 Create an account
               </Link>
             ) : (
@@ -246,7 +291,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     Sign in
                   </Link>
                   <Link
-                    href="/register"
+                    href={registerHref}
                     onClick={() => setMobileNavOpen(false)}
                     className="btn btn--primary btn--sm flex-1 text-center"
                   >
@@ -316,7 +361,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/register">
+                  <Link href={registerHref}>
                     Join as Volunteer
                   </Link>
                 </li>

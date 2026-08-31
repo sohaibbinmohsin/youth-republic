@@ -4,40 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
-
-function getEffectiveReturnUrl(searchParamRedirect?: string | null): string {
-  if (
-    searchParamRedirect &&
-    searchParamRedirect.startsWith("/") &&
-    !searchParamRedirect.startsWith("/login") &&
-    !searchParamRedirect.startsWith("/register") &&
-    !searchParamRedirect.startsWith("/logout")
-  ) {
-    return searchParamRedirect;
-  }
-  if (typeof window !== "undefined") {
-    try {
-      if (document.referrer) {
-        const refUrl = new URL(document.referrer);
-        if (refUrl.origin === window.location.origin) {
-          const path = refUrl.pathname + refUrl.search;
-          if (
-            path &&
-            path !== "/login" &&
-            !path.startsWith("/login") &&
-            !path.startsWith("/register") &&
-            !path.startsWith("/logout")
-          ) {
-            return path;
-          }
-        }
-      }
-    } catch {
-      // Ignore URL parse errors
-    }
-  }
-  return "/portfolio";
-}
+import { getEffectiveReturnUrl, clearReturnUrl } from "@/lib/returnUrl";
 
 function LoginForm() {
   const router = useRouter();
@@ -47,22 +14,40 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const redirectToParam = searchParams.get("redirectTo");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const errors: Record<string, string> = {};
+
+    if (!email.trim()) {
+      errors.email = "Please enter your email address";
+    }
+    if (!password) {
+      errors.password = "Please enter your password";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError(Object.values(errors)[0]);
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = getBrowserSupabaseClient();
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (signInError || !data.session) {
         setError(signInError?.message ?? "Invalid email or password");
+        setFieldErrors({ email: " ", password: " " });
         setLoading(false);
         return;
       }
       const dest = getEffectiveReturnUrl(redirectToParam);
+      clearReturnUrl();
       router.push(dest);
       router.refresh();
     } catch (err) {
@@ -71,7 +56,10 @@ function LoginForm() {
     }
   }
 
-  const registerHref = redirectToParam ? `/register?redirectTo=${encodeURIComponent(redirectToParam)}` : "/register";
+  const effectiveReturn = getEffectiveReturnUrl(redirectToParam);
+  const registerHref = effectiveReturn && effectiveReturn !== "/portfolio"
+    ? `/register?redirectTo=${encodeURIComponent(effectiveReturn)}`
+    : "/register";
 
   return (
     <section className="route-centered">
@@ -86,8 +74,8 @@ function LoginForm() {
             </div>
           )}
 
-          <form className="form-narrow" onSubmit={handleSubmit}>
-            <div className="field">
+          <form className="form-narrow" onSubmit={handleSubmit} noValidate>
+            <div className={`field ${fieldErrors.email ? "has-error" : ""}`}>
               <label htmlFor="s-email">Email</label>
               <input
                 id="s-email"
@@ -96,11 +84,24 @@ function LoginForm() {
                 autoComplete="email"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) {
+                    setFieldErrors((prev) => {
+                      const n = { ...prev };
+                      delete n.email;
+                      return n;
+                    });
+                  }
+                }}
+                className={fieldErrors.email && fieldErrors.email.trim() ? "input-error" : fieldErrors.email ? "input-error" : ""}
               />
+              {fieldErrors.email && fieldErrors.email.trim() !== "" && (
+                <p className="field__error" role="alert">{fieldErrors.email}</p>
+              )}
             </div>
 
-            <div className="field">
+            <div className={`field ${fieldErrors.password ? "has-error" : ""}`}>
               <label htmlFor="s-pass">Password</label>
               <div className="pwd">
                 <input
@@ -108,10 +109,19 @@ function LoginForm() {
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"
-                  className="dots-placeholder"
+                  className={`dots-placeholder ${fieldErrors.password ? "input-error" : ""}`}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) {
+                      setFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.password;
+                        return n;
+                      });
+                    }
+                  }}
                 />
                 <button
                   type="button"
@@ -123,6 +133,9 @@ function LoginForm() {
                   {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
+              {fieldErrors.password && fieldErrors.password.trim() !== "" && (
+                <p className="field__error" role="alert">{fieldErrors.password}</p>
+              )}
             </div>
 
             <div className="field-checkbox" style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginTop: "0.75rem", marginBottom: "0.75rem" }}>

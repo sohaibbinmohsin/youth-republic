@@ -9,6 +9,7 @@
   --ink: #24262D;
   --ink-2: #6B6B66;
   --ink-3: #9A9A93;
+  --placeholder: #9CA3AF;
   --line: #E7E4DC;
   --bg: #FFFFFF;
   --bg-2: #F7F5EF;
@@ -44,9 +45,22 @@ body {
 
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
-h1, h2, h3, p { margin: 0; text-wrap: balance; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; text-wrap: pretty; }
 button { font-family: inherit; }
 :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+
+/* Global placeholder styling */
+::placeholder {
+  color: var(--placeholder) !important;
+  opacity: 1;
+}
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+  color: var(--placeholder) !important;
+  opacity: 1;
+}
 
 input[type="radio"] { accent-color: var(--blue); }
 input[type="checkbox"] {
@@ -109,6 +123,23 @@ input[type="checkbox"]:checked::after {
   overflow: hidden; text-decoration: none !important;
 }
 .avatar-btn:hover { filter: brightness(.94); }
+.dots-menu-btn {
+  width: 38px; height: 38px; border-radius: 999px;
+  border: 0; background: transparent; cursor: pointer;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3.5px; padding: 0;
+  transition: background-color .15s ease;
+}
+.dots-menu-btn:hover {
+  background: var(--bg-2);
+}
+.dots-menu-btn .dot {
+  width: 5px; height: 5px; border-radius: 999px;
+  display: block; flex-shrink: 0;
+  background-color: var(--blue-strong);
+  transition: transform .15s ease;
+}
+.dots-menu-btn:hover .dot { transform: scale(1.15); }
 .usermenu__pop {
   position: absolute; right: 0; top: calc(100% + .5rem); z-index: 50;
   background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card);
@@ -292,16 +323,49 @@ select {
 @media (min-width: 880px) { .pane { grid-template-columns: minmax(0, 1fr) 290px; } }
 .pane__aside {
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-card);
-  padding: 1.25rem; font-size: .88rem;
+  padding: 1.25rem 1.35rem; font-size: .88rem;
 }
 @media (min-width: 880px) { .pane__aside { position: sticky; top: 88px; } }
-.pane__aside h3 { font-family: "Oswald", sans-serif; font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: .5rem; color: var(--ink); }
-.pane__aside h3 + h3, .pane__aside .facts + h3 { margin-top: 1.25rem; }
-.pane__aside ol { margin: 0 0 1.25rem; padding-left: 1.25rem; list-style-type: decimal !important; color: var(--ink-2); }
-.pane__aside ol li { margin-bottom: .5rem; color: var(--ink-2); list-style-type: decimal !important; }
-.pane__aside ul { margin: 0; padding-left: 1.1rem; color: var(--ink-2); }
-.pane__aside li { margin-bottom: .4rem; }
-.pane__aside p { margin: 0 0 .5rem; color: var(--ink-2); }
+.pane__aside h3 { font-family: "Oswald", sans-serif; font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: .5rem; color: var(--ink); text-wrap: balance; }
+.pane__aside h3 + h3, .pane__aside .facts + h3 { margin-top: 1.15rem; }
+.pane__aside ol {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  list-style: decimal !important;
+  color: var(--ink-2);
+}
+.pane__aside ol li {
+  margin-bottom: 0.55rem;
+  color: var(--ink-2);
+  list-style: decimal !important;
+  padding-left: 0.2rem;
+  line-height: 1.45;
+  text-wrap: normal;
+}
+.pane__aside ol li::marker {
+  font-weight: 700;
+  color: var(--blue);
+  font-family: "Oswald", sans-serif;
+}
+.pane__aside ul {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  list-style: disc !important;
+  color: var(--ink-2);
+}
+.pane__aside ul li {
+  margin-bottom: 0.45rem;
+  color: var(--ink-2);
+  list-style: disc !important;
+  padding-left: 0.15rem;
+  line-height: 1.45;
+  text-wrap: normal;
+}
+.pane__aside ul li::marker {
+  color: var(--blue);
+}
+.pane__aside p { margin: 0 0 .5rem; color: var(--ink-2); line-height: 1.5; font-size: 0.85rem; text-wrap: normal; }
+.pane__aside strong { color: var(--ink); }
 
 .detail { width: 100%; min-width: 0; }
 .detail__org { display: flex; align-items: center; gap: .6rem; font-weight: 600; font-size: .95rem; color: var(--ink); margin: 0 0 .5rem; }
@@ -326,8 +390,20 @@ select {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   width: 100%;
   padding: 1.5rem 0 2.5rem;
+}
+.route-centered .pane {
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+@media (min-width: 880px) {
+  .route-centered .pane {
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 2rem 2.5rem;
+  }
 }
 
 .auth-head h1 { font-size: 2.2rem; margin-bottom: .35rem; }
@@ -349,12 +425,64 @@ select {
 }
 .field textarea { min-height: 96px; resize: vertical; }
 .field select { padding-right: 2.1rem; background-color: var(--bg); }
-.field select option[value=""] { color: var(--ink-2); }
+.field select option[value=""] { color: var(--placeholder); }
 .field select option:not([value=""]) { color: var(--ink); }
-.field input::placeholder, .field textarea::placeholder { color: var(--ink-2); }
+.field input::placeholder, .field textarea::placeholder { color: var(--placeholder); }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(148,26,128,.18); }
 .field input[readonly] { background: var(--bg-2); color: var(--ink-2); }
 .field .hint { font-size: .8rem; color: var(--ink-2); margin-top: .3rem; }
+
+/* Field Error & Validation States */
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea,
+.field.has-error .autocomplete-input,
+.field.has-error .dob-text-input,
+.field input.input-error,
+.field select.input-error,
+.field textarea.input-error,
+.autocomplete-input.input-error,
+.dob-text-input.input-error,
+input.input-error,
+select.input-error,
+textarea.input-error {
+  border-color: var(--st-neg-fg) !important;
+  background-color: #FFF8F8 !important;
+}
+
+.field.has-error input:focus,
+.field.has-error select:focus,
+.field.has-error textarea:focus,
+.field.has-error .autocomplete-input:focus,
+.field.has-error .dob-text-input:focus,
+.field input.input-error:focus,
+.field select.input-error:focus,
+.field textarea.input-error:focus,
+.autocomplete-input.input-error:focus,
+.dob-text-input.input-error:focus,
+input.input-error:focus,
+select.input-error:focus,
+textarea.input-error:focus {
+  outline: none !important;
+  border-color: var(--st-neg-fg) !important;
+  box-shadow: 0 0 0 3px rgba(163, 45, 45, 0.18) !important;
+}
+
+.field.has-error label,
+.field label.label-error {
+  color: var(--st-neg-fg);
+}
+
+.field__error {
+  color: var(--st-neg-fg);
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
 
 input[type="password"] {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
@@ -364,7 +492,7 @@ input[type="password"] {
 input[type="password"]::placeholder {
   font-family: var(--font-body, "Jost", sans-serif) !important;
   letter-spacing: normal !important;
-  color: var(--ink-2);
+  color: var(--placeholder) !important;
   font-size: .85rem;
 }
 
@@ -373,7 +501,7 @@ input[type="password"].dots-placeholder::placeholder,
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   letter-spacing: 0.18em !important;
   font-size: .85rem !important;
-  color: var(--ink-2) !important;
+  color: var(--placeholder) !important;
 }
 
 .pwd { position: relative; }

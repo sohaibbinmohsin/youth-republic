@@ -12,9 +12,9 @@ export interface RegisterVolunteerInput {
   country: string;
   institution: string;
   degreeProgram: string;
-  idDocType: "cnic" | "b_form";
-  idDocNumber: string;
-  idDocAttachmentId: string;
+  idDocType?: "cnic" | "b_form";
+  idDocNumber?: string;
+  idDocAttachmentId?: string;
   guardianName?: string;
   guardianContact?: string;
   guardianConsent?: boolean;
@@ -66,24 +66,26 @@ export async function registerVolunteer(
     if (!hasConsent) {
       throw new Error("minor_consent_required");
     }
-    if (input.idDocType !== "b_form") {
+    if (input.idDocType && input.idDocType !== "b_form") {
       throw new Error("b_form_required_for_minor");
     }
   }
 
-  const { data: attachment, error: attachmentError } = await supabase
-    .from("attachments")
-    .select("id, domain, owner_type, status, uploaded_by")
-    .eq("id", input.idDocAttachmentId)
-    .single();
-  if (
-    attachmentError || !attachment ||
-    attachment.domain !== "identity_doc" ||
-    attachment.owner_type !== "volunteer" ||
-    attachment.status !== "ready" ||
-    attachment.uploaded_by !== input.authUserId
-  ) {
-    throw new Error("id_doc_attachment_required");
+  if (input.idDocAttachmentId) {
+    const { data: attachment, error: attachmentError } = await supabase
+      .from("attachments")
+      .select("id, domain, owner_type, status, uploaded_by")
+      .eq("id", input.idDocAttachmentId)
+      .single();
+    if (
+      attachmentError || !attachment ||
+      attachment.domain !== "identity_doc" ||
+      attachment.owner_type !== "volunteer" ||
+      attachment.status !== "ready" ||
+      attachment.uploaded_by !== input.authUserId
+    ) {
+      throw new Error("id_doc_attachment_required");
+    }
   }
 
   const { data, error } = await supabase
@@ -100,8 +102,8 @@ export async function registerVolunteer(
       country: input.country,
       institution: input.institution,
       degree_program: input.degreeProgram,
-      id_doc_type: input.idDocType,
-      id_doc_number: input.idDocNumber,
+      id_doc_type: input.idDocType ?? (isMinor ? "b_form" : "cnic"),
+      id_doc_number: input.idDocNumber ?? null,
       guardian_name: input.guardianName ?? null,
       guardian_contact: input.guardianContact ?? null,
       guardian_consent_at: input.guardianConsent ? new Date().toISOString() : null,
@@ -111,10 +113,12 @@ export async function registerVolunteer(
 
   if (error) throw error;
 
-  await supabase
-    .from("attachments")
-    .update({ owner_id: data.id })
-    .eq("id", input.idDocAttachmentId);
+  if (input.idDocAttachmentId) {
+    await supabase
+      .from("attachments")
+      .update({ owner_id: data.id })
+      .eq("id", input.idDocAttachmentId);
+  }
 
   await flagNearDuplicatesIfAny(supabase, data.id, input.fullName, input.city, input.email);
 
