@@ -18,7 +18,6 @@ function RegisterContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [guestLoading, setGuestLoading] = useState(false);
 
   const redirectToParam = searchParams.get("redirectTo");
   const targetDestination = redirectToParam && redirectToParam.startsWith("/") ? redirectToParam : "/portfolio";
@@ -73,25 +72,6 @@ function RegisterContent() {
     } catch (err) {
       setSignupError(err instanceof Error ? err.message : "Signup error");
       setLoading(false);
-    }
-  }
-
-  async function handleGuestSignIn() {
-    setSignupError(null);
-    setGuestLoading(true);
-    try {
-      const supabase = getBrowserSupabaseClient();
-      const { data, error: anonError } = await supabase.auth.signInAnonymously();
-      if (anonError || !data.session) {
-        setSignupError(anonError?.message ?? "Guest sign-in is not enabled on this instance.");
-        setGuestLoading(false);
-        return;
-      }
-      router.push(targetDestination);
-      router.refresh();
-    } catch (err) {
-      setSignupError(err instanceof Error ? err.message : "Guest authentication error");
-      setGuestLoading(false);
     }
   }
 
@@ -204,26 +184,11 @@ function RegisterContent() {
                 </div>
               </div>
 
-              <button type="submit" disabled={loading || guestLoading} className="btn btn--primary btn--block">
+              <button type="submit" disabled={loading} className="btn btn--primary btn--block">
                 {loading ? "Creating account..." : "Create account"}
               </button>
 
-              <div className="flex items-center my-4">
-                <div className="flex-1 border-t border-gray-200"></div>
-                <span className="px-3 text-xs text-gray-400 uppercase font-bold">or</span>
-                <div className="flex-1 border-t border-gray-200"></div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleGuestSignIn}
-                disabled={loading || guestLoading}
-                className="btn btn--ghost btn--block"
-              >
-                {guestLoading ? "Connecting..." : "Continue as Guest (Anonymous)"}
-              </button>
-
-              <p className="altline" style={{ marginTop: "1rem" }}>
+              <p className="altline" style={{ marginTop: "1.25rem" }}>
                 Already have an account? <Link href={loginHref}>Sign in</Link>
               </p>
             </form>

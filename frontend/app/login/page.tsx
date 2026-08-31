@@ -46,7 +46,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [guestLoading, setGuestLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const redirectToParam = searchParams.get("redirectTo");
@@ -69,26 +68,6 @@ function LoginForm() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication error");
       setLoading(false);
-    }
-  }
-
-  async function handleGuestSignIn() {
-    setError(null);
-    setGuestLoading(true);
-    try {
-      const supabase = getBrowserSupabaseClient();
-      const { data, error: anonError } = await supabase.auth.signInAnonymously();
-      if (anonError || !data.session) {
-        setError(anonError?.message ?? "Guest sign-in is not enabled on this instance.");
-        setGuestLoading(false);
-        return;
-      }
-      const dest = getEffectiveReturnUrl(redirectToParam);
-      router.push(dest);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Guest authentication error");
-      setGuestLoading(false);
     }
   }
 
@@ -146,27 +125,11 @@ function LoginForm() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading || guestLoading} className="btn btn--primary btn--block">
+            <button type="submit" disabled={loading} className="btn btn--primary btn--block">
               {loading ? "Signing in..." : "Log in"}
             </button>
 
-            <div className="flex items-center my-4">
-              <div className="flex-1 border-t border-gray-200"></div>
-              <span className="px-3 text-xs text-gray-400 uppercase font-bold">or</span>
-              <div className="flex-1 border-t border-gray-200"></div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleGuestSignIn}
-              disabled={loading || guestLoading}
-              className="btn btn--ghost btn--block"
-              style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
-            >
-              {guestLoading ? "Connecting..." : "Continue as Guest (Anonymous)"}
-            </button>
-
-            <p className="altline" style={{ marginTop: "1rem" }}>
+            <p className="altline" style={{ marginTop: "1.25rem" }}>
               New here? <Link href={registerHref}>Create an account</Link>
             </p>
           </form>

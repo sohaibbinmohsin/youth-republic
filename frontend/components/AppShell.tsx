@@ -38,9 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
 
       const email = user.email ?? null;
-      const coolName = getCoolName(user.id);
-      const name = fullName || coolName;
-      const initials = getAvatarInitials(fullName || coolName || email || "YR");
+      const metaName = (user as any).user_metadata?.full_name ?? null;
+      const name = fullName || metaName || (email ? email.split("@")[0] : "Volunteer");
+      const initials = getAvatarInitials(name || email || "YR");
 
       setUserSession({ id: user.id, email, name, initials });
     }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { SubmitHoursForm } from "@/components/SubmitHoursForm";
 import { RegisterForm } from "@/components/RegisterForm";
@@ -9,7 +8,7 @@ import { SensitiveFieldEditor } from "@/components/SensitiveFieldEditor";
 import { ProfileFieldEditor } from "@/components/ProfileFieldEditor";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
-import { getCoolName, getAvatarInitials } from "@/lib/coolNames";
+import { getAvatarInitials } from "@/lib/coolNames";
 
 interface VolunteerProfile {
   id: string;
@@ -28,7 +27,7 @@ interface VolunteerProfile {
   status: string;
   created_at: string;
   emergency_contact?: { name: string; phone: string } | null;
-  is_anon?: boolean;
+  is_unregistered?: boolean;
 }
 
 interface ApplicationItem {
@@ -98,6 +97,12 @@ function formatDateDisplay(isoString?: string | null): string {
   }
 }
 
+function formatYrCode(rawCode?: string | null, userId?: string | null): string {
+  if (rawCode && rawCode.startsWith("YR-")) return rawCode;
+  const cleanId = (userId || "YR").replace(/[^A-Za-z0-9]/g, "").slice(0, 5).toUpperCase();
+  return `YR-${cleanId || "VOL01"}`;
+}
+
 export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState<"impact" | "apps" | "details">("impact");
   const [totalVerifiedHours, setTotalVerifiedHours] = useState<number | null>(null);
@@ -119,6 +124,7 @@ export default function PortfolioPage() {
 
     const authUserId = sessionData.session.user.id;
     const sessionEmail = sessionData.session.user.email ?? "";
+    const sessionMetaName = (sessionData.session.user.user_metadata?.full_name as string) ?? "";
 
     let volunteerRow: any = null;
     try {
@@ -135,7 +141,10 @@ export default function PortfolioPage() {
     }
 
     if (volunteerRow) {
-      setVolunteer(volunteerRow as VolunteerProfile);
+      setVolunteer({
+        ...volunteerRow,
+        volunteer_code: formatYrCode(volunteerRow.volunteer_code, authUserId),
+      } as VolunteerProfile);
 
       try {
         const { data: chapterLink } = await supabase
@@ -243,7 +252,7 @@ export default function PortfolioPage() {
           type: opp.type ?? "community",
           status: p.status ?? "in_progress",
           role: "Volunteer",
-          dates: opp.activity_start_at ? `${formatDateDisplay(opp.activity_start_at)} – ongoing` : "Ongoing",
+          dates: opp.activity_start_at ? `${formatDateDisplay(opp.activity_start_at)} - ongoing` : "Ongoing",
           hoursTotal: 0,
           hoursVerified: 0,
           allVerified: false,
@@ -295,19 +304,19 @@ export default function PortfolioPage() {
 
       setProgrammes(Array.from(programmeMap.values()));
     } else {
-      // Anonymous / Unregistered Volunteer
-      const coolName = getCoolName(authUserId);
+      // Unregistered Volunteer (skipped Step 2 or newly created account)
+      const effectiveName = sessionMetaName || (sessionEmail ? sessionEmail.split("@")[0] : "Volunteer");
       setVolunteer({
         id: authUserId,
-        full_name: coolName,
+        full_name: effectiveName,
         email: sessionEmail,
         phone: "",
-        volunteer_code: "GUEST-" + authUserId.slice(0, 6).toUpperCase(),
-        city: "Exploring Opportunities",
-        institution: "Youth Republic Community",
+        volunteer_code: formatYrCode(null, authUserId),
+        city: "Pakistan",
+        institution: "Youth Republic",
         status: "pending_verification",
         created_at: sessionData.session.user.created_at || new Date().toISOString(),
-        is_anon: true,
+        is_unregistered: true,
       });
       setTotalVerifiedHours(0);
       setApplications([]);
@@ -325,7 +334,7 @@ export default function PortfolioPage() {
   }
 
   const avatarInitials = getAvatarInitials(volunteer.full_name);
-  const isVerified = volunteer.status === "active" || (!volunteer.is_anon && volunteer.status !== "pending_verification");
+  const isVerified = volunteer.status === "active" || (!volunteer.is_unregistered && volunteer.status === "verified");
   const uniqueOrgCount = new Set(programmes.map((p) => p.orgName)).size;
   const showOrgLabel = uniqueOrgCount > 1;
 
@@ -335,26 +344,7 @@ export default function PortfolioPage() {
 
   return (
     <div className="wrap space-y-6 font-['Jost']">
-      {/* Verification / Anonymous Alert Banner */}
-      {volunteer.is_anon ? (
-        <div className="verify-banner" style={{ background: "#FFF7ED", color: "#9A3412", borderColor: "#FDBA74" }}>
-          <strong>Guest Volunteer Profile.</strong> You are currently exploring as <strong>{volunteer.full_name}</strong>.{" "}
-          <button
-            type="button"
-            onClick={() => setActiveTab("details")}
-            style={{ textDecoration: "underline", background: "transparent", border: 0, padding: 0, font: "inherit", fontWeight: 600, color: "#C2410C", cursor: "pointer" }}
-          >
-            Complete your portfolio details
-          </button>{" "}
-          to verify hours and receive accredited certificates.
-        </div>
-      ) : !isVerified ? (
-        <div className="verify-banner">
-          <strong>Verification pending.</strong> An admin is checking your details. You can browse and apply now; your verified badge appears once approved.
-        </div>
-      ) : null}
-
-      {/* Header Profile Identity (Prototypes Wave 1 fidelity) */}
+      {/* Header Profile Identity */}
       <div className="pf-id">
         <div className="avatar">{avatarInitials}</div>
         <div className="pf-id__who">
@@ -362,8 +352,6 @@ export default function PortfolioPage() {
             <span>{volunteer.full_name}</span>
             {isVerified ? (
               <span className="pill pill--pos">Verified</span>
-            ) : volunteer.is_anon ? (
-              <span className="pill pill--prog">Anonymous</span>
             ) : (
               <span className="pill pill--pend">Verification pending</span>
             )}
@@ -419,9 +407,8 @@ export default function PortfolioPage() {
       {/* TAB 1: IMPACT */}
       {activeTab === "impact" && (
         <div className="pf-panel">
-          <div className="pf-panel-head">
-            <p className="hint">Every programme you’ve joined — sessions, hours and status.</p>
-            {programmes.length > 0 && (
+          {programmes.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
               <button
                 type="button"
                 className="btn btn--primary btn--sm"
@@ -432,18 +419,12 @@ export default function PortfolioPage() {
               >
                 Log hours
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {programmes.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[var(--line)] p-8 text-center text-sm text-[var(--ink-2)] bg-[var(--bg-2)]">
-              <p className="font-semibold text-base text-[var(--ink)]">No joined programmes yet</p>
-              <p className="mt-1 text-xs text-[var(--ink-2)]">
-                Browse open opportunities on the noticeboard and apply to start logging accredited service hours.
-              </p>
-              <Link href="/opportunities" className="btn btn--primary btn--sm" style={{ marginTop: "1rem" }}>
-                Explore opportunities →
-              </Link>
+            <div style={{ textAlign: "center", padding: "3rem 1rem", border: "1px dashed var(--line)", borderRadius: "var(--radius-card)", background: "var(--bg-2)", color: "var(--ink-2)", fontSize: ".9rem" }}>
+              No programmes joined yet.
             </div>
           ) : (
             <div className="pcards">
@@ -570,14 +551,8 @@ export default function PortfolioPage() {
       {activeTab === "apps" && (
         <div className="pf-panel">
           {applications.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[var(--line)] p-8 text-center text-sm text-[var(--ink-2)] bg-[var(--bg-2)]">
-              <p className="font-semibold text-base text-[var(--ink)]">No applications yet</p>
-              <p className="mt-1 text-xs text-[var(--ink-2)]">
-                Browse open volunteer drives and submit an application with your portfolio in one tap.
-              </p>
-              <Link href="/opportunities" className="btn btn--primary btn--sm" style={{ marginTop: "1rem" }}>
-                Browse opportunities →
-              </Link>
+            <div style={{ textAlign: "center", padding: "3rem 1rem", border: "1px dashed var(--line)", borderRadius: "var(--radius-card)", background: "var(--bg-2)", color: "var(--ink-2)", fontSize: ".9rem" }}>
+              No applications yet.
             </div>
           ) : (
             <div className="list">
@@ -624,7 +599,7 @@ export default function PortfolioPage() {
       {/* TAB 3: PORTFOLIO DETAILS */}
       {activeTab === "details" && (
         <div className="pf-panel">
-          {volunteer.is_anon ? (
+          {volunteer.is_unregistered ? (
             /* If user has not provided details yet: Show the Step 2 details form inline */
             <div className="rounded-xl border border-[var(--line)] bg-[var(--bg-2)] p-6 shadow-sm max-w-2xl">
               <div className="mb-6 pb-4 border-b border-[var(--line)]">
