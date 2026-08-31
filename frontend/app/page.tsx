@@ -19,6 +19,7 @@ export default function Home() {
   const [memberSince, setMemberSince] = useState<string | null>(null);
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [opportunities, setOpportunities] = useState<OpportunityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -89,6 +90,8 @@ export default function Home() {
         }
       } catch {
         // If mock does not have opportunities table, ignore
+      } finally {
+        setIsLoading(false);
       }
     }
     load();
@@ -142,9 +145,6 @@ export default function Home() {
             )}
           </div>
         </div>
-
-        {/* Noticeboard below dashboard */}
-        {opportunities.length > 0 && <NoticeboardHub initialOpportunities={opportunities} />}
       </div>
     );
   }
@@ -153,6 +153,7 @@ export default function Home() {
   return (
     <NoticeboardHub
       initialOpportunities={opportunities}
+      isLoading={isLoading}
     />
   );
 }

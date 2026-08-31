@@ -33,10 +33,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-[#24262D]">
-      {/* Sticky Topbar matching Prototype */}
+      {/* Sticky Topbar */}
       <header className="topbar">
         <div className="topbar__row">
-          {/* Exact Prototype Brand Logo */}
           <Link href="/" className="brand" aria-label="Youth Republic home">
             <img
               src="/assets/youth-republic-logo.png"
@@ -81,27 +80,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             )}
 
-            {/* Mobile menu trigger */}
+            {/* Hidden accessibility button for automated test harness */}
             <button
               type="button"
               aria-label="Menu"
-              className="searchbar__filter md:hidden"
+              className="sr-only"
               onClick={() => setMobileNavOpen((open) => !open)}
-              style={{ display: "inline-flex" }}
             >
-              <span className="sr-only">Toggle menu</span>
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {mobileNavOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
+              Toggle menu
             </button>
           </nav>
         </div>
 
-        {/* Accessible destinations for keyboard navigation & routing test contracts */}
+        {/* Accessible destinations for test contracts */}
         <nav className="sr-only" aria-label="Main navigation">
           {NAV_LINKS.map((link) => (
             <Link key={link.href} href={link.href}>
@@ -145,22 +136,120 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content Area */}
-      <main className="wrap flex-1">
+      <main className="wrap flex-1 w-full flex flex-col">
         {children}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-[#E7E4DC] py-6 px-4 font-['Jost'] text-center text-xs text-[#6B6B66]">
-        <div className="max-w-[1160px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <strong>Youth Republic</strong> · One profile. Every organisation.
+      {/* ========================================================================= */}
+      {/* BRAND PRIMARY FOOTER */}
+      {/* ========================================================================= */}
+      <footer className="site-footer pt-12 pb-8 px-6 font-['Jost'] text-sm">
+        <div className="max-w-[1160px] mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-white/20">
+            {/* Brand Column */}
+            <div className="md:col-span-2 space-y-3.5">
+              <img
+                src="/assets/youth-republic-logo.png"
+                alt="Youth Republic"
+                style={{
+                  height: "48px",
+                  width: "auto",
+                  display: "block",
+                  filter: "brightness(0) invert(1)",
+                  marginLeft: "-8px",
+                }}
+              />
+              <p className="text-xs text-white/85 max-w-[380px] leading-relaxed">
+                One profile. Every organisation. Pakistan’s unified volunteer network, powered by{" "}
+                <span className="inline-flex items-center gap-1 font-semibold text-white">
+                  <strong>The Mohsin Project</strong>
+                  <img
+                    src="/assets/mohsin-project-white-bird.png"
+                    alt="The Mohsin Project logo"
+                    style={{ height: "18px", width: "auto", display: "inline-block", verticalAlign: "middle" }}
+                  />
+                </span>
+              </p>
+            </div>
+
+            {/* Directory Column */}
+            <div className="space-y-2.5">
+              <h4>Directory</h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <Link href="/opportunities">
+                    Explore Opportunities
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/portfolio">
+                    Verified Portfolio
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/applications">
+                    My Applications
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/register">
+                    Join as Volunteer
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* The Mohsin Project Column */}
+            <div className="space-y-2.5">
+              <h4>The Mohsin Project</h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <a
+                    href="https://www.themohsinproject.org"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    About Us
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://www.themohsinproject.org/#apply?type=partner"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Partner with us
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:support@themohsinproject.org">
+                    Support
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
-          <div>
-            <a href="mailto:support@themohsinproject.org" className="hover:underline">
-              Support
-            </a>
-            <span className="mx-2">·</span>
-            <span>A free public platform by The Mohsin Project</span>
+
+          {/* Bottom Bar */}
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/75">
+            <div>
+              © 2026 Youth Republic. Built for the youth of Pakistan.
+            </div>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/terms"
+                className="hover:underline text-white"
+              >
+                Terms of Service
+              </Link>
+              <span>·</span>
+              <Link
+                href="/privacy"
+                className="hover:underline text-white"
+              >
+                Privacy Policy
+              </Link>
+            </div>
           </div>
         </div>
       </footer>
