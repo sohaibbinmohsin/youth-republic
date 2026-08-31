@@ -165,6 +165,7 @@ export function RegisterForm({
   }
 
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUploadPromiseRef = useRef<Promise<string | null> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -234,6 +235,22 @@ export function RegisterForm({
 
     setSubmitting(true);
     try {
+      // If a document upload is currently in flight, wait briefly for it to complete
+      let resolvedAttachmentId = form.idDocAttachmentId.trim() || undefined;
+      if (pendingUploadPromiseRef.current) {
+        try {
+          const uploadedId = await Promise.race([
+            pendingUploadPromiseRef.current,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+          ]);
+          if (uploadedId) {
+            resolvedAttachmentId = uploadedId;
+          }
+        } catch {
+          // If upload fails, allow registration to continue anyway
+        }
+      }
+
       const payload: RegisterVolunteerPayload = {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
@@ -247,7 +264,7 @@ export function RegisterForm({
         degreeProgram: form.degreeProgram.trim(),
         idDocType: (form.idDocType as "cnic" | "b_form") || (minor ? "b_form" : "cnic"),
         idDocNumber: form.idDocNumber.trim() || undefined,
-        idDocAttachmentId: form.idDocAttachmentId.trim() || undefined,
+        idDocAttachmentId: resolvedAttachmentId,
         ...(showGuardianFields ? guardian : {}),
       };
 
@@ -566,6 +583,9 @@ export function RegisterForm({
 
           <CnicUploadField
             accessToken={accessToken}
+            onUploadPromise={(promise) => {
+              pendingUploadPromiseRef.current = promise;
+            }}
             onUploaded={(attachmentId) => {
               updateField("idDocAttachmentId", attachmentId);
               if (fieldErrors.idDocAttachmentId) {

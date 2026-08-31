@@ -1,6 +1,6 @@
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
-import { verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
+import { verifyVolunteerAuthUser, verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
 import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
 import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 import { finalizeAttachment } from "./handler.ts";
@@ -15,8 +15,17 @@ async function resolveAuthUserId(
   } catch (err) {
     if (!(err instanceof Error) || err.message !== "unauthorized") throw err;
   }
-  const claims = await verifyStaffToken(authHeader);
-  return claims.staffId;
+
+  try {
+    const claims = await verifyStaffToken(authHeader);
+    return claims.staffId;
+  } catch (err) {
+    if (!(err instanceof Error) || err.message !== "unauthorized") throw err;
+  }
+
+  // Pre-registration user fallback (authenticated Supabase Auth user without a volunteers row yet)
+  const { authUserId } = await verifyVolunteerAuthUser(supabase, authHeader);
+  return authUserId;
 }
 
 export async function handler(req: Request): Promise<Response> {

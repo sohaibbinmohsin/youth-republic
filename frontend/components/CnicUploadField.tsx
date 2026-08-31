@@ -7,10 +7,12 @@ export function CnicUploadField({
   accessToken,
   ownerId,
   onUploaded,
+  onUploadPromise,
 }: {
   accessToken: string;
   ownerId?: string;
   onUploaded: (attachmentId: string) => void;
+  onUploadPromise?: (promise: Promise<string | null> | null) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -22,27 +24,36 @@ export function CnicUploadField({
 
     setError(null);
     setUploading(true);
-    try {
-      const { uploadUrl, attachmentId } = await requestAttachmentUpload(
-        {
-          domain: "identity_doc",
-          ownerType: "volunteer",
-          ownerId: ownerId || "00000000-0000-0000-0000-000000000000",
-          mimeType: file.type,
-          sizeBytes: file.size,
-          originalFilename: file.name,
-        },
-        accessToken,
-      );
-      await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-      await finalizeAttachment({ attachmentId }, accessToken);
-      setUploadedFileName(file.name);
-      onUploaded(attachmentId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "unknown_error");
-    } finally {
-      setUploading(false);
-    }
+
+    const uploadTask = (async () => {
+      try {
+        const { uploadUrl, attachmentId } = await requestAttachmentUpload(
+          {
+            domain: "identity_doc",
+            ownerType: "volunteer",
+            ownerId: ownerId || "00000000-0000-0000-0000-000000000000",
+            mimeType: file.type || "image/jpeg",
+            sizeBytes: file.size,
+            originalFilename: file.name,
+          },
+          accessToken,
+        );
+        await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type || "application/octet-stream" } });
+        await finalizeAttachment({ attachmentId }, accessToken);
+        setUploadedFileName(file.name);
+        onUploaded(attachmentId);
+        return attachmentId;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "unknown_error";
+        setError(msg);
+        return null;
+      } finally {
+        setUploading(false);
+        onUploadPromise?.(null);
+      }
+    })();
+
+    onUploadPromise?.(uploadTask);
   }
 
   return (
