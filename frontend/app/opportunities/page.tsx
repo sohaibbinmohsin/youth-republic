@@ -65,33 +65,44 @@ export default async function OpportunitiesPage({
   }
 
   return (
-    <div className="space-y-8 font-['Jost']">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="pb-6 border-b border-[#E7E4DC] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div style={{ paddingBottom: "1.5rem", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h1 className="font-['Oswald'] text-3xl font-bold uppercase tracking-tight text-[#24262D]">
+          <h1 className="display" style={{ fontSize: "2.4rem" }}>
             Explore Opportunities
           </h1>
-          <p className="text-sm text-[#6B6B66] mt-1">
-            Browse verified community service drives &amp; volunteering programs across Pakistan.
+          <p style={{ color: "var(--ink-2)", fontSize: "1rem", marginTop: ".5rem" }}>
+            Browse verified community service drives & volunteering programs across Pakistan.
           </p>
         </div>
-        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#941A80]/10 text-[#941A80]">
-          {count ?? opportunities.length} Drives Available
-        </span>
       </div>
 
       {/* Filter Toolbar */}
-      <form className="p-4 rounded-xl border border-[#E7E4DC] bg-[#F7F5EF] flex flex-wrap items-end gap-4 text-xs font-medium" action="/opportunities" method="get">
-        <div className="space-y-1">
-          <label htmlFor="type" className="block text-[#6B6B66] uppercase font-['Oswald'] tracking-wider">
+      <form
+        action="/opportunities"
+        method="get"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "1rem",
+          background: "var(--bg-2)",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--radius-card)",
+          padding: "1rem 1.25rem",
+          fontSize: ".88rem",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
+          <label htmlFor="type" style={{ fontWeight: 600, fontSize: ".82rem", textTransform: "uppercase", letterSpacing: ".08em", fontFamily: "Oswald, sans-serif" }}>
             Type
           </label>
           <select
             id="type"
             name="type"
             defaultValue={type ?? ""}
-            className="rounded-lg border border-[#E7E4DC] bg-white px-3 py-2 text-xs text-[#24262D] focus:border-[#941A80] focus:outline-none min-w-[140px]"
+            style={{ padding: ".4rem 1.8rem .4rem .6rem", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--bg)", font: "inherit" }}
           >
             <option value="">All Types</option>
             {OPPORTUNITY_TYPES.map((t) => (
@@ -102,15 +113,15 @@ export default async function OpportunitiesPage({
           </select>
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="status" className="block text-[#6B6B66] uppercase font-['Oswald'] tracking-wider">
+        <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
+          <label htmlFor="status" style={{ fontWeight: 600, fontSize: ".82rem", textTransform: "uppercase", letterSpacing: ".08em", fontFamily: "Oswald, sans-serif" }}>
             Status
           </label>
           <select
             id="status"
             name="status"
             defaultValue={status ?? ""}
-            className="rounded-lg border border-[#E7E4DC] bg-white px-3 py-2 text-xs text-[#24262D] focus:border-[#941A80] focus:outline-none min-w-[140px]"
+            style={{ padding: ".4rem 1.8rem .4rem .6rem", borderRadius: "6px", border: "1px solid var(--line)", background: "var(--bg)", font: "inherit" }}
           >
             <option value="">All Statuses</option>
             {STATUSES.map((s) => (
@@ -121,18 +132,12 @@ export default async function OpportunitiesPage({
           </select>
         </div>
 
-        <button
-          type="submit"
-          className="px-5 py-2 rounded-lg bg-[#941A80] hover:bg-[#7C1568] text-white font-semibold transition shadow-sm"
-        >
-          Filter Results
+        <button type="submit" className="btn btn--primary btn--sm">
+          Filter
         </button>
 
         {(type || status) && (
-          <Link
-            href="/opportunities"
-            className="px-3 py-2 text-xs text-[#6B6B66] hover:text-[#24262D] hover:underline"
-          >
+          <Link href="/opportunities" style={{ fontSize: ".82rem", color: "var(--blue)" }}>
             Clear filters
           </Link>
         )}
@@ -140,11 +145,11 @@ export default async function OpportunitiesPage({
 
       {/* Grid */}
       {opportunities.length === 0 ? (
-        <div className="text-center py-16 rounded-xl border border-dashed border-[#E7E4DC] bg-[#F7F5EF]">
-          <p className="text-sm text-[#6B6B66]">No opportunities found matching these filters.</p>
+        <div style={{ textAlign: "center", padding: "3rem 1rem", border: "1px dashed var(--line)", borderRadius: "var(--radius-card)", background: "var(--bg-2)", color: "var(--ink-2)", fontSize: ".9rem" }}>
+          No opportunities found matching these filters.
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="cards">
           {opportunities.map((opportunity) => (
             <OpportunityCard
               key={opportunity.id}
@@ -158,19 +163,19 @@ export default async function OpportunitiesPage({
       )}
 
       {/* Pagination */}
-      <div className="pt-6 border-t border-[#E7E4DC] flex items-center justify-between text-xs text-[#6B6B66]">
+      <div className="pager">
         {page > 1 ? (
-          <Link href={pageHref(page - 1)} className="font-semibold text-[#941A80] hover:underline">
+          <Link href={pageHref(page - 1)}>
             Previous
           </Link>
         ) : (
           <span />
         )}
-        <span>
-          Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+        <span style={{ alignSelf: "center", fontSize: ".85rem", color: "var(--ink-2)" }}>
+          Page {page} of {totalPages}
         </span>
         {page < totalPages ? (
-          <Link href={pageHref(page + 1)} className="font-semibold text-[#941A80] hover:underline">
+          <Link href={pageHref(page + 1)}>
             Next
           </Link>
         ) : (

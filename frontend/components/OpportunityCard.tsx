@@ -11,102 +11,52 @@ export interface OpportunitySummary {
   isOnline?: boolean;
 }
 
-const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
-  environment: { label: "Environment", color: "#079541" },
-  health: { label: "Health", color: "#E30912" },
-  education: { label: "Education", color: "#099EE2" },
-  community: { label: "Community", color: "#F39104" },
-};
-
-const ORG_COLORS: Record<string, string> = {
-  rizq: "#8A7A10",
-  "green crescent": "#0B7A3B",
-  "sehat first": "#B02A2A",
-  "read foundation": "#6E1560",
+const ORG_CONFIG: Record<string, { monogram: string; color: string }> = {
+  rizq: { monogram: "RZ", color: "#8A7A10" },
+  "green crescent": { monogram: "GC", color: "#0B7A3B" },
+  "sehat first": { monogram: "SF", color: "#B02A2A" },
+  "read foundation": { monogram: "RF", color: "#6E1560" },
 };
 
 export function OpportunityCard({ opportunity }: { opportunity: OpportunitySummary }) {
-  const typeConf = TYPE_CONFIG[opportunity.type.toLowerCase()] ?? {
-    label: opportunity.type,
-    color: "#941A80",
+  const orgKey = opportunity.organizationName.toLowerCase();
+  const orgConf = ORG_CONFIG[orgKey] ?? {
+    monogram: opportunity.organizationName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
+    color: "#8A7A10",
   };
-  const orgColor = ORG_COLORS[opportunity.organizationName.toLowerCase()] ?? "#8A7A10";
-  const orgInitials = opportunity.organizationName
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 
   const status = opportunity.computedStatus ?? "open";
+  const typeClass = `type-${opportunity.type.toLowerCase()}`;
   const isPos = status === "open";
   const isProg = status === "in_progress";
-  const statusLabel =
-    status === "open"
-      ? "Open"
-      : status === "coming_soon"
-      ? "Coming soon"
-      : status === "in_progress"
-      ? "In progress"
-      : status;
+  const isPend = status === "coming_soon";
+  const pillClass = isPos ? "pill--pos" : isProg ? "pill--prog" : isPend ? "pill--pend" : "pill--neu";
+  const statusLabel = isPos
+    ? "Open"
+    : isPend
+    ? "Coming soon"
+    : isProg
+    ? "In progress"
+    : status;
 
   return (
-    <Link
-      href={`/opportunities/${opportunity.id}`}
-      className="group flex flex-col justify-between rounded-xl border border-[#E7E4DC] bg-white p-4.5 hover:border-[#941A80] hover:shadow-md transition duration-150 hover:no-underline font-['Jost']"
-    >
-      <div>
-        {/* Org Header */}
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-['Oswald'] font-bold text-white uppercase shrink-0"
-            style={{ backgroundColor: orgColor }}
-          >
-            {orgInitials}
-          </span>
-          <span className="font-['Oswald'] text-[11px] font-semibold tracking-wider text-[#6B6B66] uppercase truncate">
-            {opportunity.organizationName}
-          </span>
-        </div>
-
-        {/* Title */}
-        <h2 className="font-['Jost'] font-bold text-base text-[#24262D] group-hover:text-[#941A80] transition line-clamp-2 leading-snug">
-          {opportunity.name}
-        </h2>
-
-        {/* Location */}
-        <p className="text-xs text-[#24262D] font-medium mt-1">
-          {opportunity.location ?? "Lahore"} · {opportunity.isOnline ? "online" : "in person"}
-        </p>
-
-        {/* Snippet */}
-        {opportunity.description && (
-          <p className="text-xs text-[#6B6B66] mt-2 line-clamp-2 leading-relaxed">
-            {opportunity.description}
-          </p>
-        )}
+    <Link href={`/opportunities/${opportunity.id}`} className="oc">
+      <div className="oc__org">
+        <span className="orglogo" style={{ background: orgConf.color }}>
+          {orgConf.monogram}
+        </span>
+        <span className="org">{opportunity.organizationName}</span>
       </div>
-
-      {/* Card Footer */}
-      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-        <span className="inline-flex items-center gap-1.5 font-medium text-[11px] text-[#6B6B66]">
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ backgroundColor: typeConf.color }}
-          ></span>
-          {typeConf.label}
-        </span>
-        <span
-          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium capitalize ${
-            isPos
-              ? "bg-[#EAF3DE] text-[#3B6D11]"
-              : isProg
-              ? "bg-[#E6F1FB] text-[#0C447C]"
-              : "bg-[#FAEEDA] text-[#854F0B]"
-          }`}
-        >
-          {statusLabel}
-        </span>
+      <h3>{opportunity.name}</h3>
+      <div className="loc">
+        {opportunity.location ?? "Lahore"} · {opportunity.isOnline ? "online" : "in person"}
+      </div>
+      <p className="meta">
+        {opportunity.description ?? "Pack and distribute ration hampers to families across Lahore through the month."}
+      </p>
+      <div className="foot">
+        <span className={`ttag ${typeClass}`}>{opportunity.type}</span>
+        <span className={`pill ${pillClass}`}>{statusLabel}</span>
       </div>
     </Link>
   );
