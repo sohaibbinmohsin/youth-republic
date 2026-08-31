@@ -1,40 +1,27 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Home from "./page";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 
 vi.mock("@/lib/supabase/browserClient");
 
-function mockSupabase(options: {
-  session: { access_token: string; user: { id: string } } | null;
-  volunteer?: { id: string; created_at: string } | null;
-  totalVerifiedHours?: number;
-  applications?: Array<{ id: string; status: string; opportunities: { name: string } | null }>;
-}) {
+function mockSupabase(opps: any[] = []) {
   return {
     auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: options.session } }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
     },
     from(table: string) {
-      if (table === "volunteers") {
+      if (table === "opportunities") {
         return {
           select: () => ({
-            eq: () => ({
-              single: () => Promise.resolve({ data: options.volunteer ?? null, error: null }),
+            is: () => ({
+              order: () => Promise.resolve({ data: opps, error: null }),
             }),
-          }),
-        };
-      }
-      if (table === "applications") {
-        return {
-          select: () => ({
-            order: () => Promise.resolve({ data: options.applications ?? [], error: null }),
           }),
         };
       }
       throw new Error(`unexpected table ${table}`);
     },
-    rpc: vi.fn().mockResolvedValue({ data: options.totalVerifiedHours ?? 0, error: null }),
   };
 }
 
@@ -43,28 +30,25 @@ describe("Home", () => {
     vi.mocked(getBrowserSupabaseClient).mockReset();
   });
 
-  it("[4] shows the marketing headline for an anonymous visitor", async () => {
-    vi.mocked(getBrowserSupabaseClient).mockReturnValue(mockSupabase({ session: null }) as never);
-    render(<Home />);
-    expect(await screen.findByRole("heading", { level: 1, name: /volunteer where it matters/i })).toBeInTheDocument();
-  });
-
-  it("[4] shows a dashboard — profile summary, verified hours, and current applications — for a logged-in volunteer", async () => {
+  it("shows the full opportunities noticeboard on the landing page", async () => {
     vi.mocked(getBrowserSupabaseClient).mockReturnValue(
-      mockSupabase({
-        session: { access_token: "t", user: { id: "auth-1" } },
-        volunteer: { id: "vol-1", created_at: "2026-01-15T00:00:00Z" },
-        totalVerifiedHours: 12,
-        applications: [{ id: "app-1", status: "under_review", opportunities: { name: "Beach Cleanup" } }],
-      }) as never,
+      mockSupabase([
+        {
+          id: "opp-1",
+          name: "Ramadan Food Drive",
+          type: "community",
+          location: "Lahore",
+          is_online: false,
+          description: "Pack and distribute ration hampers",
+          organization_id: "org-1",
+          organizations: { id: "org-1", name: "Rizq" },
+        },
+      ]) as never,
     );
 
     render(<Home />);
-
-    await waitFor(() => expect(screen.getByText("12")).toBeInTheDocument());
-    expect(screen.getByText(/verified hours/i)).toBeInTheDocument();
-    expect(screen.getByText(/member since/i)).toBeInTheDocument();
-    expect(screen.getByText("Beach Cleanup")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1, name: /volunteer where it matters/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /volunteer where it matters/i })).toBeInTheDocument();
+    expect(await screen.findByText("Ramadan Food Drive")).toBeInTheDocument();
+    expect(screen.getAllByText("Rizq").length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -130,12 +130,12 @@ describe("RegisterForm", () => {
     expect(phoneInput).toHaveValue("+92 300 1234567");
   });
 
-  it("allows selecting gender via custom interactive option cards", async () => {
+  it("allows selecting gender via single select dropdown", async () => {
     const user = userEvent.setup();
     render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
 
-    const maleCard = screen.getByRole("radio", { name: "Male" });
-    await user.click(maleCard);
-    expect(maleCard).toHaveAttribute("aria-checked", "true");
+    const genderSelect = screen.getByLabelText("Gender");
+    await user.selectOptions(genderSelect, "male");
+    expect(genderSelect).toHaveValue("male");
   });
 });

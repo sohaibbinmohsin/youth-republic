@@ -7,7 +7,7 @@ import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { getCoolName, getAvatarInitials } from "@/lib/coolNames";
 
 const NAV_LINKS = [
-  { href: "/opportunities", label: "Opportunities" },
+  { href: "/", label: "Opportunities" },
   { href: "/applications", label: "My Applications" },
   { href: "/portfolio", label: "Portfolio" },
 ];

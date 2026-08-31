@@ -7,7 +7,6 @@ import { formatPhoneNumber } from "@/lib/phoneUtils";
 import { INSTITUTIONS, CITIES, PAKISTAN_PROVINCES, COUNTRIES } from "@/lib/formDatasets";
 import { GuardianConsentFields, type GuardianConsentValue } from "./GuardianConsentFields";
 import { DateOfBirthInput } from "./DateOfBirthInput";
-import { GenderCards } from "./GenderCards";
 import { AutocompleteInput } from "./AutocompleteInput";
 
 type InitialFormKeys = "fullName" | "email" | "phone" | "dob" | "gender" | "city" | "province" | "country" | "institution" | "degreeProgram";
@@ -181,12 +180,19 @@ export function RegisterForm({
         </div>
         <div className="field">
           <label htmlFor="gender">Gender</label>
-          <GenderCards
+          <select
             id="gender"
+            name="gender"
             required
             value={form.gender}
-            onChange={(val) => updateField("gender", val)}
-          />
+            onChange={(e) => updateField("gender", e.target.value)}
+          >
+            <option value="">Select gender</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+            <option value="other">Other</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
+          </select>
         </div>
         <div className="field">
           <label htmlFor="institution">Institution</label>

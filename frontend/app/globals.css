@@ -579,7 +579,6 @@ input[type="password"].dots-placeholder::placeholder,
   display: flex;
   align-items: center;
   gap: 1rem;
-  flex-wrap: wrap;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--line);
   margin-bottom: 1.75rem;
@@ -615,7 +614,35 @@ input[type="password"].dots-placeholder::placeholder,
 .pf-id .sub { color: var(--ink-2); font-size: .88rem; margin-top: .15rem; }
 .pf-actions { margin-left: auto; display: flex; gap: .6rem; flex-wrap: wrap; }
 @media (max-width: 620px) {
-  .pf-actions { margin-left: 0; width: 100%; }
+  .pf-id {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+  }
+  .pf-id .avatar {
+    width: 60px;
+    height: 60px;
+    font-size: 1.4rem;
+    margin: 0 auto;
+  }
+  .pf-id__who {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .pf-id h1 {
+    justify-content: center;
+    text-align: center;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .pf-id .sub {
+    text-align: center;
+  }
+  .pf-actions { margin-left: 0; width: 100%; justify-content: center; }
   .pf-actions .btn { flex: 1; }
 }
 

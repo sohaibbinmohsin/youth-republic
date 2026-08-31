@@ -343,7 +343,7 @@ export default function PortfolioPage() {
   }
 
   return (
-    <div className="wrap space-y-6 font-['Jost']">
+    <div className="w-full space-y-6 font-['Jost']">
       {/* Header Profile Identity */}
       <div className="pf-id">
         <div className="avatar">{avatarInitials}</div>
