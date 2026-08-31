@@ -387,8 +387,20 @@ select {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   width: 100%;
   padding: 1.5rem 0 2.5rem;
+}
+.route-centered .pane {
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+@media (min-width: 880px) {
+  .route-centered .pane {
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 2rem 2.5rem;
+  }
 }
 
 .auth-head h1 { font-size: 2.2rem; margin-bottom: .35rem; }

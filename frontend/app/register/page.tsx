@@ -305,48 +305,53 @@ function RegisterContent() {
         <aside className="pane__aside">
           {!accessToken ? (
             <>
-              <h3>What's next</h3>
+              <h3>What happens next</h3>
               <ol>
                 <li>
-                  <strong>Create Account</strong>: Enter your name, email & password.
+                  <strong>Portfolio Details</strong>: Next, you’ll add your education, location, and CNIC / B-Form. You can also skip this and complete it later.
                 </li>
                 <li>
-                  <strong>Profile Details</strong>: Add education & CNIC / B-Form.
+                  <strong>Volunteer ID</strong>: You’ll receive your unique ID immediately after saving your details.
                 </li>
                 <li>
-                  <strong>Volunteer ID</strong>: Issued instantly upon saving.
+                  <strong>Start Applying</strong>: Explore drives across Pakistan and apply directly from your profile.
                 </li>
               </ol>
 
+              <h3>Why join Youth Republic?</h3>
+              <p>
+                Build one verified volunteer record across partner organizations. Earn certified hours recognized by universities and employers.
+              </p>
+
               <h3>Need help?</h3>
               <p>
-                Have questions? Email{" "}
+                Have questions about signing up? Email{" "}
                 <a href="mailto:support@themohsinproject.org">support@themohsinproject.org</a>.
               </p>
             </>
           ) : (
             <>
-              <h3>Verification</h3>
+              <h3>Verification process</h3>
               <ol>
                 <li>
-                  <strong>Volunteer ID</strong> is issued immediately upon saving.
+                  <strong>Volunteer ID Issued</strong>: Your unique ID is generated immediately once you submit your details.
                 </li>
                 <li>
-                  <strong>Verification</strong> checks your CNIC / B-Form against your details.
+                  <strong>Document Review</strong>: Administrators check your CNIC / B-Form against your profile information.
                 </li>
                 <li>
-                  <strong>Verified Hours</strong> carry official accreditation across drives.
+                  <strong>Certified Portfolio</strong>: Once verified, all volunteer hours and achievements become officially authenticated.
                 </li>
               </ol>
 
-              <h3>Why CNIC / B-Form?</h3>
+              <h3>Why we ask for CNIC / B-Form</h3>
               <p>
-                Authenticates your identity so your volunteer record carries official weight. Minors provide a <strong>B-Form</strong>.
+                Confirming your identity ensures your verified volunteer hours mean something to universities and employers. Volunteers under 18 provide a <strong>B-Form</strong>.
               </p>
 
               <h3>Need help?</h3>
               <p>
-                Questions or issues? Email{" "}
+                If your details don’t match or you need assistance, email{" "}
                 <a href="mailto:support@themohsinproject.org">support@themohsinproject.org</a>.
               </p>
             </>
