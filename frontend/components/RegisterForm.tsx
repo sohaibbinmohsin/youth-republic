@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { registerVolunteer, ValidationError, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
 import { isMinor } from "@/lib/ageUtils";
 import { formatPhoneNumber } from "@/lib/phoneUtils";
@@ -164,6 +164,61 @@ export function RegisterForm({
     };
   }
 
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function scrollToFirstError(errorsMap?: Record<string, string>) {
+    if (typeof window === "undefined") return;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      // 1. Look for the top-most error field/element in the DOM
+      const errorEl = document.querySelector(".field.has-error, .input-error, .field__error, [role='alert']");
+      if (errorEl) {
+        if (typeof errorEl.scrollIntoView === "function") {
+          try {
+            errorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+          } catch {
+            // Ignore scroll errors
+          }
+        }
+        return;
+      }
+
+      // 2. Fallback: check elements by ID in logical form order
+      if (errorsMap) {
+        const order = [
+          "fullName", "phone", "email", "dob", "gender", "institution",
+          "city", "province", "country", "degreeProgram", "guardianName",
+          "guardianContact", "guardianConsent", "idDocNumber", "idDocType", "idDocAttachmentId"
+        ];
+        for (const key of order) {
+          if (errorsMap[key]) {
+            const el = document.getElementById(key) || document.querySelector(`[name="${key}"]`);
+            if (el) {
+              if (typeof el.scrollIntoView === "function") {
+                try {
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                } catch {
+                  // Ignore scroll errors
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+    }, 0);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -173,6 +228,7 @@ export function RegisterForm({
     if (!isValid) {
       setFieldErrors(errors);
       setValidationError(`Please fill in: ${missingLabels.join(", ")}`);
+      scrollToFirstError(errors);
       return;
     }
 
@@ -201,25 +257,31 @@ export function RegisterForm({
       if (err instanceof ValidationError) {
         setFieldErrors(err.fieldErrors || {});
         setError(err.message || "Please correct the highlighted fields");
+        scrollToFirstError(err.fieldErrors);
       } else {
         const message = err instanceof Error ? err.message : "unknown_error";
+        const errMap: Record<string, string> = {};
         if (message === "id_doc_attachment_required") {
+          errMap.idDocAttachmentId = "Please upload your CNIC / B-Form document scan";
           setFieldErrors((prev) => ({
             ...prev,
-            idDocAttachmentId: "Please upload your CNIC / B-Form document scan",
+            ...errMap,
           }));
         } else if (message === "b_form_required_for_minor") {
+          errMap.idDocType = "Minors under 18 must select B-Form document type";
           setFieldErrors((prev) => ({
             ...prev,
-            idDocType: "Minors under 18 must select B-Form document type",
+            ...errMap,
           }));
         } else if (message === "minor_consent_required") {
+          errMap.guardianConsent = "Guardian consent is mandatory for minors under 18";
           setFieldErrors((prev) => ({
             ...prev,
-            guardianConsent: "Guardian consent is mandatory for minors under 18",
+            ...errMap,
           }));
         }
         setError(message);
+        scrollToFirstError(errMap);
       }
     } finally {
       setSubmitting(false);

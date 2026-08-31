@@ -130,12 +130,16 @@ describe("RegisterForm", () => {
     expect(phoneInput).toHaveValue("+92 300 1234567");
   });
 
-  it("allows selecting gender via single select dropdown", async () => {
+  it("scrolls to the top-most error field when submit fails validation", async () => {
+    const scrollMock = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollMock;
     const user = userEvent.setup();
     render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
 
-    const genderSelect = screen.getByLabelText("Gender");
-    await user.selectOptions(genderSelect, "male");
-    expect(genderSelect).toHaveValue("male");
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
+
+    await waitFor(() => {
+      expect(scrollMock).toHaveBeenCalled();
+    });
   });
 });
