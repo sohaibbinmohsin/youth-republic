@@ -18,5 +18,6 @@ out/
 **/supabase/.temp/
 **/supabase/.branches/
 
-# OS
+# OS & Tooling
 .DS_Store
+.claude/

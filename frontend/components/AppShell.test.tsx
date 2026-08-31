@@ -41,4 +41,14 @@ describe("AppShell", () => {
     const supportLink = screen.getByRole("link", { name: "Support" });
     expect(supportLink).toHaveAttribute("href", "mailto:support@themohsinproject.org");
   });
+
+  it("renders a 'Sign in' button by default for unauthenticated visitors", () => {
+    render(
+      <AppShell>
+        <p>page content</p>
+      </AppShell>,
+    );
+    const authBtn = screen.getByRole("link", { name: "Sign in" });
+    expect(authBtn).toHaveAttribute("href", "/login");
+  });
 });

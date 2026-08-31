@@ -105,4 +105,26 @@ describe("RegisterForm", () => {
     expect(edgeFunctions.registerVolunteer).not.toHaveBeenCalled();
     expect(screen.getByText(/please fill in.*full name/i)).toBeInTheDocument();
   });
+
+  it("formats 0-prefixed and +-prefixed phone numbers automatically as the user types", async () => {
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
+
+    const phoneInput = screen.getByLabelText("Phone");
+    await user.type(phoneInput, "03001234567");
+    expect(phoneInput).toHaveValue("0300 1234567");
+
+    await user.clear(phoneInput);
+    await user.type(phoneInput, "+923001234567");
+    expect(phoneInput).toHaveValue("+92 300 1234567");
+  });
+
+  it("allows selecting gender via custom interactive option cards", async () => {
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
+
+    const maleCard = screen.getByRole("radio", { name: "Male" });
+    await user.click(maleCard);
+    expect(maleCard).toHaveAttribute("aria-checked", "true");
+  });
 });

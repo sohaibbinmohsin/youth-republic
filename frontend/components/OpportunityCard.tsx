@@ -31,13 +31,19 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
   const isProg = status === "in_progress";
   const isPend = status === "coming_soon";
   const pillClass = isPos ? "pill--pos" : isProg ? "pill--prog" : isPend ? "pill--pend" : "pill--neu";
-  const statusLabel = isPos
-    ? "Open"
-    : isPend
-    ? "Coming soon"
-    : isProg
-    ? "In progress"
-    : status;
+  const statusLabels: Record<string, string> = {
+    open: "Open",
+    coming_soon: "Coming soon",
+    in_progress: "In progress",
+    completed: "Completed",
+    closed: "Closed",
+  };
+  const statusLabel = statusLabels[status] ?? (status ? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ") : "Open");
+
+  const locationDisplay = opportunity.isOnline
+    ? (!opportunity.location || opportunity.location.toLowerCase() === "online" ? "Online" : `${opportunity.location} · Online`)
+    : `${opportunity.location ?? "Lahore"} · In person`;
+  const typeLabel = opportunity.type ? opportunity.type.charAt(0).toUpperCase() + opportunity.type.slice(1) : "";
 
   return (
     <Link href={`/opportunities/${opportunity.id}`} className="oc">
@@ -49,13 +55,13 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
       </div>
       <h3>{opportunity.name}</h3>
       <div className="loc">
-        {opportunity.location ?? "Lahore"} · {opportunity.isOnline ? "online" : "in person"}
+        {locationDisplay}
       </div>
       <p className="meta">
         {opportunity.description ?? "Pack and distribute ration hampers to families across Lahore through the month."}
       </p>
       <div className="foot">
-        <span className={`ttag ${typeClass}`}>{opportunity.type}</span>
+        <span className={`ttag ${typeClass}`}>{typeLabel}</span>
         <span className={`pill ${pillClass}`}>{statusLabel}</span>
       </div>
     </Link>
