@@ -308,13 +308,10 @@ function RegisterContent() {
               <h3>What happens next</h3>
               <ol>
                 <li>
-                  <strong>Portfolio Details</strong>: Next, you’ll add your education, location, and CNIC / B-Form. You can also skip this and complete it later.
+                  <strong>Step 2: Portfolio Details & ID</strong>: Add your basic info (education, location & CNIC / B-Form) to get your Volunteer ID issued immediately.
                 </li>
                 <li>
-                  <strong>Volunteer ID</strong>: You’ll receive your unique ID immediately after saving your details.
-                </li>
-                <li>
-                  <strong>Start Applying</strong>: Explore drives across Pakistan and apply directly from your profile.
+                  <strong>Browse & Apply</strong>: Explore verified volunteer drives across Pakistan and apply directly from your profile.
                 </li>
               </ol>
 
@@ -334,7 +331,7 @@ function RegisterContent() {
               <h3>Verification process</h3>
               <ol>
                 <li>
-                  <strong>Volunteer ID Issued</strong>: Your unique ID is generated immediately once you submit your details.
+                  <strong>Instant Volunteer ID</strong>: Your official ID is generated immediately once you save your details.
                 </li>
                 <li>
                   <strong>Document Review</strong>: Administrators check your CNIC / B-Form against your profile information.
