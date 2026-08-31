@@ -45,7 +45,7 @@ describe("RegisterForm", () => {
 
     await fillBaseFields(user);
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     await waitFor(() => {
       expect(edgeFunctions.registerVolunteer).toHaveBeenCalledWith(
@@ -53,6 +53,17 @@ describe("RegisterForm", () => {
         accessToken,
       );
     });
+  });
+
+  it("calls onSkip callback when Skip for now button is clicked", async () => {
+    const onSkip = vi.fn();
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" onSkip={onSkip} />);
+
+    const skipBtn = screen.getByRole("button", { name: /skip for now/i });
+    expect(skipBtn).toBeInTheDocument();
+    await user.click(skipBtn);
+    expect(onSkip).toHaveBeenCalledTimes(1);
   });
 
   it("pre-fills Email from the authenticated account and does not let it be edited", async () => {
@@ -74,7 +85,7 @@ describe("RegisterForm", () => {
 
     await fillBaseFields(user);
     await user.type(screen.getByLabelText("Date of birth"), "2015-01-01");
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     expect(await screen.findByText("minor_consent_required")).toBeInTheDocument();
   });
@@ -87,7 +98,7 @@ describe("RegisterForm", () => {
 
     await fillBaseFields(user);
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     expect(await screen.findByText("VOL-2026-000001")).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
@@ -100,7 +111,7 @@ describe("RegisterForm", () => {
     const user = userEvent.setup();
     render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
 
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     expect(edgeFunctions.registerVolunteer).not.toHaveBeenCalled();
     expect(screen.getByText(/please fill in.*full name/i)).toBeInTheDocument();
@@ -119,12 +130,12 @@ describe("RegisterForm", () => {
     expect(phoneInput).toHaveValue("+92 300 1234567");
   });
 
-  it("allows selecting gender via custom interactive option cards", async () => {
+  it("allows selecting gender via single select dropdown", async () => {
     const user = userEvent.setup();
     render(<RegisterForm accessToken={accessToken} email="test@example.com" />);
 
-    const maleCard = screen.getByRole("radio", { name: "Male" });
-    await user.click(maleCard);
-    expect(maleCard).toHaveAttribute("aria-checked", "true");
+    const genderSelect = screen.getByLabelText("Gender");
+    await user.selectOptions(genderSelect, "male");
+    expect(genderSelect).toHaveValue("male");
   });
 });

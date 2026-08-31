@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { registerVolunteer, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
 import { isMinor } from "@/lib/ageUtils";
 import { formatPhoneNumber } from "@/lib/phoneUtils";
 import { INSTITUTIONS, CITIES, PAKISTAN_PROVINCES, COUNTRIES } from "@/lib/formDatasets";
 import { GuardianConsentFields, type GuardianConsentValue } from "./GuardianConsentFields";
 import { DateOfBirthInput } from "./DateOfBirthInput";
-import { GenderCards } from "./GenderCards";
 import { AutocompleteInput } from "./AutocompleteInput";
+import { CnicUploadField } from "./CnicUploadField";
 
 type InitialFormKeys = "fullName" | "email" | "phone" | "dob" | "gender" | "city" | "province" | "country" | "institution" | "degreeProgram";
 
@@ -38,8 +38,50 @@ const MANDATORY_FIELD_LABELS: Record<InitialFormKeys, string> = {
   degreeProgram: "Degree program",
 };
 
-export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: string; email: string; onSuccess?: () => void }) {
-  const [form, setForm] = useState({ ...initialForm, email });
+export function RegisterForm({
+  accessToken,
+  email,
+  initialFullName = "",
+  initialPhone = "",
+  initialCity = "",
+  initialInstitution = "",
+  initialCountry = "",
+  showCnicUpload = false,
+  onSuccess,
+  onSkip,
+}: {
+  accessToken: string;
+  email: string;
+  initialFullName?: string;
+  initialPhone?: string;
+  initialCity?: string;
+  initialInstitution?: string;
+  initialCountry?: string;
+  showCnicUpload?: boolean;
+  onSuccess?: () => void;
+  onSkip?: () => void;
+}) {
+  const [form, setForm] = useState({
+    ...initialForm,
+    email: email || "",
+    fullName: initialFullName || "",
+    phone: initialPhone || "",
+    city: initialCity || "",
+    institution: initialInstitution || "",
+    country: initialCountry || "",
+  });
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      email: email || prev.email,
+      fullName: initialFullName || prev.fullName,
+      phone: initialPhone || prev.phone,
+      city: initialCity || prev.city,
+      institution: initialInstitution || prev.institution,
+      country: initialCountry || prev.country || "",
+    }));
+  }, [email, initialFullName, initialPhone, initialCity, initialInstitution, initialCountry]);
   const [guardian, setGuardian] = useState<GuardianConsentValue>({
     guardianName: "",
     guardianContact: "",
@@ -169,12 +211,24 @@ export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: s
         </div>
         <div className="field">
           <label htmlFor="gender">Gender</label>
-          <GenderCards
+          <select
             id="gender"
+            name="gender"
             required
             value={form.gender}
-            onChange={(val) => updateField("gender", val)}
-          />
+            onChange={(e) => updateField("gender", e.target.value)}
+            style={{
+              color: form.gender === "" ? "var(--ink-2)" : "var(--ink)",
+            }}
+          >
+            <option value="" style={{ color: "var(--ink-2)" }}>
+              Select gender
+            </option>
+            <option value="female" style={{ color: "var(--ink)" }}>Female</option>
+            <option value="male" style={{ color: "var(--ink)" }}>Male</option>
+            <option value="other" style={{ color: "var(--ink)" }}>Other</option>
+            <option value="prefer_not_to_say" style={{ color: "var(--ink)" }}>Prefer not to say</option>
+          </select>
         </div>
         <div className="field">
           <label htmlFor="institution">Institution</label>
@@ -247,15 +301,36 @@ export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: s
         </div>
       )}
 
-      <button
-        type="submit"
-        aria-label="Register"
-        disabled={submitting}
-        className="btn btn--primary btn--block"
-        style={{ marginTop: "1rem" }}
-      >
-        {submitting ? "Creating account..." : "Create account"}
-      </button>
+      {showCnicUpload && (
+        <div style={{ marginTop: "1.25rem" }}>
+          <CnicUploadField
+            accessToken={accessToken}
+            onUploaded={() => {}}
+          />
+        </div>
+      )}
+
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 w-full" style={{ marginTop: "1.25rem" }}>
+        {onSkip && (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="btn btn--ghost w-full sm:w-auto"
+            aria-label="Skip for now"
+          >
+            Skip for now
+          </button>
+        )}
+
+        <button
+          type="submit"
+          aria-label="Save details"
+          disabled={submitting}
+          className="btn btn--primary w-full sm:w-auto"
+        >
+          {submitting ? "Saving details..." : "Save & build portfolio"}
+        </button>
+      </div>
     </form>
   );
 }

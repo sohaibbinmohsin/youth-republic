@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { ApplyForm } from "@/components/ApplyForm";
+import ApplyLoading from "./loading";
 
 export default function ApplyPage({ params }: { params: Promise<{ opportunityId: string }> }) {
   const { opportunityId } = use(params);
@@ -28,7 +29,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
   }, [opportunityId]);
 
   if (!accessToken || !organizationId) {
-    return <p>Loading…</p>;
+    return <ApplyLoading />;
   }
 
   return (

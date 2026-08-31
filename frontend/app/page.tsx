@@ -1,23 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
-import { PortfolioSummary } from "@/components/PortfolioSummary";
-import { ApplicationStatusBadge, type ApplicationStatus } from "@/components/ApplicationStatusBadge";
 import { NoticeboardHub, type OpportunityItem } from "@/components/NoticeboardHub";
 import { computeOpportunityStatus } from "@/lib/opportunityStatus";
 
-interface ApplicationRow {
-  id: string;
-  status: ApplicationStatus;
-  opportunities: { name: string } | null;
-}
-
 export default function Home() {
-  const [totalVerifiedHours, setTotalVerifiedHours] = useState<number | null>(null);
-  const [memberSince, setMemberSince] = useState<string | null>(null);
-  const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [opportunities, setOpportunities] = useState<OpportunityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -25,36 +13,6 @@ export default function Home() {
     async function load() {
       const supabase = getBrowserSupabaseClient();
 
-      // Check session
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session) {
-          const { data: volunteer } = await supabase
-            .from("volunteers")
-            .select("id, created_at")
-            .eq("auth_user_id", sessionData.session.user.id)
-            .single();
-
-          if (volunteer) {
-            setMemberSince(volunteer.created_at);
-
-            const { data: totalHours } = await supabase.rpc("volunteer_total_verified_hours", {
-              p_volunteer_id: volunteer.id,
-            });
-            setTotalVerifiedHours(totalHours ?? 0);
-
-            const { data: applicationRows } = await supabase
-              .from("applications")
-              .select("id, status, opportunities(name)")
-              .order("applied_at", { ascending: false });
-            setApplications((applicationRows as unknown as ApplicationRow[]) ?? []);
-          }
-        }
-      } catch {
-        // Continue if session fails
-      }
-
-      // Load opportunities for noticeboard
       try {
         const { data: opps } = await supabase
           .from("opportunities")
@@ -89,7 +47,7 @@ export default function Home() {
           setOpportunities(items);
         }
       } catch {
-        // If mock does not have opportunities table, ignore
+        // If query fails, proceed with empty list
       } finally {
         setIsLoading(false);
       }
@@ -97,59 +55,6 @@ export default function Home() {
     load();
   }, []);
 
-  const isLoggedInVolunteer = memberSince !== null && totalVerifiedHours !== null;
-
-  if (isLoggedInVolunteer) {
-    return (
-      <div className="space-y-8 font-['Jost']">
-        <div className="rounded-xl border border-[#E7E4DC] bg-white p-6 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-[#E7E4DC]">
-            <div>
-              <h2 className="font-['Oswald'] text-2xl font-bold uppercase tracking-wider text-[#24262D]">
-                Welcome Back
-              </h2>
-              <p className="text-xs text-[#6B6B66] mt-0.5">
-                Your national volunteer impact snapshot
-              </p>
-            </div>
-            <Link
-              href="/portfolio"
-              className="px-4 py-2 text-xs font-semibold uppercase tracking-wider font-['Oswald'] rounded-lg bg-[#941A80] text-white hover:bg-[#7C1568] transition"
-            >
-              Full Portfolio &amp; Certificates →
-            </Link>
-          </div>
-
-          <PortfolioSummary totalVerifiedHours={totalVerifiedHours} memberSince={memberSince} />
-
-          <div>
-            <h2 className="font-['Oswald'] text-sm font-bold uppercase tracking-wider text-[#24262D] mb-3">
-              Current Applications
-            </h2>
-            {applications.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[#E7E4DC] p-4 text-center text-xs text-[#6B6B66]">
-                No applications submitted yet. Browse opportunities below to apply.
-              </div>
-            ) : (
-              <ul className="space-y-2.5">
-                {applications.map((application) => (
-                  <li
-                    key={application.id}
-                    className="flex items-center justify-between rounded-lg border border-[#E7E4DC] p-3 text-sm"
-                  >
-                    <span className="font-medium text-[#24262D]">{application.opportunities?.name}</span>
-                    <ApplicationStatusBadge status={application.status} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Anonymous visitor: Noticeboard Hub
   return (
     <NoticeboardHub
       initialOpportunities={opportunities}

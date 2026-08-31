@@ -102,7 +102,7 @@ describe("§4 Navigation — the volunteer must be able to find the front door",
     render(<AppShell><p>content</p></AppShell>);
     expect(screen.getByRole("link", { name: "Opportunities" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Portfolio" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
   });
 
   // REGRESSION GUARD (was TESTING-STRATEGY.md §8 #1 — the "no register option"
@@ -111,7 +111,10 @@ describe("§4 Navigation — the volunteer must be able to find the front door",
   // Home / Dashboard todo in 5B-portfolio-dashboard.test.tsx).
   it("[4/§3] the shell exposes a Log in and a Register entry point", () => {
     render(<AppShell><p>content</p></AppShell>);
-    expect(screen.getByRole("link", { name: /log ?in|sign ?in/i })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: /log ?in|sign ?in/i })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/\/login/),
+    );
     expect(screen.getByRole("link", { name: /register|create account|sign ?up/i })).toHaveAttribute(
       "href",
       "/register",

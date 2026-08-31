@@ -2,7 +2,8 @@ import Link from "next/link";
 
 export const metadata = {
   title: "Privacy Policy | Youth Republic",
-  description: "How Youth Republic collects, protects, and handles volunteer information and identity documents.",
+  description:
+    "How Youth Republic and The Mohsin Project Global handle volunteer information with a strict zero-retention immediate document purge policy.",
 };
 
 export default function PrivacyPage() {
@@ -16,17 +17,23 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="mt-2 text-sm text-[#6B6B66]">
-          Last updated: February 2026. How we protect your data, documents, and verified credentials across Youth Republic.
+          Last updated: August 31, 2026. The Mohsin Project Global (SMC) Pvt. Ltd (Corporate UID: 0352616).
         </p>
       </div>
 
       <div className="space-y-8 text-sm leading-relaxed text-[#4A4B46]">
         <section>
           <h2 className="font-['Oswald'] text-lg font-bold uppercase tracking-wider text-[#24262D] mb-2">
-            1. Overview
+            1. Overview &amp; Zero-Retention Commitment
           </h2>
           <p>
-            Youth Republic, powered by The Mohsin Project, is Pakistan’s unified volunteer network. We connect volunteers with accredited non-profit organisations, track service hours, and issue verified digital credentials. This policy explains what personal data we collect, how it is secured, and your rights over your data.
+            Youth Republic, powered by <strong>The Mohsin Project Global (SMC) Pvt. Ltd</strong> (Corporate Unique Identification No. 0352616),
+            is Pakistan&rsquo;s unified volunteer network and credentialing platform. We connect volunteers with accredited non-profit organisations,
+            verify national volunteer identities, track community service hours, and issue tamper-evident credentials.
+          </p>
+          <p className="mt-2">
+            To eliminate data leakage risks and provide uncompromising privacy defense, Youth Republic enforces an immediate document purge architecture
+            for all sensitive government identification documents.
           </p>
         </section>
 
@@ -36,29 +43,39 @@ export default function PrivacyPage() {
           </h2>
           <ul className="list-disc pl-5 space-y-1.5 mt-2">
             <li>
-              <strong>Account and Profile Data:</strong> Full name, email address, phone number, date of birth, gender, educational institution, degree program, city, province, and country.
+              <strong>Account &amp; Demographics:</strong> Full legal name, email address, mobile number, date of birth, gender, city, province,
+              and country.
             </li>
             <li>
-              <strong>Identity Verification Documents:</strong> CNIC (for adults) or B-Form document (for minors under 18) uploaded solely for administrative verification.
+              <strong>Academic &amp; Profile Details:</strong> Educational institution, degree program, graduation year, skills, interest areas,
+              and bio.
             </li>
             <li>
-              <strong>Safeguarding &amp; Guardian Consent:</strong> For volunteers under 18, guardian full name, contact information, and explicit opt-in consent.
+              <strong>Transient Identity Verification Documents (Immediately Purged):</strong> CNIC/NICOP (for adults aged 18+) or B-Form document (for minors aged 13–17),
+              uploaded solely for active verification and deleted permanently immediately thereafter.
             </li>
             <li>
-              <strong>Volunteering Activity:</strong> Applied opportunities, attendance logs, verified volunteer hours, supervisor sign-offs, and skills logged.
+              <strong>Guardian Consent &amp; Safeguarding:</strong> For volunteers under 18, guardian full name, relationship, contact
+              information, and explicit digital consent records.
+            </li>
+            <li>
+              <strong>Volunteering Activity:</strong> Applied opportunities, shift attendance records, verified service hours, supervisor sign-offs,
+              and awarded digital credentials.
             </li>
           </ul>
         </section>
 
         <section className="rounded-xl border border-[#941A80]/20 bg-[#941A80]/5 p-5">
           <h2 className="font-['Oswald'] text-lg font-bold uppercase tracking-wider text-[#941A80] mb-2">
-            3. Identity Documents &amp; Partner Confidentiality
+            3. Zero Retention: Immediate Identity Document Purge
           </h2>
           <p className="text-[#24262D] font-medium mb-2">
-            Your document is used only to verify your identity and is stored securely.
+            Your government identity documents are permanently deleted the moment verification is complete.
           </p>
           <p>
-            Identity documents (CNIC / B-Form) are never shared with partner organisations or third parties. Partner organisations only ever see your verified badge and basic profile details (such as your name, institution, and approved hours), not the raw identity document itself.
+            To prevent any data leakage incident, raw CNIC, NICOP, and B-Form files are <strong>permanently wiped and deleted</strong> from our servers
+            immediately after an authorized officer validates your identity. We do not store document copies long-term. Only an immutable cryptographic
+            verification badge remains on your profile. Identity files are never shared with partner organisations, recruiters, or third parties.
           </p>
         </section>
 
@@ -66,38 +83,52 @@ export default function PrivacyPage() {
           <h2 className="font-['Oswald'] text-lg font-bold uppercase tracking-wider text-[#24262D] mb-2">
             4. How We Use Your Information
           </h2>
-          <p>We use your information strictly to:</p>
+          <p>We process your personal information strictly to:</p>
           <ul className="list-disc pl-5 space-y-1.5 mt-2">
             <li>Issue and maintain your unique, lifelong Volunteer ID.</li>
-            <li>Enable seamless applications to volunteer opportunities across partner organisations.</li>
-            <li>Verify your identity and maintain platform trust for participating non-profits.</li>
-            <li>Accredit and generate tamper-evident records of your community service hours.</li>
+            <li>Facilitate direct applications to accredited volunteer opportunities across partner organisations.</li>
+            <li>Verify authentic legal identity and ensure compliance with child safeguarding standards for minors.</li>
+            <li>Accredit and generate tamper-evident records of your community service hours and digital certificates.</li>
           </ul>
         </section>
 
         <section>
           <h2 className="font-['Oswald'] text-lg font-bold uppercase tracking-wider text-[#24262D] mb-2">
-            5. Data Retention &amp; Deletion Rights
+            5. Data Retention &amp; User Rights
           </h2>
           <p>
-            You retain ownership of your personal data. You can request the deletion of your account, profile, and stored identity documents at any time once you leave the platform by emailing{" "}
-            <a href="mailto:support@themohsinproject.org" className="text-[#941A80] font-medium underline">
-              support@themohsinproject.org
-            </a>
-            . Verified institutional hours records may be retained in anonymised form for compliance and certificate validation.
+            You retain ownership of your personal data. You can request the review or deletion of your profile data at any time by contacting our
+            Data Protection Officer. Verified institutional service records are retained in tamper-evident form to preserve the lifelong validity of
+            your accredited certificates.
           </p>
         </section>
 
         <section>
           <h2 className="font-['Oswald'] text-lg font-bold uppercase tracking-wider text-[#24262D] mb-2">
-            6. Contact &amp; Questions
+            6. Governing Law &amp; Jurisdiction
           </h2>
           <p>
-            If you have questions regarding this Privacy Policy or wish to review the information stored against your profile, contact our support team at{" "}
+            This Privacy Policy shall be governed by the laws of the Islamic Republic of Pakistan. Any legal dispute or claim regarding data
+            protection shall be subject to the exclusive jurisdiction of the competent courts in <strong>Karachi, Pakistan</strong>.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-['Oswald'] text-lg font-bold uppercase tracking-wider text-[#24262D] mb-2">
+            7. Contact &amp; Data Protection Officer
+          </h2>
+          <p>
+            For privacy inquiries, data access requests, or guardian consent verification, contact:
+          </p>
+          <p className="mt-2">
+            <strong>Data Protection Officer (DPO)</strong>
+            <br />
+            The Mohsin Project Global (SMC) Pvt. Ltd (Corporate UID: 0352616)
+            <br />
+            Email:{" "}
             <a href="mailto:support@themohsinproject.org" className="text-[#941A80] font-medium underline">
               support@themohsinproject.org
             </a>
-            .
           </p>
         </section>
       </div>

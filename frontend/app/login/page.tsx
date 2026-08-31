@@ -1,9 +1,43 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
+
+function getEffectiveReturnUrl(searchParamRedirect?: string | null): string {
+  if (
+    searchParamRedirect &&
+    searchParamRedirect.startsWith("/") &&
+    !searchParamRedirect.startsWith("/login") &&
+    !searchParamRedirect.startsWith("/register") &&
+    !searchParamRedirect.startsWith("/logout")
+  ) {
+    return searchParamRedirect;
+  }
+  if (typeof window !== "undefined") {
+    try {
+      if (document.referrer) {
+        const refUrl = new URL(document.referrer);
+        if (refUrl.origin === window.location.origin) {
+          const path = refUrl.pathname + refUrl.search;
+          if (
+            path &&
+            path !== "/login" &&
+            !path.startsWith("/login") &&
+            !path.startsWith("/register") &&
+            !path.startsWith("/logout")
+          ) {
+            return path;
+          }
+        }
+      }
+    } catch {
+      // Ignore URL parse errors
+    }
+  }
+  return "/portfolio";
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -13,6 +47,8 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const redirectToParam = searchParams.get("redirectTo");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +62,8 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      router.push(searchParams.get("redirectTo") ?? "/portfolio");
+      const dest = getEffectiveReturnUrl(redirectToParam);
+      router.push(dest);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication error");
@@ -34,12 +71,14 @@ function LoginForm() {
     }
   }
 
+  const registerHref = redirectToParam ? `/register?redirectTo=${encodeURIComponent(redirectToParam)}` : "/register";
+
   return (
     <section className="route-centered">
       <div className="pane">
         <div className="auth-head">
           <h1 className="display">Sign in</h1>
-          <p>One profile across every organisation on Youth Republic.</p>
+          <p>One volunteer record across every organisation on Youth Republic.</p>
 
           {error && (
             <div className="notice" style={{ background: "var(--st-neg-bg)", color: "var(--st-neg-fg)" }} role="alert">
@@ -86,12 +125,31 @@ function LoginForm() {
               </div>
             </div>
 
+            <div className="field-checkbox" style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginTop: "0.75rem", marginBottom: "0.75rem" }}>
+              <input
+                id="s-terms"
+                type="checkbox"
+                defaultChecked
+                style={{ marginTop: "0.2rem", cursor: "pointer" }}
+              />
+              <label htmlFor="s-terms" style={{ fontSize: "0.8125rem", color: "var(--color-text-muted, #4A4B46)", cursor: "pointer", lineHeight: "1.4" }}>
+                I agree to the{" "}
+                <Link href="/terms" target="_blank" style={{ textDecoration: "underline", color: "inherit", fontWeight: 500 }}>
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" target="_blank" style={{ textDecoration: "underline", color: "inherit", fontWeight: 500 }}>
+                  Privacy Policy
+                </Link>
+              </label>
+            </div>
+
             <button type="submit" disabled={loading} className="btn btn--primary btn--block">
               {loading ? "Signing in..." : "Log in"}
             </button>
 
-            <p className="altline">
-              New here? <Link href="/register">Create an account</Link>
+            <p className="altline" style={{ marginTop: "1.25rem", textAlign: "center" }}>
+              New here? <Link href={registerHref}>Create an account</Link>
             </p>
           </form>
         </div>
@@ -102,7 +160,7 @@ function LoginForm() {
             <li>Apply to any opportunity in a couple of taps.</li>
             <li>Track every application’s status in one place.</li>
             <li>Build a verified record of your hours and programmes.</li>
-            <li>Carry the same profile across every organisation on Youth Republic.</li>
+            <li>Carry the same verified record across every organisation on Youth Republic.</li>
           </ul>
         </aside>
       </div>

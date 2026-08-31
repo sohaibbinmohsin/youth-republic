@@ -14,6 +14,7 @@ export function CnicUploadField({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -35,6 +36,7 @@ export function CnicUploadField({
       );
       await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
       await finalizeAttachment({ attachmentId }, accessToken);
+      setUploadedFileName(file.name);
       onUploaded(attachmentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "unknown_error");
@@ -44,10 +46,50 @@ export function CnicUploadField({
   }
 
   return (
-    <div>
-      <label htmlFor="cnicFile" className="block text-sm">CNIC / B-Form document</label>
-      <input id="cnicFile" type="file" accept="image/*,.pdf" onChange={handleFileChange} disabled={uploading} className="mt-1" />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+    <div
+      style={{
+        background: "var(--bg-2)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius-card)",
+        padding: "1.15rem 1.25rem",
+      }}
+      className="space-y-3"
+    >
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <label htmlFor="cnicFile" className="block text-sm font-semibold text-[var(--ink)] mb-0">
+            CNIC / B-Form document
+          </label>
+          {uploadedFileName ? (
+            <span className="pill pill--pos text-[0.7rem] py-0.5 px-2 flex-shrink-0">Uploaded</span>
+          ) : (
+            <span className="pill pill--pend text-[0.7rem] py-0.5 px-2 flex-shrink-0">Required for verification</span>
+          )}
+        </div>
+        <p className="text-xs text-[var(--ink-2)] leading-relaxed mb-0">
+          Upload your CNIC (or B-Form if under 18) document scan or photo to complete national verification.
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-0.5">
+        <input
+          id="cnicFile"
+          type="file"
+          accept="image/*,.pdf"
+          onChange={handleFileChange}
+          disabled={uploading}
+          className="block w-full text-sm text-[var(--ink-2)] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-[var(--line)] file:text-xs file:font-semibold file:bg-[var(--bg)] file:text-[var(--ink)] hover:file:bg-[var(--bg-2)] cursor-pointer"
+        />
+        {uploading && <span className="text-xs text-[var(--ink-2)] animate-pulse flex-shrink-0">Uploading…</span>}
+      </div>
+
+      {uploadedFileName && (
+        <p className="text-xs text-green-700 font-medium mb-0">
+          ✓ Document attached: {uploadedFileName}
+        </p>
+      )}
+
+      {error && <p className="text-sm text-red-600 font-medium mb-0">{error}</p>}
     </div>
   );
 }
