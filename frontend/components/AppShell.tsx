@@ -74,6 +74,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
               </div>
+            ) : pathname === "/login" ? (
+              <Link href="/register" className="btn btn--primary btn--sm">
+                Create an account
+              </Link>
             ) : (
               <Link href="/login" className="btn btn--primary btn--sm">
                 Sign in
