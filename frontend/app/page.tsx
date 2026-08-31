@@ -15,7 +15,6 @@ interface ApplicationRow {
 }
 
 export default function Home() {
-  const [checkedSession, setCheckedSession] = useState(false);
   const [totalVerifiedHours, setTotalVerifiedHours] = useState<number | null>(null);
   const [memberSince, setMemberSince] = useState<string | null>(null);
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
@@ -91,13 +90,11 @@ export default function Home() {
       } catch {
         // If mock does not have opportunities table, ignore
       }
-
-      setCheckedSession(true);
     }
     load();
   }, []);
 
-  const isLoggedInVolunteer = checkedSession && memberSince !== null && totalVerifiedHours !== null;
+  const isLoggedInVolunteer = memberSince !== null && totalVerifiedHours !== null;
 
   if (isLoggedInVolunteer) {
     return (
@@ -152,7 +149,7 @@ export default function Home() {
     );
   }
 
-  // Anonymous visitor
+  // Anonymous visitor: Noticeboard Hub
   return (
     <NoticeboardHub
       initialOpportunities={opportunities}
