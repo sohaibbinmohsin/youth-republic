@@ -303,29 +303,56 @@ function RegisterContent() {
 
         {/* Right Aside: Informational Card */}
         <aside className="pane__aside">
-          <h3>What happens after you register</h3>
-          <ol>
-            <li>
-              Your account is created straight away and your Volunteer ID is issued.
-            </li>
-            <li>
-              Status shows <strong>verification pending</strong> while an admin checks your CNIC / B-Form against your name and details.
-            </li>
-            <li>
-              Once verified, your portfolio is marked verified with no action needed from you.
-            </li>
-          </ol>
+          {!accessToken ? (
+            <>
+              <h3>Why create an account?</h3>
+              <ul>
+                <li>One volunteer record across every organisation on Youth Republic.</li>
+                <li>Apply to volunteer opportunities in seconds.</li>
+                <li>Track application statuses and verified hours in real time.</li>
+                <li>Build an authentic, verified portfolio for universities and employers.</li>
+              </ul>
 
-          <h3>Why we ask for CNIC / B-Form</h3>
-          <p>
-            It confirms you are who you say you are, so verified hours on your portfolio mean something to the organisations that read them. Applicants under 18 provide a <strong>B-Form</strong> instead of a CNIC.
-          </p>
+              <h3>What to expect next</h3>
+              <ol>
+                <li>Create your account credentials with your name and email.</li>
+                <li>Fill in your basic portfolio details to get your Volunteer ID.</li>
+                <li>Browse open drives and start applying right away.</li>
+              </ol>
 
-          <h3>Need help?</h3>
-          <p>
-            If your details don’t match, or verification is taking more than a few days, email{" "}
-            <a href="mailto:support@themohsinproject.org">support@themohsinproject.org</a> and someone will look into it.
-          </p>
+              <h3>Need help?</h3>
+              <p>
+                Have questions about getting started? Email{" "}
+                <a href="mailto:support@themohsinproject.org">support@themohsinproject.org</a> and our team will help.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3>What happens after you save</h3>
+              <ol>
+                <li>
+                  Your profile is saved and your official <strong>Volunteer ID</strong> is issued immediately.
+                </li>
+                <li>
+                  Status shows <strong>verification pending</strong> while an admin checks your CNIC / B-Form against your details.
+                </li>
+                <li>
+                  Once verified, all completed hours on your portfolio are marked verified.
+                </li>
+              </ol>
+
+              <h3>Why we ask for CNIC / B-Form</h3>
+              <p>
+                It confirms your identity so verified hours on your portfolio mean something to organisations and universities. Applicants under 18 provide a <strong>B-Form</strong> instead of a CNIC.
+              </p>
+
+              <h3>Need help?</h3>
+              <p>
+                If your details don’t match, or verification is taking more than a few days, email{" "}
+                <a href="mailto:support@themohsinproject.org">support@themohsinproject.org</a> and someone will look into it.
+              </p>
+            </>
+          )}
         </aside>
       </div>
     </section>
