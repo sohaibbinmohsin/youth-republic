@@ -149,18 +149,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="nav-actions" id="navActions">
             {userSession ? (
               <div className="usermenu" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="dots-menu-btn"
-                  aria-label="User menu"
-                  title={userSession.name}
-                >
-                  <span className="dot dot-1" aria-hidden="true" />
-                  <span className="dot dot-2" aria-hidden="true" />
-                  <span className="dot dot-3" aria-hidden="true" />
-                  <span className="sr-only">{userSession.initials}</span>
-                </button>
+                {pathname.startsWith("/portfolio") ? (
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className="dots-menu-btn"
+                    aria-label="User menu"
+                    title={userSession.name}
+                  >
+                    <span className="dot" aria-hidden="true" />
+                    <span className="dot" aria-hidden="true" />
+                    <span className="dot" aria-hidden="true" />
+                    <span className="sr-only">{userSession.initials}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className="avatar-btn"
+                    aria-label="User menu"
+                    title={userSession.name}
+                  >
+                    {userSession.initials}
+                  </button>
+                )}
                 {userDropdownOpen && (
                   <div className="usermenu__pop open">
                     <div style={{ padding: ".55rem .75rem", borderBottom: "1px solid #f0eee6" }}>
