@@ -9,6 +9,7 @@
   --ink: #24262D;
   --ink-2: #6B6B66;
   --ink-3: #9A9A93;
+  --placeholder: #9CA3AF;
   --line: #E7E4DC;
   --bg: #FFFFFF;
   --bg-2: #F7F5EF;
@@ -47,6 +48,18 @@ a:hover { text-decoration: underline; }
 h1, h2, h3, p { margin: 0; text-wrap: balance; }
 button { font-family: inherit; }
 :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+
+/* Global placeholder styling */
+::placeholder {
+  color: var(--placeholder) !important;
+  opacity: 1;
+}
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+  color: var(--placeholder) !important;
+  opacity: 1;
+}
 
 input[type="radio"] { accent-color: var(--blue); }
 input[type="checkbox"] {
@@ -349,12 +362,64 @@ select {
 }
 .field textarea { min-height: 96px; resize: vertical; }
 .field select { padding-right: 2.1rem; background-color: var(--bg); }
-.field select option[value=""] { color: var(--ink-2); }
+.field select option[value=""] { color: var(--placeholder); }
 .field select option:not([value=""]) { color: var(--ink); }
-.field input::placeholder, .field textarea::placeholder { color: var(--ink-2); }
+.field input::placeholder, .field textarea::placeholder { color: var(--placeholder); }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(148,26,128,.18); }
 .field input[readonly] { background: var(--bg-2); color: var(--ink-2); }
 .field .hint { font-size: .8rem; color: var(--ink-2); margin-top: .3rem; }
+
+/* Field Error & Validation States */
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea,
+.field.has-error .autocomplete-input,
+.field.has-error .dob-text-input,
+.field input.input-error,
+.field select.input-error,
+.field textarea.input-error,
+.autocomplete-input.input-error,
+.dob-text-input.input-error,
+input.input-error,
+select.input-error,
+textarea.input-error {
+  border-color: var(--st-neg-fg) !important;
+  background-color: #FFF8F8 !important;
+}
+
+.field.has-error input:focus,
+.field.has-error select:focus,
+.field.has-error textarea:focus,
+.field.has-error .autocomplete-input:focus,
+.field.has-error .dob-text-input:focus,
+.field input.input-error:focus,
+.field select.input-error:focus,
+.field textarea.input-error:focus,
+.autocomplete-input.input-error:focus,
+.dob-text-input.input-error:focus,
+input.input-error:focus,
+select.input-error:focus,
+textarea.input-error:focus {
+  outline: none !important;
+  border-color: var(--st-neg-fg) !important;
+  box-shadow: 0 0 0 3px rgba(163, 45, 45, 0.18) !important;
+}
+
+.field.has-error label,
+.field label.label-error {
+  color: var(--st-neg-fg);
+}
+
+.field__error {
+  color: var(--st-neg-fg);
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
 
 input[type="password"] {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
@@ -364,7 +429,7 @@ input[type="password"] {
 input[type="password"]::placeholder {
   font-family: var(--font-body, "Jost", sans-serif) !important;
   letter-spacing: normal !important;
-  color: var(--ink-2);
+  color: var(--placeholder) !important;
   font-size: .85rem;
 }
 
@@ -373,7 +438,7 @@ input[type="password"].dots-placeholder::placeholder,
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   letter-spacing: 0.18em !important;
   font-size: .85rem !important;
-  color: var(--ink-2) !important;
+  color: var(--placeholder) !important;
 }
 
 .pwd { position: relative; }

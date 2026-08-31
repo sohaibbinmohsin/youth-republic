@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { RegisterForm } from "@/components/RegisterForm";
+import { getEffectiveReturnUrl, clearReturnUrl } from "@/lib/returnUrl";
 
 function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +22,7 @@ function RegisterContent() {
   const [loading, setLoading] = useState(false);
 
   const redirectToParam = searchParams.get("redirectTo");
-  const targetDestination = redirectToParam && redirectToParam.startsWith("/") ? redirectToParam : "/portfolio";
+  const targetDestination = getEffectiveReturnUrl(redirectToParam);
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
@@ -36,17 +38,35 @@ function RegisterContent() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setSignupError(null);
+    const errors: Record<string, string> = {};
+    let firstError = "";
 
     if (!fullName.trim()) {
-      setSignupError("Please enter your full name");
-      return;
+      errors.fullName = "Full name is required";
+      if (!firstError) firstError = "Please enter your full name";
     }
-    if (password !== confirmPassword) {
-      setSignupError("Passwords do not match");
-      return;
+    if (!email.trim()) {
+      errors.email = "Email is required";
+      if (!firstError) firstError = "Please enter your email address";
     }
-    if (password.length < 8) {
-      setSignupError("Password must be at least 8 characters");
+    if (!password) {
+      errors.password = "Password is required";
+      if (!firstError) firstError = "Please enter a password";
+    } else if (password.length < 8) {
+      errors.password = "Must be at least 8 characters";
+      if (!firstError) firstError = "Password must be at least 8 characters";
+    }
+    if (!confirmPassword) {
+      errors.confirmPassword = "Confirm password is required";
+      if (!firstError) firstError = "Please confirm your password";
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = "Passwords do not match";
+      if (!firstError) firstError = "Passwords do not match";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setSignupError(firstError);
       return;
     }
 
@@ -54,7 +74,7 @@ function RegisterContent() {
     try {
       const supabase = getBrowserSupabaseClient();
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
           data: {
@@ -75,7 +95,9 @@ function RegisterContent() {
     }
   }
 
-  const loginHref = redirectToParam ? `/login?redirectTo=${encodeURIComponent(redirectToParam)}` : "/login";
+  const loginHref = targetDestination && targetDestination !== "/portfolio"
+    ? `/login?redirectTo=${encodeURIComponent(targetDestination)}`
+    : "/login";
 
   return (
     <section className="route-centered">
@@ -107,7 +129,7 @@ function RegisterContent() {
                 </div>
               )}
 
-              <div className="field">
+              <div className={`field ${fieldErrors.fullName ? "has-error" : ""}`}>
                 <label htmlFor="reg1-name">Full name</label>
                 <input
                   id="reg1-name"
@@ -116,11 +138,22 @@ function RegisterContent() {
                   autoComplete="name"
                   placeholder="e.g. Ayesha Khan"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (fieldErrors.fullName) {
+                      setFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.fullName;
+                        return n;
+                      });
+                    }
+                  }}
+                  className={fieldErrors.fullName ? "input-error" : ""}
                 />
+                {fieldErrors.fullName && <p className="field__error" role="alert">{fieldErrors.fullName}</p>}
               </div>
 
-              <div className="field">
+              <div className={`field ${fieldErrors.email ? "has-error" : ""}`}>
                 <label htmlFor="reg1-email">Email</label>
                 <input
                   id="reg1-email"
@@ -129,11 +162,22 @@ function RegisterContent() {
                   autoComplete="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldErrors.email) {
+                      setFieldErrors((prev) => {
+                        const n = { ...prev };
+                        delete n.email;
+                        return n;
+                      });
+                    }
+                  }}
+                  className={fieldErrors.email ? "input-error" : ""}
                 />
+                {fieldErrors.email && <p className="field__error" role="alert">{fieldErrors.email}</p>}
               </div>
 
-              <div className="field">
+              <div className={`field ${fieldErrors.password ? "has-error" : ""}`}>
                 <label htmlFor="reg1-pass">Password</label>
                 <div className="pwd">
                   <input
@@ -141,10 +185,19 @@ function RegisterContent() {
                     type={showPassword ? "text" : "password"}
                     required
                     autoComplete="new-password"
-                    className="dots-placeholder"
+                    className={`dots-placeholder ${fieldErrors.password ? "input-error" : ""}`}
                     placeholder="••••••••"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (fieldErrors.password) {
+                        setFieldErrors((prev) => {
+                          const n = { ...prev };
+                          delete n.password;
+                          return n;
+                        });
+                      }
+                    }}
                   />
                   <button
                     type="button"
@@ -156,10 +209,14 @@ function RegisterContent() {
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
-                <p className="hint">At least 8 characters.</p>
+                {fieldErrors.password ? (
+                  <p className="field__error" role="alert">{fieldErrors.password}</p>
+                ) : (
+                  <p className="hint">At least 8 characters.</p>
+                )}
               </div>
 
-              <div className="field">
+              <div className={`field ${fieldErrors.confirmPassword ? "has-error" : ""}`}>
                 <label htmlFor="reg1-pass2">Confirm password</label>
                 <div className="pwd">
                   <input
@@ -167,10 +224,19 @@ function RegisterContent() {
                     type={showConfirmPassword ? "text" : "password"}
                     required
                     autoComplete="new-password"
-                    className="dots-placeholder"
+                    className={`dots-placeholder ${fieldErrors.confirmPassword ? "input-error" : ""}`}
                     placeholder="••••••••"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (fieldErrors.confirmPassword) {
+                        setFieldErrors((prev) => {
+                          const n = { ...prev };
+                          delete n.confirmPassword;
+                          return n;
+                        });
+                      }
+                    }}
                   />
                   <button
                     type="button"
@@ -182,6 +248,9 @@ function RegisterContent() {
                     {showConfirmPassword ? "Hide" : "Show"}
                   </button>
                 </div>
+                {fieldErrors.confirmPassword && (
+                  <p className="field__error" role="alert">{fieldErrors.confirmPassword}</p>
+                )}
               </div>
 
               <div className="field-checkbox" style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginTop: "0.75rem", marginBottom: "0.75rem" }}>
@@ -217,11 +286,14 @@ function RegisterContent() {
               accessToken={accessToken}
               email={email}
               initialFullName={fullName}
+              showCnicUpload={true}
               onSuccess={() => {
+                clearReturnUrl();
                 router.push(targetDestination);
                 router.refresh();
               }}
               onSkip={() => {
+                clearReturnUrl();
                 router.push(targetDestination);
                 router.refresh();
               }}

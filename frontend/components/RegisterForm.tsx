@@ -1,16 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { registerVolunteer, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
+import { registerVolunteer, ValidationError, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
 import { isMinor } from "@/lib/ageUtils";
 import { formatPhoneNumber } from "@/lib/phoneUtils";
+import { formatCnic } from "@/lib/cnicUtils";
 import { INSTITUTIONS, CITIES, PAKISTAN_PROVINCES, COUNTRIES } from "@/lib/formDatasets";
 import { GuardianConsentFields, type GuardianConsentValue } from "./GuardianConsentFields";
 import { DateOfBirthInput } from "./DateOfBirthInput";
 import { AutocompleteInput } from "./AutocompleteInput";
 import { CnicUploadField } from "./CnicUploadField";
 
-type InitialFormKeys = "fullName" | "email" | "phone" | "dob" | "gender" | "city" | "province" | "country" | "institution" | "degreeProgram";
+type InitialFormKeys =
+  | "fullName"
+  | "email"
+  | "phone"
+  | "dob"
+  | "gender"
+  | "city"
+  | "province"
+  | "country"
+  | "institution"
+  | "degreeProgram"
+  | "idDocType"
+  | "idDocNumber"
+  | "idDocAttachmentId";
 
 const initialForm: Record<InitialFormKeys, string> = {
   fullName: "",
@@ -23,9 +37,12 @@ const initialForm: Record<InitialFormKeys, string> = {
   country: "",
   institution: "",
   degreeProgram: "",
+  idDocType: "cnic",
+  idDocNumber: "",
+  idDocAttachmentId: "",
 };
 
-const MANDATORY_FIELD_LABELS: Record<InitialFormKeys, string> = {
+const MANDATORY_FIELD_LABELS: Record<string, string> = {
   fullName: "Full name",
   email: "Email",
   phone: "Phone",
@@ -82,26 +99,69 @@ export function RegisterForm({
       country: initialCountry || prev.country || "",
     }));
   }, [email, initialFullName, initialPhone, initialCity, initialInstitution, initialCountry]);
+
   const [guardian, setGuardian] = useState<GuardianConsentValue>({
     guardianName: "",
     guardianContact: "",
     guardianConsent: false,
   });
+
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [successResult, setSuccessResult] = useState<RegisterVolunteerResponse | null>(null);
 
-  const showGuardianFields = form.dob !== "" && isMinor(form.dob);
+  const minor = form.dob !== "" && isMinor(form.dob);
+  const showGuardianFields = minor;
+
+  // Auto set document type to b_form for minors
+  useEffect(() => {
+    if (minor && form.idDocType !== "b_form") {
+      setForm((prev) => ({ ...prev, idDocType: "b_form" }));
+    }
+  }, [minor, form.idDocType]);
 
   function updateField<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (fieldErrors[key]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+    if (validationError) {
+      setValidationError(null);
+    }
   }
 
-  function missingMandatoryLabels(): string[] {
-    return (Object.keys(MANDATORY_FIELD_LABELS) as Array<keyof typeof initialForm>)
-      .filter((key) => !form[key] || (typeof form[key] === "string" && form[key].trim() === ""))
-      .map((key) => MANDATORY_FIELD_LABELS[key]);
+  function validate(): { isValid: boolean; errors: Record<string, string>; missingLabels: string[] } {
+    const errors: Record<string, string> = {};
+    const missingLabels: string[] = [];
+
+    const checkRequired = (key: keyof typeof form, label: string) => {
+      if (!form[key] || form[key].trim() === "") {
+        errors[key] = `${label} is required`;
+        missingLabels.push(label);
+      }
+    };
+
+    checkRequired("fullName", "Full name");
+    checkRequired("phone", "Phone");
+    checkRequired("dob", "Date of birth");
+    checkRequired("gender", "Gender");
+    checkRequired("institution", "Institution");
+    checkRequired("city", "City");
+    checkRequired("province", "Province");
+    checkRequired("country", "Country");
+    checkRequired("degreeProgram", "Degree program");
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors,
+      missingLabels,
+    };
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -109,24 +169,58 @@ export function RegisterForm({
     setError(null);
     setValidationError(null);
 
-    const missing = missingMandatoryLabels();
-    if (missing.length > 0) {
-      setValidationError(`Please fill in: ${missing.join(", ")}`);
+    const { isValid, errors, missingLabels } = validate();
+    if (!isValid) {
+      setFieldErrors(errors);
+      setValidationError(`Please fill in: ${missingLabels.join(", ")}`);
       return;
     }
 
     setSubmitting(true);
     try {
-      const result = await registerVolunteer(
-        {
-          ...form,
-          ...(showGuardianFields ? guardian : {}),
-        },
-        accessToken,
-      );
+      const payload: RegisterVolunteerPayload = {
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        dob: form.dob.trim(),
+        gender: form.gender.trim(),
+        city: form.city.trim(),
+        province: form.province.trim(),
+        country: form.country.trim(),
+        institution: form.institution.trim(),
+        degreeProgram: form.degreeProgram.trim(),
+        idDocType: (form.idDocType as "cnic" | "b_form") || (minor ? "b_form" : "cnic"),
+        idDocNumber: form.idDocNumber.trim() || undefined,
+        idDocAttachmentId: form.idDocAttachmentId.trim() || undefined,
+        ...(showGuardianFields ? guardian : {}),
+      };
+
+      const result = await registerVolunteer(payload, accessToken);
       setSuccessResult(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "unknown_error");
+      if (err instanceof ValidationError) {
+        setFieldErrors(err.fieldErrors || {});
+        setError(err.message || "Please correct the highlighted fields");
+      } else {
+        const message = err instanceof Error ? err.message : "unknown_error";
+        if (message === "id_doc_attachment_required") {
+          setFieldErrors((prev) => ({
+            ...prev,
+            idDocAttachmentId: "Please upload your CNIC / B-Form document scan",
+          }));
+        } else if (message === "b_form_required_for_minor") {
+          setFieldErrors((prev) => ({
+            ...prev,
+            idDocType: "Minors under 18 must select B-Form document type",
+          }));
+        } else if (message === "minor_consent_required") {
+          setFieldErrors((prev) => ({
+            ...prev,
+            guardianConsent: "Guardian consent is mandatory for minors under 18",
+          }));
+        }
+        setError(message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -159,18 +253,26 @@ export function RegisterForm({
   return (
     <form onSubmit={handleSubmit} noValidate>
       {validationError && (
-        <div className="notice" style={{ background: "var(--st-neg-bg)", color: "var(--st-neg-fg)", marginBottom: "1rem" }} role="alert">
+        <div
+          className="notice"
+          style={{ background: "var(--st-neg-bg)", color: "var(--st-neg-fg)", marginBottom: "1rem" }}
+          role="alert"
+        >
           {validationError}
         </div>
       )}
       {error && (
-        <div className="notice" style={{ background: "var(--st-neg-bg)", color: "var(--st-neg-fg)", marginBottom: "1rem" }} role="alert">
+        <div
+          className="notice"
+          style={{ background: "var(--st-neg-bg)", color: "var(--st-neg-fg)", marginBottom: "1rem" }}
+          role="alert"
+        >
           {error}
         </div>
       )}
 
       <div className="grid-2">
-        <div className="field">
+        <div className={`field ${fieldErrors.fullName ? "has-error" : ""}`}>
           <label htmlFor="fullName">Full name</label>
           <input
             id="fullName"
@@ -178,9 +280,12 @@ export function RegisterForm({
             value={form.fullName}
             onChange={(e) => updateField("fullName", e.target.value)}
             placeholder="e.g. Ayesha Khan"
+            className={fieldErrors.fullName ? "input-error" : ""}
           />
+          {fieldErrors.fullName && <p className="field__error" role="alert">{fieldErrors.fullName}</p>}
         </div>
-        <div className="field">
+
+        <div className={`field ${fieldErrors.phone ? "has-error" : ""}`}>
           <label htmlFor="phone">Phone</label>
           <input
             id="phone"
@@ -189,7 +294,9 @@ export function RegisterForm({
             value={form.phone}
             onChange={(e) => updateField("phone", formatPhoneNumber(e.target.value))}
             placeholder="0300 1234567"
+            className={fieldErrors.phone ? "input-error" : ""}
           />
+          {fieldErrors.phone && <p className="field__error" role="alert">{fieldErrors.phone}</p>}
         </div>
       </div>
 
@@ -200,7 +307,7 @@ export function RegisterForm({
       </div>
 
       <div className="grid-3">
-        <div className="field">
+        <div className={`field ${fieldErrors.dob ? "has-error" : ""}`}>
           <label htmlFor="dob">Date of birth</label>
           <DateOfBirthInput
             id="dob"
@@ -208,8 +315,10 @@ export function RegisterForm({
             value={form.dob}
             onChange={(val) => updateField("dob", val)}
           />
+          {fieldErrors.dob && <p className="field__error" role="alert">{fieldErrors.dob}</p>}
         </div>
-        <div className="field">
+
+        <div className={`field ${fieldErrors.gender ? "has-error" : ""}`}>
           <label htmlFor="gender">Gender</label>
           <select
             id="gender"
@@ -217,11 +326,12 @@ export function RegisterForm({
             required
             value={form.gender}
             onChange={(e) => updateField("gender", e.target.value)}
+            className={fieldErrors.gender ? "input-error" : ""}
             style={{
-              color: form.gender === "" ? "var(--ink-2)" : "var(--ink)",
+              color: form.gender === "" ? "var(--placeholder)" : "var(--ink)",
             }}
           >
-            <option value="" style={{ color: "var(--ink-2)" }}>
+            <option value="" style={{ color: "var(--placeholder)" }}>
               Select gender
             </option>
             <option value="female" style={{ color: "var(--ink)" }}>Female</option>
@@ -229,8 +339,10 @@ export function RegisterForm({
             <option value="other" style={{ color: "var(--ink)" }}>Other</option>
             <option value="prefer_not_to_say" style={{ color: "var(--ink)" }}>Prefer not to say</option>
           </select>
+          {fieldErrors.gender && <p className="field__error" role="alert">{fieldErrors.gender}</p>}
         </div>
-        <div className="field">
+
+        <div className={`field ${fieldErrors.institution ? "has-error" : ""}`}>
           <label htmlFor="institution">Institution</label>
           <AutocompleteInput
             id="institution"
@@ -240,11 +352,12 @@ export function RegisterForm({
             dataset={INSTITUTIONS}
             placeholder="e.g. Punjab University"
           />
+          {fieldErrors.institution && <p className="field__error" role="alert">{fieldErrors.institution}</p>}
         </div>
       </div>
 
       <div className="grid-3">
-        <div className="field">
+        <div className={`field ${fieldErrors.city ? "has-error" : ""}`}>
           <label htmlFor="city">City</label>
           <AutocompleteInput
             id="city"
@@ -254,8 +367,10 @@ export function RegisterForm({
             dataset={CITIES}
             placeholder="e.g. Lahore"
           />
+          {fieldErrors.city && <p className="field__error" role="alert">{fieldErrors.city}</p>}
         </div>
-        <div className="field">
+
+        <div className={`field ${fieldErrors.province ? "has-error" : ""}`}>
           <label htmlFor="province">Province</label>
           <AutocompleteInput
             id="province"
@@ -265,8 +380,10 @@ export function RegisterForm({
             dataset={PAKISTAN_PROVINCES}
             placeholder="e.g. Punjab"
           />
+          {fieldErrors.province && <p className="field__error" role="alert">{fieldErrors.province}</p>}
         </div>
-        <div className="field">
+
+        <div className={`field ${fieldErrors.country ? "has-error" : ""}`}>
           <label htmlFor="country">Country</label>
           <AutocompleteInput
             id="country"
@@ -276,10 +393,11 @@ export function RegisterForm({
             dataset={COUNTRIES}
             placeholder="Pakistan"
           />
+          {fieldErrors.country && <p className="field__error" role="alert">{fieldErrors.country}</p>}
         </div>
       </div>
 
-      <div className="field">
+      <div className={`field ${fieldErrors.degreeProgram ? "has-error" : ""}`}>
         <label htmlFor="degreeProgram">Degree program</label>
         <input
           id="degreeProgram"
@@ -287,7 +405,9 @@ export function RegisterForm({
           value={form.degreeProgram}
           onChange={(e) => updateField("degreeProgram", e.target.value)}
           placeholder="e.g. BSc Computer Science"
+          className={fieldErrors.degreeProgram ? "input-error" : ""}
         />
+        {fieldErrors.degreeProgram && <p className="field__error" role="alert">{fieldErrors.degreeProgram}</p>}
       </div>
 
       {showGuardianFields && (
@@ -296,21 +416,117 @@ export function RegisterForm({
             guardianName={guardian.guardianName}
             guardianContact={guardian.guardianContact}
             guardianConsent={guardian.guardianConsent}
-            onChange={setGuardian}
+            onChange={(newVal) => {
+              setGuardian(newVal);
+              if (fieldErrors.guardianName || fieldErrors.guardianContact || fieldErrors.guardianConsent) {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.guardianName;
+                  delete next.guardianContact;
+                  delete next.guardianConsent;
+                  return next;
+                });
+              }
+            }}
           />
+          {fieldErrors.guardianConsent && (
+            <p className="field__error" role="alert" style={{ marginTop: "0.5rem" }}>
+              {fieldErrors.guardianConsent}
+            </p>
+          )}
         </div>
       )}
 
       {showCnicUpload && (
-        <div style={{ marginTop: "1.25rem" }}>
+        <div
+          className="cnic-card"
+          style={{
+            marginTop: "1.25rem",
+            background: "var(--bg-2)",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--radius-card)",
+            padding: "1.25rem",
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+            <div>
+              <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 600, color: "var(--ink)" }}>
+                {minor ? "B-Form Details & Document" : "CNIC Details & Document"}
+              </h4>
+              <p style={{ margin: "0.2rem 0 0", fontSize: "0.8rem", color: "var(--ink-2)" }}>
+                {minor
+                  ? "Minors under 18 provide a B-Form number and document scan for verification."
+                  : "Enter your National ID (CNIC) and attach your card for verification."}
+              </p>
+            </div>
+            {form.idDocAttachmentId ? (
+              <span className="pill pill--pos text-[0.7rem] py-0.5 px-2">Document Attached</span>
+            ) : (
+              <span className="pill pill--pend text-[0.7rem] py-0.5 px-2">Verification Document</span>
+            )}
+          </div>
+
+          <div className="grid-2" style={{ marginBottom: "1rem" }}>
+            <div className={`field ${fieldErrors.idDocNumber ? "has-error" : ""}`} style={{ marginBottom: 0 }}>
+              <label htmlFor="idDocNumber">
+                {minor ? "B-Form number" : "CNIC number"}
+              </label>
+              <input
+                id="idDocNumber"
+                type="text"
+                inputMode="numeric"
+                value={form.idDocNumber}
+                onChange={(e) => updateField("idDocNumber", formatCnic(e.target.value))}
+                placeholder="e.g. 35202-1234567-1"
+                className={fieldErrors.idDocNumber ? "input-error" : ""}
+              />
+              {fieldErrors.idDocNumber && (
+                <p className="field__error" role="alert">{fieldErrors.idDocNumber}</p>
+              )}
+            </div>
+
+            <div className={`field ${fieldErrors.idDocType ? "has-error" : ""}`} style={{ marginBottom: 0 }}>
+              <label htmlFor="idDocType">Document type</label>
+              <select
+                id="idDocType"
+                value={form.idDocType}
+                onChange={(e) => updateField("idDocType", e.target.value as "cnic" | "b_form")}
+                className={fieldErrors.idDocType ? "input-error" : ""}
+              >
+                <option value="cnic">CNIC (National Identity Card)</option>
+                <option value="b_form">B-Form (Child Registration Certificate)</option>
+              </select>
+              {fieldErrors.idDocType && (
+                <p className="field__error" role="alert">{fieldErrors.idDocType}</p>
+              )}
+            </div>
+          </div>
+
           <CnicUploadField
             accessToken={accessToken}
-            onUploaded={() => {}}
+            onUploaded={(attachmentId) => {
+              updateField("idDocAttachmentId", attachmentId);
+              if (fieldErrors.idDocAttachmentId) {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.idDocAttachmentId;
+                  return next;
+                });
+              }
+            }}
           />
+          {fieldErrors.idDocAttachmentId && (
+            <p className="field__error" role="alert" style={{ marginTop: "0.5rem" }}>
+              {fieldErrors.idDocAttachmentId}
+            </p>
+          )}
         </div>
       )}
 
-      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 w-full" style={{ marginTop: "1.25rem" }}>
+      <div
+        className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 w-full"
+        style={{ marginTop: "1.5rem" }}
+      >
         {onSkip && (
           <button
             type="button"

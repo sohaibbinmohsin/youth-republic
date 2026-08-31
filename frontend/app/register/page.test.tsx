@@ -1,13 +1,18 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import RegisterPage from "./page";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
+import { recordReturnUrl, clearReturnUrl } from "@/lib/returnUrl";
+
+const pushMock = vi.fn();
+const refreshMock = vi.fn();
+let mockSearchParams = new URLSearchParams();
 
 vi.mock("@/lib/supabase/browserClient");
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: pushMock, refresh: refreshMock }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 describe("RegisterPage", () => {
@@ -15,12 +20,20 @@ describe("RegisterPage", () => {
   const getSession = vi.fn();
 
   beforeEach(() => {
+    pushMock.mockReset();
+    refreshMock.mockReset();
+    mockSearchParams = new URLSearchParams();
     signUp.mockReset();
     getSession.mockReset();
     getSession.mockResolvedValue({ data: { session: null } });
+    clearReturnUrl();
     vi.mocked(getBrowserSupabaseClient).mockReturnValue({
       auth: { signUp, getSession },
     } as never);
+  });
+
+  afterEach(() => {
+    clearReturnUrl();
   });
 
   it("renders Step 1 with Full Name, Email, Password, Confirm Password, and Create account button", () => {
@@ -71,5 +84,37 @@ describe("RegisterPage", () => {
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByText("Please enter your full name")).toBeInTheDocument();
+  });
+
+  it("preserves redirectTo query destination for Step 2 Skip action", async () => {
+    mockSearchParams = new URLSearchParams("redirectTo=%2Fapply%2Fopp123");
+    getSession.mockResolvedValue({
+      data: {
+        session: { access_token: "tok123", user: { email: "ayesha@example.com", user_metadata: { full_name: "Ayesha Khan" } } },
+      },
+    });
+    const user = userEvent.setup();
+    render(<RegisterPage />);
+
+    const skipButton = await screen.findByRole("button", { name: "Skip for now" });
+    await user.click(skipButton);
+
+    expect(pushMock).toHaveBeenCalledWith("/apply/opp123");
+  });
+
+  it("preserves recorded session journey for Step 2 Skip action", async () => {
+    recordReturnUrl("/opportunities/ffd9cb51-8b8d-4914-9906-4a9dc124c59e");
+    getSession.mockResolvedValue({
+      data: {
+        session: { access_token: "tok123", user: { email: "ayesha@example.com", user_metadata: { full_name: "Ayesha Khan" } } },
+      },
+    });
+    const user = userEvent.setup();
+    render(<RegisterPage />);
+
+    const skipButton = await screen.findByRole("button", { name: "Skip for now" });
+    await user.click(skipButton);
+
+    expect(pushMock).toHaveBeenCalledWith("/opportunities/ffd9cb51-8b8d-4914-9906-4a9dc124c59e");
   });
 });

@@ -32,6 +32,8 @@ export async function middleware(request: NextRequest) {
 
   const redirectTo = computeMiddlewareRedirect({
     pathname: request.nextUrl.pathname,
+    search: request.nextUrl.search,
+    redirectToParam: request.nextUrl.searchParams.get("redirectTo"),
     isAuthenticated: Boolean(user),
   });
 
