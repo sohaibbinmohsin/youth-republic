@@ -1,35 +1,90 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
+import { getCoolName, getAvatarInitials } from "@/lib/coolNames";
 
 const NAV_LINKS = [
   { href: "/opportunities", label: "Opportunities" },
   { href: "/applications", label: "My Applications" },
   { href: "/portfolio", label: "Portfolio" },
-  { href: "/profile", label: "Profile" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const menuRef = useRef<HTMLDivElement>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userSession, setUserSession] = useState<{ id: string; email?: string | null; name: string; initials: string } | null>(null);
   const pathname = usePathname() ?? "";
 
   useEffect(() => {
-    async function checkUser() {
+    const supabase = getBrowserSupabaseClient();
+
+    async function syncUser(user: { id: string; email?: string | null } | null) {
+      if (!user) {
+        setUserSession(null);
+        return;
+      }
+
+      let fullName: string | null = null;
       try {
-        const supabase = getBrowserSupabaseClient();
-        const { data } = await supabase.auth.getSession();
-        setUserEmail(data.session?.user?.email ?? null);
+        const q = supabase.from("volunteers").select("full_name").eq("auth_user_id", user.id);
+        const res = typeof (q as any).maybeSingle === "function" ? await (q as any).maybeSingle() : await (q as any).single();
+        fullName = res?.data?.full_name ?? null;
       } catch {
-        setUserEmail(null);
+        fullName = null;
+      }
+
+      const email = user.email ?? null;
+      const coolName = getCoolName(user.id);
+      const name = fullName || coolName;
+      const initials = getAvatarInitials(fullName || coolName || email || "YR");
+
+      setUserSession({ id: user.id, email, name, initials });
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      syncUser(data.session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      syncUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
       }
     }
-    checkUser();
-  }, [pathname]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  async function handleSignOut() {
+    setUserDropdownOpen(false);
+    try {
+      const supabase = getBrowserSupabaseClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore errors if already signed out
+    }
+    setUserSession(null);
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+  }
+
+  const signInHref = pathname && pathname !== "/login" && pathname !== "/register"
+    ? `/login?redirectTo=${encodeURIComponent(pathname)}`
+    : "/login";
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-[#24262D]">
@@ -46,31 +101,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Right side actions */}
           <nav className="nav-actions" id="navActions">
-            {userEmail ? (
-              <div className="usermenu">
+            {userSession ? (
+              <div className="usermenu" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                   className="avatar-btn"
                   aria-label="User menu"
-                  title={userEmail}
+                  title={userSession.name}
                 >
-                  {userEmail.slice(0, 2).toUpperCase()}
+                  {userSession.initials}
                 </button>
                 {userDropdownOpen && (
                   <div className="usermenu__pop open">
+                    <div style={{ padding: ".55rem .75rem", borderBottom: "1px solid #f0eee6" }}>
+                      <div style={{ fontWeight: 600, fontSize: ".875rem", color: "var(--ink)", lineHeight: 1.2 }}>
+                        {userSession.name}
+                      </div>
+                      {userSession.email && (
+                        <div style={{ fontSize: ".75rem", color: "#6B6B66", marginTop: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {userSession.email}
+                        </div>
+                      )}
+                    </div>
                     <Link href="/portfolio" onClick={() => setUserDropdownOpen(false)}>
                       Portfolio
                     </Link>
                     <Link href="/applications" onClick={() => setUserDropdownOpen(false)}>
                       My Applications
                     </Link>
-                    <Link href="/profile" onClick={() => setUserDropdownOpen(false)}>
-                      Profile
-                    </Link>
-                    <Link href="/logout" onClick={() => setUserDropdownOpen(false)}>
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        textAlign: "left",
+                        alignItems: "center",
+                        gap: ".5rem",
+                        padding: ".55rem .7rem",
+                        border: 0,
+                        background: "transparent",
+                        borderRadius: "8px",
+                        font: "inherit",
+                        fontSize: ".9rem",
+                        color: "var(--ink)",
+                        cursor: "pointer",
+                      }}
+                    >
                       Sign out
-                    </Link>
+                    </button>
                   </div>
                 )}
               </div>
@@ -79,7 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Create an account
               </Link>
             ) : (
-              <Link href="/login" className="btn btn--primary btn--sm">
+              <Link href={signInHref} className="btn btn--primary btn--sm">
                 Sign in
               </Link>
             )}
@@ -120,20 +200,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             <div className="pt-2 border-t border-gray-100 flex gap-2">
-              <Link
-                href="/login"
-                onClick={() => setMobileNavOpen(false)}
-                className="btn btn--ghost btn--sm flex-1 text-center"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/register"
-                onClick={() => setMobileNavOpen(false)}
-                className="btn btn--primary btn--sm flex-1 text-center"
-              >
-                Register
-              </Link>
+              {userSession ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    handleSignOut();
+                  }}
+                  className="btn btn--ghost btn--sm flex-1 text-center"
+                >
+                  Sign out
+                </button>
+              ) : (
+                <>
+                  <Link
+                    href={signInHref}
+                    onClick={() => setMobileNavOpen(false)}
+                    className="btn btn--ghost btn--sm flex-1 text-center"
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setMobileNavOpen(false)}
+                    className="btn btn--primary btn--sm flex-1 text-center"
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
         )}

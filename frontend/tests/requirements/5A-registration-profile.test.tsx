@@ -56,7 +56,7 @@ describe("§5A Registration — mandatory identity, contact & matching fields", 
     render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await fillMandatory(user);
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     await waitFor(() => {
       expect(edgeFunctions.registerVolunteer).toHaveBeenCalledWith(
@@ -93,7 +93,7 @@ describe("§5A Registration — mandatory identity, contact & matching fields", 
     render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await fillMandatory(user);
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     expect(await screen.findByText("email_already_registered")).toBeInTheDocument();
     expect(screen.getByLabelText("Full name")).toHaveValue("Aisha Khan");
@@ -103,7 +103,7 @@ describe("§5A Registration — mandatory identity, contact & matching fields", 
     const user = userEvent.setup();
     render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     expect(edgeFunctions.registerVolunteer).not.toHaveBeenCalled();
     for (const label of MANDATORY_REGISTRATION_FIELDS) {
@@ -142,7 +142,7 @@ describe("§5A Registration — unique, human-readable Volunteer ID", () => {
     render(<RegisterForm accessToken={ACCESS_TOKEN} email="aisha@example.com" />);
 
     await fillMandatory(user);
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     expect(await screen.findByText("YR-2026-00142")).toBeInTheDocument();
   });
@@ -182,7 +182,7 @@ describe("§5A Registration — minors (safeguarding on youth programs)", () => 
     await user.type(screen.getByLabelText("Guardian name"), "Sara Khan");
     await user.type(screen.getByLabelText("Guardian contact"), "0300-7654321");
     await user.click(screen.getByLabelText("Guardian consent"));
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
     await waitFor(() => {
       expect(edgeFunctions.registerVolunteer).toHaveBeenCalledWith(

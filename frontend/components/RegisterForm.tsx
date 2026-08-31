@@ -38,8 +38,20 @@ const MANDATORY_FIELD_LABELS: Record<InitialFormKeys, string> = {
   degreeProgram: "Degree program",
 };
 
-export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: string; email: string; onSuccess?: () => void }) {
-  const [form, setForm] = useState({ ...initialForm, email });
+export function RegisterForm({
+  accessToken,
+  email,
+  initialFullName = "",
+  onSuccess,
+  onSkip,
+}: {
+  accessToken: string;
+  email: string;
+  initialFullName?: string;
+  onSuccess?: () => void;
+  onSkip?: () => void;
+}) {
+  const [form, setForm] = useState({ ...initialForm, email, fullName: initialFullName });
   const [guardian, setGuardian] = useState<GuardianConsentValue>({
     guardianName: "",
     guardianContact: "",
@@ -247,15 +259,27 @@ export function RegisterForm({ accessToken, email, onSuccess }: { accessToken: s
         </div>
       )}
 
-      <button
-        type="submit"
-        aria-label="Register"
-        disabled={submitting}
-        className="btn btn--primary btn--block"
-        style={{ marginTop: "1rem" }}
-      >
-        {submitting ? "Creating account..." : "Create account"}
-      </button>
+      <div className="flex flex-col sm:flex-row items-center gap-3" style={{ marginTop: "1rem" }}>
+        <button
+          type="submit"
+          aria-label="Save details"
+          disabled={submitting}
+          className="btn btn--primary flex-1 w-full"
+        >
+          {submitting ? "Saving details..." : "Save & build portfolio"}
+        </button>
+
+        {onSkip && (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="btn btn--ghost w-full sm:w-auto"
+            aria-label="Skip for now"
+          >
+            Skip for now
+          </button>
+        )}
+      </div>
     </form>
   );
 }

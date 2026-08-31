@@ -1,21 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { RegisterForm } from "@/components/RegisterForm";
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const redirectToParam = searchParams.get("redirectTo");
+  const targetDestination = redirectToParam && redirectToParam.startsWith("/") ? redirectToParam : "/portfolio";
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
@@ -23,6 +29,7 @@ export default function RegisterPage() {
       if (data.session) {
         setAccessToken(data.session.access_token);
         setEmail(data.session.user.email ?? "");
+        setFullName((data.session.user.user_metadata?.full_name as string) ?? "");
       }
     });
   }, []);
@@ -31,6 +38,10 @@ export default function RegisterPage() {
     e.preventDefault();
     setSignupError(null);
 
+    if (!fullName.trim()) {
+      setSignupError("Please enter your full name");
+      return;
+    }
     if (password !== confirmPassword) {
       setSignupError("Passwords do not match");
       return;
@@ -43,7 +54,15 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const supabase = getBrowserSupabaseClient();
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+          },
+        },
+      });
       if (error || !data.session) {
         setSignupError(error?.message ?? "Failed to create account");
         setLoading(false);
@@ -57,12 +76,37 @@ export default function RegisterPage() {
     }
   }
 
+  async function handleGuestSignIn() {
+    setSignupError(null);
+    setGuestLoading(true);
+    try {
+      const supabase = getBrowserSupabaseClient();
+      const { data, error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError || !data.session) {
+        setSignupError(anonError?.message ?? "Guest sign-in is not enabled on this instance.");
+        setGuestLoading(false);
+        return;
+      }
+      router.push(targetDestination);
+      router.refresh();
+    } catch (err) {
+      setSignupError(err instanceof Error ? err.message : "Guest authentication error");
+      setGuestLoading(false);
+    }
+  }
+
+  const loginHref = redirectToParam ? `/login?redirectTo=${encodeURIComponent(redirectToParam)}` : "/login";
+
   return (
     <section className="route-centered">
       <div className="pane">
         <div className="auth-head">
-          <h1 className="display">Create account</h1>
-          <p>Set up your volunteer profile. It works across every organisation on Youth Republic.</p>
+          <h1 className="display">{accessToken ? "Build your portfolio" : "Create account"}</h1>
+          <p>
+            {accessToken
+              ? "Tell us a bit about yourself to power your verified volunteer portfolio. You can also skip and fill this later."
+              : "Set up your account to start building your verified volunteer portfolio."}
+          </p>
 
           <div className="steps" id="regSteps">
             <span className={`s ${!accessToken ? "on" : ""}`} data-step="1">
@@ -70,18 +114,31 @@ export default function RegisterPage() {
             </span>
             <span className="bar"></span>
             <span className={`s ${accessToken ? "on" : ""}`} data-step="2">
-              <span className="n">2</span> Your details
+              <span className="n">2</span> Portfolio details
             </span>
           </div>
 
           {!accessToken ? (
             /* STEP 1: Account */
-            <form className="form-narrow" onSubmit={handleSignUp}>
+            <form className="form-narrow" onSubmit={handleSignUp} noValidate>
               {signupError && (
                 <div className="notice" style={{ background: "var(--st-neg-bg)", color: "var(--st-neg-fg)" }} role="alert">
                   {signupError}
                 </div>
               )}
+
+              <div className="field">
+                <label htmlFor="reg1-name">Full name</label>
+                <input
+                  id="reg1-name"
+                  type="text"
+                  required
+                  autoComplete="name"
+                  placeholder="e.g. Ayesha Khan"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
 
               <div className="field">
                 <label htmlFor="reg1-email">Email</label>
@@ -147,21 +204,41 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <button type="submit" disabled={loading} className="btn btn--primary btn--block">
-                {loading ? "Continuing..." : "Continue"}
+              <button type="submit" disabled={loading || guestLoading} className="btn btn--primary btn--block">
+                {loading ? "Creating account..." : "Create account"}
               </button>
 
-              <p className="altline">
-                Already have an account? <Link href="/login">Sign in</Link>
+              <div className="flex items-center my-4">
+                <div className="flex-1 border-t border-gray-200"></div>
+                <span className="px-3 text-xs text-gray-400 uppercase font-bold">or</span>
+                <div className="flex-1 border-t border-gray-200"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGuestSignIn}
+                disabled={loading || guestLoading}
+                className="btn btn--ghost btn--block"
+              >
+                {guestLoading ? "Connecting..." : "Continue as Guest (Anonymous)"}
+              </button>
+
+              <p className="altline" style={{ marginTop: "1rem" }}>
+                Already have an account? <Link href={loginHref}>Sign in</Link>
               </p>
             </form>
           ) : (
-            /* STEP 2: Profile & Details */
+            /* STEP 2: Portfolio & Details */
             <RegisterForm
               accessToken={accessToken}
               email={email}
+              initialFullName={fullName}
               onSuccess={() => {
-                router.push("/portfolio");
+                router.push(targetDestination);
+                router.refresh();
+              }}
+              onSkip={() => {
+                router.push(targetDestination);
                 router.refresh();
               }}
             />
@@ -179,7 +256,7 @@ export default function RegisterPage() {
               Status shows <strong>verification pending</strong> while an admin checks your CNIC / B-Form against your name and details.
             </li>
             <li>
-              Once verified, your profile is marked verified with no action needed from you.
+              Once verified, your portfolio is marked verified with no action needed from you.
             </li>
           </ol>
 
@@ -196,5 +273,13 @@ export default function RegisterPage() {
         </aside>
       </div>
     </section>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterContent />
+    </Suspense>
   );
 }

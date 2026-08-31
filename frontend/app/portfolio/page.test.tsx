@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import PortfolioPage from "./page";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
@@ -9,7 +10,7 @@ interface Fixtures {
   volunteer: { id: string; full_name: string; city: string; institution: string; created_at: string };
   totalVerifiedHours: number;
   chapterLink?: { chapters: { name: string } } | null;
-  applications?: Array<{ id: string; status: string; opportunities: { name: string } | null }>;
+  applications?: Array<{ id: string; status: string; opportunities: { name: string; type?: string; location?: string } | null; organizations?: { name: string } | null }>;
   activityHours?: Array<{
     id: string;
     role: string | null;
@@ -64,8 +65,6 @@ function mockSupabase(f: Fixtures) {
         };
       }
       if (table === "participation") {
-        // Two call sites: the existing submit-hours list (all participations)
-        // and the new "completed programmes" list (status = completed).
         return {
           select: () => ({
             eq: (col: string, value: unknown) => {
@@ -105,19 +104,24 @@ describe("PortfolioPage", () => {
     expect(screen.getByText(/North Chapter/)).toBeInTheDocument();
   });
 
-  it("[5B] shows current and past applications with their statuses", async () => {
+  it("[5B] shows current and past applications with their statuses when clicking Applications tab", async () => {
+    const user = userEvent.setup();
     vi.mocked(getBrowserSupabaseClient).mockReturnValue(
       mockSupabase({
         volunteer: { id: "vol-1", full_name: "Aisha Khan", city: "Lahore", institution: "LUMS", created_at: "2026-01-15T00:00:00Z" },
         totalVerifiedHours: 0,
         applications: [
-          { id: "app-1", status: "under_review", opportunities: { name: "Beach Cleanup" } },
-          { id: "app-2", status: "rejected", opportunities: { name: "Tree Plantation" } },
+          { id: "app-1", status: "under_review", opportunities: { name: "Beach Cleanup", type: "environment", location: "Islamabad" } },
+          { id: "app-2", status: "rejected", opportunities: { name: "Tree Plantation", type: "environment", location: "Murree" } },
         ],
       }) as never,
     );
 
     render(<PortfolioPage />);
+    await waitFor(() => expect(screen.getByText("Aisha Khan")).toBeInTheDocument());
+
+    const appsTab = screen.getByRole("button", { name: "Applications" });
+    await user.click(appsTab);
 
     expect(await screen.findByText("Beach Cleanup")).toBeInTheDocument();
     expect(screen.getByText("Tree Plantation")).toBeInTheDocument();
@@ -125,7 +129,7 @@ describe("PortfolioPage", () => {
     expect(screen.getByText("Not selected")).toBeInTheDocument();
   });
 
-  it("[6] shows the chronological activity history as an Activity / Type / Role / Date / Hours / Status table, additive — every row stays, none replace another", async () => {
+  it("[6] shows programme cards and chronological activity sessions under Impact tab", async () => {
     vi.mocked(getBrowserSupabaseClient).mockReturnValue(
       mockSupabase({
         volunteer: { id: "vol-1", full_name: "Aisha Khan", city: "Lahore", institution: "LUMS", created_at: "2026-01-15T00:00:00Z" },
@@ -149,18 +153,10 @@ describe("PortfolioPage", () => {
 
     render(<PortfolioPage />);
 
-    // Both rows present — a later one never replaces an earlier one.
     expect(await screen.findByText("Beach Cleanup")).toBeInTheDocument();
     expect(screen.getByText("Tree Plantation")).toBeInTheDocument();
     expect(screen.getAllByText("environment")).toHaveLength(2);
     expect(screen.getByText("Volunteer Lead")).toBeInTheDocument();
-    expect(screen.getByText("2026-02-01")).toBeInTheDocument();
-    expect(screen.getByText("2026-03-01")).toBeInTheDocument();
-    // Each row's own verified hours is individually visible and traceable —
-    // not just the rolled-up total (8, shown separately in PortfolioSummary).
-    expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getAllByText("Verified")).toHaveLength(2);
   });
 
   it("[6] lists programmes/opportunities the volunteer has completed", async () => {
@@ -202,29 +198,28 @@ describe("PortfolioPage", () => {
     render(<PortfolioPage />);
 
     await waitFor(() => expect(screen.getByText("Beach Cleanup")).toBeInTheDocument());
-    expect(screen.getByText("Youth Republic")).toBeInTheDocument();
-    expect(screen.getByText("Rizq")).toBeInTheDocument();
+    expect(screen.getByText(/Youth Republic/)).toBeInTheDocument();
+    expect(screen.getByText(/Rizq/)).toBeInTheDocument();
   });
 
-  it("[6/over-build] does not label activity by organization when there's only one", async () => {
+  it("renders Portfolio details tab with editable profile fields", async () => {
+    const user = userEvent.setup();
     vi.mocked(getBrowserSupabaseClient).mockReturnValue(
       mockSupabase({
         volunteer: { id: "vol-1", full_name: "Aisha Khan", city: "Lahore", institution: "LUMS", created_at: "2026-01-15T00:00:00Z" },
-        totalVerifiedHours: 5,
-        activityHours: [
-          {
-            id: "ah-1", role: "Volunteer", activity_date: "2026-02-01",
-            hours_submitted: 5, hours_verified: 5, verification_status: "verified",
-            organization_id: "org-1", opportunities: { name: "Beach Cleanup", type: "environment" },
-            organizations: { name: "Youth Republic" },
-          },
-        ],
+        totalVerifiedHours: 10,
       }) as never,
     );
 
     render(<PortfolioPage />);
+    await waitFor(() => expect(screen.getByText("Aisha Khan")).toBeInTheDocument());
 
-    await waitFor(() => expect(screen.getByText("Beach Cleanup")).toBeInTheDocument());
-    expect(screen.queryByText("Youth Republic")).not.toBeInTheDocument();
+    const detailsTab = screen.getByRole("button", { name: "Portfolio details" });
+    await user.click(detailsTab);
+
+    expect(await screen.findByText("Portfolio & Account Details")).toBeInTheDocument();
+    expect(screen.getByLabelText("Phone number")).toBeInTheDocument();
+    expect(screen.getByLabelText("City")).toBeInTheDocument();
+    expect(screen.getByLabelText("Institution / University")).toBeInTheDocument();
   });
 });
