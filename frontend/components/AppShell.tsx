@@ -16,6 +16,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [userSession, setUserSession] = useState<{ id: string; email?: string | null; name: string; initials: string } | null>(null);
   const pathname = usePathname() ?? "";
 
@@ -68,17 +70,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && showSignOutModal && !signingOut) {
+        setShowSignOutModal(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showSignOutModal, signingOut]);
+
   async function handleSignOut() {
-    setUserDropdownOpen(false);
+    setSigningOut(true);
     try {
       const supabase = getBrowserSupabaseClient();
       await supabase.auth.signOut();
     } catch {
       // Ignore errors if already signed out
-    }
-    setUserSession(null);
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
+    } finally {
+      setSigningOut(false);
+      setShowSignOutModal(false);
+      setUserDropdownOpen(false);
+      setUserSession(null);
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
     }
   }
 
@@ -124,32 +140,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         </div>
                       )}
                     </div>
-                    <Link href="/portfolio" onClick={() => setUserDropdownOpen(false)}>
-                      Portfolio
+                    <Link
+                      href={pathname.startsWith("/portfolio") ? "/" : "/portfolio"}
+                      onClick={() => setUserDropdownOpen(false)}
+                    >
+                      {pathname.startsWith("/portfolio") ? "Opportunities" : "My Portfolio"}
                     </Link>
-                    <Link href="/applications" onClick={() => setUserDropdownOpen(false)}>
-                      My Applications
+                    <Link href="/change-password" onClick={() => setUserDropdownOpen(false)}>
+                      Change password
                     </Link>
                     <button
                       type="button"
-                      onClick={handleSignOut}
-                      style={{
-                        display: "flex",
-                        width: "100%",
-                        textAlign: "left",
-                        alignItems: "center",
-                        gap: ".5rem",
-                        padding: ".55rem .7rem",
-                        border: 0,
-                        background: "transparent",
-                        borderRadius: "8px",
-                        font: "inherit",
-                        fontSize: ".9rem",
-                        color: "var(--ink)",
-                        cursor: "pointer",
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setShowSignOutModal(true);
                       }}
+                      className="sign-out-btn"
+                      aria-label="Sign out"
                     >
-                      Sign out
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
+                      <span>Sign out</span>
                     </button>
                   </div>
                 )}
@@ -205,9 +230,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={() => {
                     setMobileNavOpen(false);
-                    handleSignOut();
+                    setShowSignOutModal(true);
                   }}
-                  className="btn btn--ghost btn--sm flex-1 text-center"
+                  className="btn btn--ghost btn--sm flex-1 text-center sign-out-btn"
                 >
                   Sign out
                 </button>
@@ -352,6 +377,78 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {/* Sign Out Confirmation Card Modal */}
+      {showSignOutModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]"
+          onClick={() => !signingOut && setShowSignOutModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sign-out-modal-title"
+        >
+          <div
+            className="bg-white rounded-2xl border border-[var(--line)] shadow-2xl max-w-sm w-full p-5 text-left font-['Jost'] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "var(--st-neg-bg, #FCEBEB)", color: "var(--st-neg-fg, #A32D2D)" }}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </div>
+              <div>
+                <h3
+                  id="sign-out-modal-title"
+                  className="font-bold text-base text-[var(--ink)] font-['Oswald'] uppercase tracking-wide leading-tight"
+                >
+                  Confirm Sign Out
+                </h3>
+                <p className="text-xs text-[var(--ink-2)] mt-0.5">Youth Republic Account</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-[var(--ink-2)] leading-relaxed m-0">
+              Are you sure you want to sign out? You will need your credentials to access your verified portfolio again.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 mt-3.5">
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => setShowSignOutModal(false)}
+                disabled={signingOut}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn--sm text-white border-transparent"
+                style={{ background: "var(--st-neg-fg, #A32D2D)" }}
+                onClick={handleSignOut}
+                disabled={signingOut}
+              >
+                {signingOut ? "Signing out..." : "Sign out"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -45,6 +45,25 @@ export function ApplyForm({
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex items-start gap-2 text-xs text-gray-700">
+        <input
+          id="apply-terms"
+          type="checkbox"
+          defaultChecked
+          className="mt-0.5 cursor-pointer"
+        />
+        <label htmlFor="apply-terms" className="cursor-pointer">
+          I agree to the{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline font-medium text-gray-900">
+            Terms of Service
+          </a>{" "}
+          and acknowledge the{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline font-medium text-gray-900">
+            Privacy Policy
+          </a>
+        </label>
+      </div>
+
       <button type="submit" disabled={submitting} className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50">
         Submit application
       </button>

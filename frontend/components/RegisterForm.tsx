@@ -8,6 +8,7 @@ import { INSTITUTIONS, CITIES, PAKISTAN_PROVINCES, COUNTRIES } from "@/lib/formD
 import { GuardianConsentFields, type GuardianConsentValue } from "./GuardianConsentFields";
 import { DateOfBirthInput } from "./DateOfBirthInput";
 import { AutocompleteInput } from "./AutocompleteInput";
+import { CnicUploadField } from "./CnicUploadField";
 
 type InitialFormKeys = "fullName" | "email" | "phone" | "dob" | "gender" | "city" | "province" | "country" | "institution" | "degreeProgram";
 
@@ -45,6 +46,7 @@ export function RegisterForm({
   initialCity = "",
   initialInstitution = "",
   initialCountry = "",
+  showCnicUpload = false,
   onSuccess,
   onSkip,
 }: {
@@ -55,6 +57,7 @@ export function RegisterForm({
   initialCity?: string;
   initialInstitution?: string;
   initialCountry?: string;
+  showCnicUpload?: boolean;
   onSuccess?: () => void;
   onSkip?: () => void;
 }) {
@@ -214,12 +217,17 @@ export function RegisterForm({
             required
             value={form.gender}
             onChange={(e) => updateField("gender", e.target.value)}
+            style={{
+              color: form.gender === "" ? "var(--ink-2)" : "var(--ink)",
+            }}
           >
-            <option value="">Select gender</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-            <option value="other">Other</option>
-            <option value="prefer_not_to_say">Prefer not to say</option>
+            <option value="" style={{ color: "var(--ink-2)" }}>
+              Select gender
+            </option>
+            <option value="female" style={{ color: "var(--ink)" }}>Female</option>
+            <option value="male" style={{ color: "var(--ink)" }}>Male</option>
+            <option value="other" style={{ color: "var(--ink)" }}>Other</option>
+            <option value="prefer_not_to_say" style={{ color: "var(--ink)" }}>Prefer not to say</option>
           </select>
         </div>
         <div className="field">
@@ -293,26 +301,35 @@ export function RegisterForm({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3" style={{ marginTop: "1.25rem" }}>
-        <button
-          type="submit"
-          aria-label="Save details"
-          disabled={submitting}
-          className="btn btn--primary"
-        >
-          {submitting ? "Saving details..." : "Save & build portfolio"}
-        </button>
+      {showCnicUpload && (
+        <div style={{ marginTop: "1.25rem" }}>
+          <CnicUploadField
+            accessToken={accessToken}
+            onUploaded={() => {}}
+          />
+        </div>
+      )}
 
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 w-full" style={{ marginTop: "1.25rem" }}>
         {onSkip && (
           <button
             type="button"
             onClick={onSkip}
-            className="btn btn--ghost"
+            className="btn btn--ghost w-full sm:w-auto"
             aria-label="Skip for now"
           >
             Skip for now
           </button>
         )}
+
+        <button
+          type="submit"
+          aria-label="Save details"
+          disabled={submitting}
+          className="btn btn--primary w-full sm:w-auto"
+        >
+          {submitting ? "Saving details..." : "Save & build portfolio"}
+        </button>
       </div>
     </form>
   );

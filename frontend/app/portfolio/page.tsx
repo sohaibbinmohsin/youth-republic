@@ -403,7 +403,7 @@ export default function PortfolioPage() {
           aria-current={activeTab === "details" ? "page" : undefined}
           onClick={() => setActiveTab("details")}
         >
-          Portfolio details
+          Details
           {isPending && (
             <span className="pill pill--pend" style={{ marginLeft: ".5rem", fontSize: ".7rem", padding: ".15rem .45rem" }}>
               Pending
@@ -727,6 +727,7 @@ export default function PortfolioPage() {
                 initialPhone={volunteer.phone}
                 initialCity={volunteer.city !== "Pakistan" ? volunteer.city : ""}
                 initialInstitution={volunteer.institution !== "Youth Republic" ? volunteer.institution : ""}
+                showCnicUpload={true}
                 onSuccess={() => {
                   loadAll();
                   setActiveTab("impact");
@@ -788,18 +789,7 @@ export default function PortfolioPage() {
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, emergency_contact: newValue } : v))}
               />
 
-              <div className="pt-4 border-t border-[var(--line)]">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-semibold text-[var(--ink)] mb-0">
-                    CNIC / B-Form Verification Document
-                  </label>
-                  {isPending ? (
-                    <span className="pill pill--pend text-[0.7rem] py-0.5 px-2">Pending verification</span>
-                  ) : (
-                    <span className="pill pill--pos text-[0.7rem] py-0.5 px-2">Verified</span>
-                  )}
-                </div>
-                <p className="text-xs text-[var(--ink-2)] mb-3">Upload your document scan to complete national verification standing.</p>
+              <div style={{ marginTop: "1.25rem" }}>
                 <CnicUploadField accessToken={accessToken} onUploaded={() => loadAll()} />
               </div>
             </div>

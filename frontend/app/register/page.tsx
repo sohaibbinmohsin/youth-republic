@@ -184,11 +184,30 @@ function RegisterContent() {
                 </div>
               </div>
 
+              <div className="field-checkbox" style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", marginTop: "0.75rem", marginBottom: "0.75rem" }}>
+                <input
+                  id="reg1-terms"
+                  type="checkbox"
+                  defaultChecked
+                  style={{ marginTop: "0.2rem", cursor: "pointer" }}
+                />
+                <label htmlFor="reg1-terms" style={{ fontSize: "0.8125rem", color: "var(--color-text-muted, #4A4B46)", cursor: "pointer", lineHeight: "1.4" }}>
+                  I agree to the{" "}
+                  <Link href="/terms" target="_blank" style={{ textDecoration: "underline", color: "inherit", fontWeight: 500 }}>
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" target="_blank" style={{ textDecoration: "underline", color: "inherit", fontWeight: 500 }}>
+                    Privacy Policy
+                  </Link>
+                </label>
+              </div>
+
               <button type="submit" disabled={loading} className="btn btn--primary btn--block">
                 {loading ? "Creating account..." : "Create account"}
               </button>
 
-              <p className="altline" style={{ marginTop: "1.25rem" }}>
+              <p className="altline" style={{ marginTop: "1.25rem", textAlign: "center" }}>
                 Already have an account? <Link href={loginHref}>Sign in</Link>
               </p>
             </form>
