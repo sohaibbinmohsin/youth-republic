@@ -95,9 +95,18 @@ function RegisterContent() {
     }
   }
 
-  const loginHref = targetDestination && targetDestination !== "/portfolio"
-    ? `/login?redirectTo=${encodeURIComponent(targetDestination)}`
-    : "/login";
+  const [loginHref, setLoginHref] = useState(() => {
+    return redirectToParam
+      ? `/login?redirectTo=${encodeURIComponent(redirectToParam)}`
+      : "/login";
+  });
+
+  useEffect(() => {
+    const effectiveReturn = getEffectiveReturnUrl(redirectToParam);
+    if (effectiveReturn && effectiveReturn !== "/portfolio") {
+      setLoginHref(`/login?redirectTo=${encodeURIComponent(effectiveReturn)}`);
+    }
+  }, [redirectToParam]);
 
   return (
     <section className="route-centered">

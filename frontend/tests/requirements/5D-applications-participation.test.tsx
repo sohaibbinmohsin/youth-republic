@@ -23,18 +23,27 @@ beforeEach(() => {
 });
 
 describe("§5D Applying — reuses the stored profile, asks only opportunity-specific info", () => {
-  it("[5D] the apply form asks for a motivation statement and nothing already on the profile", () => {
+  it("[5D] the apply form asks for a motivation statement and pre-fills stored profile info", () => {
     render(
-      <ApplyForm opportunityId="opp-1" organizationId="org-1" accessToken={ACCESS_TOKEN} onSuccess={() => {}} />,
+      <ApplyForm
+        opportunityId="opp-1"
+        organizationId="org-1"
+        accessToken={ACCESS_TOKEN}
+        onSuccess={() => {}}
+        initialVolunteerProfile={{
+          fullName: "Ayesha Khan",
+          email: "ayesha.k@example.com",
+          phone: "0300 1234567",
+        }}
+      />,
     );
     expect(screen.getByLabelText(/why do you want to volunteer/i)).toBeInTheDocument();
-
-    for (const alreadyOnFile of [/full name/i, /email/i, /phone/i, /city/i, /institution/i, /date of birth/i]) {
-      expect(screen.queryByLabelText(alreadyOnFile)).not.toBeInTheDocument();
-    }
+    expect(screen.getByLabelText("Full name")).toHaveValue("Ayesha Khan");
+    expect(screen.getByLabelText("Email")).toHaveValue("ayesha.k@example.com");
+    expect(screen.getByLabelText("Phone")).toHaveValue("0300 1234567");
   });
 
-  it("[5D] submitting sends only opportunity + org + motivation — never identity fields, never a client-supplied volunteerId", async () => {
+  it("[5D] submitting sends only opportunity + org + motivation + answers — never a client-supplied volunteerId", async () => {
     vi.mocked(edgeFunctions.applyToOpportunity).mockResolvedValue({ applicationId: "app-1" });
     const user = userEvent.setup();
     render(
@@ -42,17 +51,24 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "I ran a food bank at university.");
+    await user.click(screen.getByLabelText(/I confirm the information above is accurate/i));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
     await waitFor(() => {
       expect(edgeFunctions.applyToOpportunity).toHaveBeenCalledTimes(1);
     });
     const [payload, token] = vi.mocked(edgeFunctions.applyToOpportunity).mock.calls[0];
-    expect(payload).toEqual({
-      opportunityId: "opp-1",
-      organizationId: "org-1",
-      motivationStatement: "I ran a food bank at university.",
-    });
+    expect(payload).toEqual(
+      expect.objectContaining({
+        opportunityId: "opp-1",
+        organizationId: "org-1",
+        motivationStatement: "I ran a food bank at university.",
+        answers: expect.objectContaining({
+          why: "I ran a food bank at university.",
+          consent: true,
+        }),
+      }),
+    );
     expect(payload).not.toHaveProperty("volunteerId");
     expect(token).toBe(ACCESS_TOKEN);
   });
@@ -65,6 +81,7 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "motivated");
+    await user.click(screen.getByLabelText(/I confirm the information above is accurate/i));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
     expect(await screen.findByText("cnic_required")).toBeInTheDocument();

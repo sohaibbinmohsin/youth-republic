@@ -329,7 +329,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
               />
               <p className="text-xs text-white/85 max-w-[380px] leading-relaxed">
-                One profile. Every organisation. Pakistan’s unified volunteer network, powered by{" "}
+                One profile. Every organization. Pakistan’s unified volunteer network, powered by{" "}
                 <span className="inline-flex items-center gap-1 font-semibold text-white">
                   <strong>The Mohsin Project</strong>
                   <img

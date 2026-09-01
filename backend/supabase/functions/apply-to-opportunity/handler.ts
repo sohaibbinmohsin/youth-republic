@@ -1,6 +1,7 @@
 // backend/supabase/functions/apply-to-opportunity/handler.ts
 import { SupabaseClient } from "@supabase/supabase-js";
 import { validateAnswers, resolveConsent, type FormDefinition } from "../_shared/forms.ts";
+import { computeOpportunityStatus } from "../_shared/opportunityStatus.ts";
 
 export interface ApplyToOpportunityInput {
   volunteerId: string;
@@ -21,9 +22,20 @@ export async function applyToOpportunity(
   if (!volunteer.id_doc_number) throw new Error("id_doc_required");
 
   const { data: opp, error: oErr } = await supabase.from("opportunities")
-    .select("id, organization_id, deactivated_at, application_form").eq("id", input.opportunityId).single();
+    .select("id, organization_id, deactivated_at, application_form, status_override, application_open_at, application_deadline, activity_start_at, activity_end_at")
+    .eq("id", input.opportunityId)
+    .single();
   if (oErr || !opp) throw new Error("not_found");
-  if (opp.deactivated_at !== null) throw new Error("opportunity_unavailable");
+
+  const status = computeOpportunityStatus({
+    statusOverride: opp.status_override ?? null,
+    applicationOpenAt: opp.application_open_at ?? null,
+    applicationDeadline: opp.application_deadline ?? null,
+    activityStartAt: opp.activity_start_at ?? null,
+    activityEndAt: opp.activity_end_at ?? null,
+    deactivatedAt: opp.deactivated_at ?? null,
+  });
+  if (status !== "open") throw new Error("opportunity_unavailable");
 
   const form = opp.application_form as FormDefinition;
   const result = validateAnswers(form, input.answers);

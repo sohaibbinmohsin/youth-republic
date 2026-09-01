@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import { OpportunityCard } from "./OpportunityCard";
 
 export interface OpportunityItem {
   id: string;
@@ -254,7 +254,7 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
               <span className="swatch"></span> Community
             </label>
 
-            <h4>Organisation</h4>
+            <h4>Organization</h4>
             {availableOrgs.map((org) => (
               <label key={org}>
                 <input
@@ -302,6 +302,22 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
                 onChange={() => toggleStatus("in_progress")}
               />
               In progress
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("closed")}
+                onChange={() => toggleStatus("closed")}
+              />
+              Closed
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("completed")}
+                onChange={() => toggleStatus("completed")}
+              />
+              Completed
             </label>
 
             <h4>Format</h4>
@@ -455,55 +471,9 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
           {/* 3. LOADED OPPORTUNITIES GRID */}
           {!isLoading && filteredOpportunities.length > 0 && (
             <div className="cards">
-              {filteredOpportunities.map((opp) => {
-                const orgKey = opp.organizationName.toLowerCase();
-                const orgConf = ORG_CONFIG[orgKey] ?? {
-                  monogram: opp.organizationName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
-                  color: "#8A7A10",
-                };
-
-                const typeClass = `type-${opp.type.toLowerCase()}`;
-                const isPos = opp.computedStatus === "open";
-                const isProg = opp.computedStatus === "in_progress";
-                const isPend = opp.computedStatus === "coming_soon";
-                const isComp = opp.computedStatus === "completed";
-                const pillClass = isPos ? "pill--pos" : isProg ? "pill--prog" : isPend ? "pill--pend" : "pill--neu";
-                const statusLabels: Record<string, string> = {
-                  open: "Open",
-                  coming_soon: "Coming soon",
-                  in_progress: "In progress",
-                  completed: "Completed",
-                  closed: "Closed",
-                };
-                const statusLabel = statusLabels[opp.computedStatus] ?? (opp.computedStatus ? opp.computedStatus.charAt(0).toUpperCase() + opp.computedStatus.slice(1).replace(/_/g, " ") : "Open");
-
-                const locationDisplay = opp.isOnline
-                  ? (!opp.location || opp.location.toLowerCase() === "online" ? "Online" : `${opp.location} · Online`)
-                  : `${opp.location ?? "Lahore"} · In person`;
-                const typeLabel = opp.type ? opp.type.charAt(0).toUpperCase() + opp.type.slice(1) : "";
-
-                return (
-                  <Link key={opp.id} href={`/opportunities/${opp.id}`} className="oc">
-                    <div className="oc__org">
-                      <span className="orglogo" style={{ background: orgConf.color }}>
-                        {orgConf.monogram}
-                      </span>
-                      <span className="org">{opp.organizationName}</span>
-                    </div>
-                    <h3>{opp.name}</h3>
-                    <div className="loc">
-                      {locationDisplay}
-                    </div>
-                    <p className="meta">
-                      {opp.description ?? "Pack and distribute ration hampers to families across Lahore through the month."}
-                    </p>
-                    <div className="foot">
-                      <span className={`ttag ${typeClass}`}>{typeLabel}</span>
-                      <span className={`pill ${pillClass}`}>{statusLabel}</span>
-                    </div>
-                  </Link>
-                );
-              })}
+              {filteredOpportunities.map((opp) => (
+                <OpportunityCard key={opp.id} opportunity={opp} />
+              ))}
             </div>
           )}
         </div>

@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           </h2>
           <p>
             Youth Republic, powered by <strong>The Mohsin Project Global (SMC) Pvt. Ltd</strong> (Corporate Unique Identification No. 0352616),
-            is Pakistan&rsquo;s unified volunteer network and credentialing platform. We connect volunteers with accredited non-profit organisations,
+            is Pakistan&rsquo;s unified volunteer network and credentialing platform. We connect volunteers with accredited non-profit organizations,
             verify national volunteer identities, track community service hours, and issue tamper-evident credentials.
           </p>
           <p className="mt-2">
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
           <p>
             To prevent any data leakage incident, raw CNIC, NICOP, and B-Form files are <strong>permanently wiped and deleted</strong> from our servers
             immediately after an authorized officer validates your identity. We do not store document copies long-term. Only an immutable cryptographic
-            verification badge remains on your profile. Identity files are never shared with partner organisations, recruiters, or third parties.
+            verification badge remains on your profile. Identity files are never shared with partner organizations, recruiters, or third parties.
           </p>
         </section>
 
@@ -86,7 +86,7 @@ export default function PrivacyPage() {
           <p>We process your personal information strictly to:</p>
           <ul className="list-disc pl-5 space-y-1.5 mt-2">
             <li>Issue and maintain your unique, lifelong Volunteer ID.</li>
-            <li>Facilitate direct applications to accredited volunteer opportunities across partner organisations.</li>
+            <li>Facilitate direct applications to accredited volunteer opportunities across partner organizations.</li>
             <li>Verify authentic legal identity and ensure compliance with child safeguarding standards for minors.</li>
             <li>Accredit and generate tamper-evident records of your community service hours and digital certificates.</li>
           </ul>
