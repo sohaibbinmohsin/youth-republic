@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
+import { LiveIndicator } from "./LiveIndicator";
 
 export interface OpportunitySummary {
   id: string;
@@ -27,23 +29,17 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
 
   const status = opportunity.computedStatus ?? "open";
   const typeClass = `type-${opportunity.type.toLowerCase()}`;
-  const isPos = status === "open";
-  const isProg = status === "in_progress";
-  const isPend = status === "coming_soon";
-  const pillClass = isPos ? "pill--pos" : isProg ? "pill--prog" : isPend ? "pill--pend" : "pill--neu";
-  const statusLabels: Record<string, string> = {
-    open: "Open",
-    coming_soon: "Coming soon",
-    in_progress: "In progress",
-    completed: "Completed",
-    closed: "Closed",
-  };
-  const statusLabel = statusLabels[status] ?? (status ? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ") : "Open");
+  const badge = getOpportunityBadgeConfig(status);
+  const isLive = isOpportunityLive(status);
 
   const locationDisplay = opportunity.isOnline
     ? (!opportunity.location || opportunity.location.toLowerCase() === "online" ? "Online" : `${opportunity.location} · Online`)
     : `${opportunity.location ?? "Lahore"} · In person`;
   const typeLabel = opportunity.type ? opportunity.type.charAt(0).toUpperCase() + opportunity.type.slice(1) : "";
+
+  const words = opportunity.name.trim().split(/\s+/);
+  const prefix = words.length > 1 ? words.slice(0, -1).join(" ") + " " : "";
+  const lastWord = words.length > 0 ? words[words.length - 1] : "";
 
   return (
     <Link href={`/opportunities/${opportunity.id}`} className="oc">
@@ -53,7 +49,21 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
         </span>
         <span className="org">{opportunity.organizationName}</span>
       </div>
-      <h3>{opportunity.name}</h3>
+      <div className="oc__title-row">
+        <h3>
+          {isLive ? (
+            <>
+              {prefix}
+              <span className="title-with-live">
+                {lastWord}
+                <LiveIndicator />
+              </span>
+            </>
+          ) : (
+            opportunity.name
+          )}
+        </h3>
+      </div>
       <div className="loc">
         {locationDisplay}
       </div>
@@ -62,7 +72,7 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
       </p>
       <div className="foot">
         <span className={`ttag ${typeClass}`}>{typeLabel}</span>
-        <span className={`pill ${pillClass}`}>{statusLabel}</span>
+        <span className={`pill ${badge.pillClass}`}>{badge.label}</span>
       </div>
     </Link>
   );

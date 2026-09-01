@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getServerSupabaseClient } from "@/lib/supabase/serverClient";
-import { computeOpportunityStatus } from "@/lib/opportunityStatus";
+import { computeOpportunityStatus, getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import {
   type OpportunityDetailRow,
   TYPE_CONFIG,
@@ -49,25 +50,18 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     color: "#941A80",
   };
 
-  const isPos = status === "open";
-  const isProg = status === "in_progress";
-  const isPend = status === "coming_soon";
-  const isComp = status === "completed";
-  const pillClass = isPos ? "pill--pos" : isProg ? "pill--prog" : isPend ? "pill--pend" : "pill--neu";
-  const statusLabel =
-    status === "open"
-      ? "Open"
-      : status === "coming_soon"
-      ? "Coming soon"
-      : status === "in_progress"
-      ? "In progress"
-      : status === "completed"
-      ? "Completed"
-      : "Closed";
+  const badge = getOpportunityBadgeConfig(status);
+  const isLive = isOpportunityLive(status);
 
   const locationDisplay = opp.is_online
     ? (!opp.location || opp.location.toLowerCase() === "online" ? "Online" : `${opp.location} · Online`)
     : `${opp.location ?? "Lahore"} · In person`;
+
+  const words = opp.name.trim().split(/\s+/);
+  const prefix = words.length > 1 ? words.slice(0, -1).join(" ") + " " : "";
+  const lastWord = words.length > 0 ? words[words.length - 1] : "";
+
+  const badgeLabel = badge.label === "Closed" ? "Applications closed" : badge.label;
 
   return (
     <section data-route="opportunity" className="pb-12">
@@ -86,16 +80,26 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             <span>{org.name}</span>
           </p>
 
-          <h1 className="display">{opp.name}</h1>
+          <h1 className="display">
+            {isLive ? (
+              <>
+                {prefix}
+                <span className="title-with-live">
+                  {lastWord}
+                  <LiveIndicator />
+                </span>
+              </>
+            ) : (
+              opp.name
+            )}
+          </h1>
 
-          <p className="sub">
+          <div className="detail__meta">
             <span style={{ color: typeConf.color, fontWeight: 600 }}>{typeConf.label}</span>
-            <span> · </span>
+            <span className="dot">·</span>
             <span>{locationDisplay}</span>
-          </p>
-
-          <div className="badges">
-            <span className={`pill ${pillClass}`}>{statusLabel}</span>
+            <span className="dot">·</span>
+            <span className={`pill ${badge.pillClass}`}>{badgeLabel}</span>
           </div>
 
           {opp.description && (
