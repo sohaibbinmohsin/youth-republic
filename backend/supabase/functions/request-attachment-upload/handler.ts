@@ -1,6 +1,6 @@
-// backend/supabase/functions/request-attachment-upload/handler.ts
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ATTACHMENT_POLICY, EXT_BY_MIME, type AttachmentDomain } from "../_shared/attachmentPolicy.ts";
+import { type R2Client } from "../_shared/r2.ts";
 
 export interface RequestAttachmentUploadInput {
   domain: AttachmentDomain;
@@ -30,6 +30,7 @@ export async function requestAttachmentUpload(
   supabase: SupabaseClient,
   requester: AttachmentRequester,
   input: RequestAttachmentUploadInput,
+  r2Client?: R2Client,
 ): Promise<RequestAttachmentUploadResult> {
   const policy = ATTACHMENT_POLICY[input.domain];
   if (!policy) throw new Error("bad_domain");
@@ -97,9 +98,16 @@ export async function requestAttachmentUpload(
   if (insErr) throw insErr;
   const persistedId = (inserted && (inserted as { id?: string }).id) || attachmentId;
 
-  const { data: signed, error: sErr } = await supabase.storage
-    .from(policy.bucket).createSignedUploadUrl(storagePath);
-  if (sErr || !signed) throw new Error("upload_url_failed");
+  let uploadUrl: string | undefined;
+  if (r2Client) {
+    uploadUrl = await r2Client.putSignedUrl(storagePath, 900);
+  } else {
+    const { data: signed, error: sErr } = await supabase.storage
+      .from(policy.bucket).createSignedUploadUrl(storagePath);
+    if (sErr || !signed) throw new Error("upload_url_failed");
+    uploadUrl = signed.signedUrl;
+  }
+  if (!uploadUrl) throw new Error("upload_url_failed");
 
-  return { attachmentId: persistedId, uploadUrl: signed.signedUrl, storagePath };
+  return { attachmentId: persistedId, uploadUrl, storagePath };
 }

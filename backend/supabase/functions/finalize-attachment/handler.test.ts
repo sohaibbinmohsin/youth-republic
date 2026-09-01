@@ -29,3 +29,14 @@ Deno.test("happy path flips status to ready", async () => {
   const r = await finalizeAttachment(sb({ size: 100 }), { authUserId: "u" }, { attachmentId: "att-1" });
   assertEquals(r.ok, true);
 });
+
+Deno.test("uses R2 client when provided", async () => {
+  const fakeR2 = {
+    async putSignedUrl() { return ""; },
+    async getSignedUrl() { return ""; },
+    async headObject() { return { size: 100 }; },
+  };
+  const r = await finalizeAttachment(sb(null), { authUserId: "u" }, { attachmentId: "att-1" }, fakeR2);
+  assertEquals(r.ok, true);
+});
+

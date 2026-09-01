@@ -40,3 +40,19 @@ Deno.test("application_file: staff of a different org denied", async () => {
   await assertRejects(() => getAttachment(sbWith({ id: "a", domain: "application_file", owner_type: "application", owner_id: "app1", organization_id: "org-1", bucket: "application-files", storage_path: "p" }),
     { staffOrgIds: ["org-2"] }, { attachmentId: "a" }), Error, "forbidden");
 });
+
+Deno.test("uses R2 client when provided", async () => {
+  const fakeR2 = {
+    async putSignedUrl() { return ""; },
+    async getSignedUrl(key: string) { return `https://r2.test/download/${key}`; },
+    async headObject() { return null; },
+  };
+  const r = await getAttachment(
+    sbWith({ id: "a", domain: "identity_doc", owner_type: "volunteer", owner_id: "v1", organization_id: null, bucket: "identity-docs", storage_path: "path/to/file.png" }),
+    { volunteerId: "v1" },
+    { attachmentId: "a" },
+    fakeR2,
+  );
+  assertEquals(r.url, "https://r2.test/download/path/to/file.png");
+});
+

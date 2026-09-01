@@ -93,3 +93,20 @@ Deno.test("happy path returns attachmentId, uploadUrl, storagePath", async () =>
   assertEquals(r.uploadUrl, "https://upload");
   assertEquals(r.storagePath.startsWith("activity_hours/own-1/"), true);
 });
+
+Deno.test("uses R2 client when provided", async () => {
+  const fakeR2 = {
+    async putSignedUrl(key: string) { return `https://r2.test/${key}`; },
+    async getSignedUrl() { return ""; },
+    async headObject() { return null; },
+  };
+  const r = await requestAttachmentUpload(
+    fakeSupabase(),
+    { authUserId: "u", volunteerId: "v" },
+    { domain: "identity_doc", ownerType: "volunteer", ownerId: "own-1", mimeType: "image/png", sizeBytes: 100 },
+    fakeR2,
+  );
+  assertEquals(r.attachmentId, "att-new");
+  assertEquals(r.uploadUrl.startsWith("https://r2.test/volunteer/own-1/"), true);
+});
+

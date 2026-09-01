@@ -3,6 +3,7 @@ import { checkRateLimit } from "../_shared/rateLimit.ts";
 import { verifyVolunteerAuthUser, verifyVolunteerToken } from "../_shared/verifyVolunteerAuth.ts";
 import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
 import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { buildR2Client } from "../_shared/r2.ts";
 import { type AttachmentRequester, requestAttachmentUpload } from "./handler.ts";
 
 async function resolveRequester(
@@ -59,7 +60,8 @@ export async function handler(req: Request): Promise<Response> {
   try {
     const requester = await resolveRequester(supabase, req.headers.get("Authorization"));
     const input = await req.json();
-    const result = await requestAttachmentUpload(supabase, requester, input);
+    const r2Client = Deno.env.get("R2_BUCKET_URL") ? buildR2Client() : undefined;
+    const result = await requestAttachmentUpload(supabase, requester, input, r2Client);
     return new Response(JSON.stringify(result), {
       status: 201,
       headers: { "Content-Type": "application/json", ...corsHeaders },
