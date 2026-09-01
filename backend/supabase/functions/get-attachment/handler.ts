@@ -1,5 +1,5 @@
-// get-attachment/handler.ts
 import { SupabaseClient } from "@supabase/supabase-js";
+import { type R2Client } from "../_shared/r2.ts";
 
 export interface GetAttachmentInput { attachmentId: string; }
 export interface AttachmentReader {
@@ -12,6 +12,7 @@ export async function getAttachment(
   supabase: SupabaseClient,
   reader: AttachmentReader,
   input: GetAttachmentInput,
+  r2Client?: R2Client,
 ): Promise<{ url: string }> {
   const { data: att, error } = await supabase.from("attachments")
     .select("id, domain, owner_type, owner_id, organization_id, bucket, storage_path, status")
@@ -35,10 +36,18 @@ export async function getAttachment(
     if (!ownsIt && !isOrgStaff) throw new Error("forbidden");
   }
 
-  const { data: signed, error: sErr } = await supabase.storage
-    .from(att.bucket).createSignedUrl(att.storage_path, 300);
-  if (sErr || !signed) throw new Error("download_url_failed");
-  return { url: signed.signedUrl };
+  let downloadUrl: string | undefined;
+  if (r2Client) {
+    downloadUrl = await r2Client.getSignedUrl(att.storage_path, 300);
+  } else {
+    const { data: signed, error: sErr } = await supabase.storage
+      .from(att.bucket).createSignedUrl(att.storage_path, 300);
+    if (sErr || !signed) throw new Error("download_url_failed");
+    downloadUrl = signed.signedUrl;
+  }
+  if (!downloadUrl) throw new Error("download_url_failed");
+
+  return { url: downloadUrl };
 }
 
 async function volunteerOwns(supabase: SupabaseClient, volunteerId: string, ownerId: string): Promise<boolean> {
