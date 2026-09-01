@@ -53,7 +53,7 @@ export default function TermsPage() {
               National Identity Card (CNIC) or Passport.
             </li>
             <li>
-              <strong>Safeguarding Protocol:</strong> All partner organisations hosting activities involving minors must maintain
+              <strong>Safeguarding Protocol:</strong> All partner organizations hosting activities involving minors must maintain
               direct adult supervision and adhere to strict safeguarding guidelines.
             </li>
           </ul>
@@ -65,7 +65,7 @@ export default function TermsPage() {
           </h2>
           <p>
             Registered volunteers are issued a single, non-transferable digital identity (&ldquo;Volunteer ID&rdquo;) recognized
-            across all accredited partner non-profit organisations. Volunteers agree to:
+            across all accredited partner non-profit organizations. Volunteers agree to:
           </p>
           <ul className="list-disc pl-5 space-y-1.5 mt-2">
             <li>Provide truthful, accurate demographic and contact information during registration.</li>
@@ -104,11 +104,11 @@ export default function TermsPage() {
 
         <section>
           <h2 className="font-['Oswald'] text-lg font-bold uppercase tracking-wider text-[#24262D] mb-2">
-            6. Partner Organisation Commitments
+            6. Partner Organization Commitments
           </h2>
           <p>
-            All non-profit organisations listed on Youth Republic are vetted for credibility, legal standing, and safe operating
-            environments. Partner organisations agree to treat applicant data with strict confidentiality, refrain from selling or
+            All non-profit organizations listed on Youth Republic are vetted for credibility, legal standing, and safe operating
+            environments. Partner organizations agree to treat applicant data with strict confidentiality, refrain from selling or
             scraping data, and evaluate applications fairly.
           </p>
         </section>
@@ -118,7 +118,7 @@ export default function TermsPage() {
             7. Limitation of Liability
           </h2>
           <p>
-            Youth Republic connects volunteers with third-party community organisations. The Company does not directly employ
+            Youth Republic connects volunteers with third-party community organizations. The Company does not directly employ
             volunteers. Participation in on-site community service, fieldwork, and relief activities is undertaken voluntarily at
             the user&rsquo;s own risk.
           </p>

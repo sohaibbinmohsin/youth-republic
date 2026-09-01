@@ -14,6 +14,8 @@ interface SbOpts {
   oppForm?: unknown;
   volunteer?: Record<string, unknown>;
   deactivatedAt?: string | null;
+  statusOverride?: string | null;
+  applicationDeadline?: string | null;
   capture?: { application?: Record<string, unknown> };
 }
 
@@ -34,6 +36,11 @@ function sb(opts: SbOpts = {}) {
                 id: "opp1",
                 organization_id: "org1",
                 deactivated_at: opts.deactivatedAt ?? null,
+                status_override: opts.statusOverride ?? null,
+                application_deadline: opts.applicationDeadline ?? null,
+                application_open_at: null,
+                activity_start_at: null,
+                activity_end_at: null,
                 application_form: opts.oppForm ?? form,
               },
               error: null,
@@ -80,6 +87,34 @@ Deno.test("rejects an application to a deactivated opportunity", async () => {
   await assertRejects(
     () =>
       applyToOpportunity(sb({ deactivatedAt: "2026-01-01T00:00:00Z" }), {
+        volunteerId: "v1",
+        authUserId: "u1",
+        opportunityId: "opp1",
+        answers: { why: "I care", consent: true },
+      }),
+    Error,
+    "opportunity_unavailable",
+  );
+});
+
+Deno.test("rejects an application when opportunity status is closed", async () => {
+  await assertRejects(
+    () =>
+      applyToOpportunity(sb({ statusOverride: "closed" }), {
+        volunteerId: "v1",
+        authUserId: "u1",
+        opportunityId: "opp1",
+        answers: { why: "I care", consent: true },
+      }),
+    Error,
+    "opportunity_unavailable",
+  );
+});
+
+Deno.test("rejects an application when application deadline has passed", async () => {
+  await assertRejects(
+    () =>
+      applyToOpportunity(sb({ applicationDeadline: "2020-01-01T00:00:00Z" }), {
         volunteerId: "v1",
         authUserId: "u1",
         opportunityId: "opp1",

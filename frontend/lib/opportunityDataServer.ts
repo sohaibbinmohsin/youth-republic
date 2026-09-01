@@ -1,0 +1,30 @@
+import { getServerSupabaseClient } from "@/lib/supabase/serverClient";
+import { PROTOTYPE_SEED_OPPORTUNITIES, type OpportunityDetailRow } from "./opportunityData";
+
+export async function fetchOpportunityServer(id: string): Promise<OpportunityDetailRow | null> {
+  if (PROTOTYPE_SEED_OPPORTUNITIES[id]) {
+    return PROTOTYPE_SEED_OPPORTUNITIES[id];
+  }
+
+  try {
+    const supabase = await getServerSupabaseClient();
+    const { data, error } = await supabase
+      .from("opportunities")
+      .select(
+        "id, name, type, description, about, duties, eligibility, what_to_bring, location, is_online, application_open_at, application_deadline, activity_start_at, activity_end_at, capacity, status_override, deactivated_at, organization_id, application_form, organizations(id, name, about, logo_url, brand_color)"
+      )
+      .eq("id", id)
+      .single();
+
+    if (data && !error) {
+      return data as unknown as OpportunityDetailRow;
+    }
+  } catch {
+    // Continue to prototype fallback match
+  }
+
+  const matched = Object.values(PROTOTYPE_SEED_OPPORTUNITIES).find((o) => o.id === id);
+  if (matched) return matched;
+
+  return null;
+}

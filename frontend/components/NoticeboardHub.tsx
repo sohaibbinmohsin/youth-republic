@@ -254,7 +254,7 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
               <span className="swatch"></span> Community
             </label>
 
-            <h4>Organisation</h4>
+            <h4>Organization</h4>
             {availableOrgs.map((org) => (
               <label key={org}>
                 <input

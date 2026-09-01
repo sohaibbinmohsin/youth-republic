@@ -56,17 +56,25 @@ function LoginForm() {
     }
   }
 
-  const effectiveReturn = getEffectiveReturnUrl(redirectToParam);
-  const registerHref = effectiveReturn && effectiveReturn !== "/portfolio"
-    ? `/register?redirectTo=${encodeURIComponent(effectiveReturn)}`
-    : "/register";
+  const [registerHref, setRegisterHref] = useState(() => {
+    return redirectToParam
+      ? `/register?redirectTo=${encodeURIComponent(redirectToParam)}`
+      : "/register";
+  });
+
+  useEffect(() => {
+    const effectiveReturn = getEffectiveReturnUrl(redirectToParam);
+    if (effectiveReturn && effectiveReturn !== "/portfolio") {
+      setRegisterHref(`/register?redirectTo=${encodeURIComponent(effectiveReturn)}`);
+    }
+  }, [redirectToParam]);
 
   return (
     <section className="route-centered">
       <div className="pane">
         <div className="auth-head">
           <h1 className="display">Sign in</h1>
-          <p>One volunteer record across every organisation on Youth Republic.</p>
+          <p>One volunteer record across every organization on Youth Republic.</p>
 
           {error && (
             <div className="notice" style={{ background: "var(--st-neg-bg)", color: "var(--st-neg-fg)" }} role="alert">
@@ -173,7 +181,7 @@ function LoginForm() {
             <li>Apply to any opportunity in a couple of taps.</li>
             <li>Track every application’s status in one place.</li>
             <li>Build a verified record of your hours and programmes.</li>
-            <li>Carry the same verified record across every organisation on Youth Republic.</li>
+            <li>Carry the same verified record across every organization on Youth Republic.</li>
           </ul>
         </aside>
       </div>
