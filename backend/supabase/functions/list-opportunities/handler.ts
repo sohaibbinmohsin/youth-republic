@@ -23,6 +23,11 @@ export interface OpportunityCard {
   online: boolean;
   computedStatus: string;
   description: string | null;
+  capacity: number | null;
+  filledCount: number;
+  applicationDeadline: string | null;
+  activityStartAt: string | null;
+  activityEndAt: string | null;
 }
 
 export interface ListOpportunitiesResult {
@@ -59,7 +64,7 @@ export function computeOpportunityStatus(o: OpportunityStatusInputs): string {
 }
 
 const CARD_SELECT =
-  "id, name, type, description, location, is_online, status_override, " +
+  "id, name, type, description, location, is_online, status_override, capacity, " +
   "application_open_at, application_deadline, activity_start_at, activity_end_at, " +
   "deactivated_at, organization_id, organizations(name, logo_url)";
 
@@ -70,7 +75,7 @@ interface QueryScope {
   includeDeactivated: boolean;
 }
 
-function toCard(o: Record<string, unknown>): OpportunityCard {
+function toCard(o: Record<string, unknown>, filledCount: number): OpportunityCard {
   const org = (o.organizations ?? {}) as { name?: string | null; logo_url?: string | null };
   return {
     id: o.id as string,
@@ -81,6 +86,11 @@ function toCard(o: Record<string, unknown>): OpportunityCard {
     city: (o.location ?? null) as string | null,
     online: Boolean(o.is_online),
     description: (o.description ?? null) as string | null,
+    capacity: (o.capacity ?? null) as number | null,
+    filledCount,
+    applicationDeadline: (o.application_deadline ?? null) as string | null,
+    activityStartAt: (o.activity_start_at ?? null) as string | null,
+    activityEndAt: (o.activity_end_at ?? null) as string | null,
     computedStatus: computeOpportunityStatus({
       statusOverride: (o.status_override ?? null) as string | null,
       applicationOpenAt: (o.application_open_at ?? null) as string | null,
@@ -90,6 +100,26 @@ function toCard(o: Record<string, unknown>): OpportunityCard {
       deactivatedAt: (o.deactivated_at ?? null) as string | null,
     }),
   };
+}
+
+// Confirmed-volunteer counts per opportunity, for the capacity meter. One
+// grouped query over the returned page's ids (same pattern as computeFacets).
+async function filledCountsByOpportunity(
+  supabase: SupabaseClient,
+  opportunityIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (opportunityIds.length === 0) return counts;
+  const { data, error } = await supabase
+    .from("participation")
+    .select("opportunity_id")
+    .in("opportunity_id", opportunityIds);
+  if (error) throw error;
+  for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
+    const id = row.opportunity_id as string;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }
 
 async function computeFacets(
@@ -159,7 +189,9 @@ async function runOpportunityQuery(
   const { data, error, count } = await query.range(offset, offset + limit - 1);
   if (error) throw error;
 
-  let opportunities = ((data ?? []) as unknown as Record<string, unknown>[]).map(toCard);
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  const filled = await filledCountsByOpportunity(supabase, rows.map((r) => r.id as string));
+  let opportunities = rows.map((r) => toCard(r, filled.get(r.id as string) ?? 0));
   const facets = await computeFacets(supabase, scope);
 
   // status is computed in JS (not filterable in SQL), so a status filter

@@ -104,9 +104,9 @@ function seedDb() {
   const opportunities: Row[] = [
     {
       id: "o1", name: "Beach Cleanup", type: "environment", description: "Clean the shore",
-      location: "Karachi", is_online: false, status_override: null,
-      application_open_at: null, application_deadline: null,
-      activity_start_at: null, activity_end_at: null,
+      location: "Karachi", is_online: false, status_override: null, capacity: 40,
+      application_open_at: null, application_deadline: "2099-03-01T00:00:00Z",
+      activity_start_at: "2099-03-10T00:00:00Z", activity_end_at: "2099-03-12T00:00:00Z",
       created_at: "2026-01-03T00:00:00Z", deactivated_at: null,
       organization_id: "org-1", organizations: greenOrg(),
     },
@@ -139,7 +139,12 @@ function seedDb() {
     { id: "org-1", name: "Green Org" },
     { id: "org-2", name: "Ed Org" },
   ];
-  return makeDb({ opportunities, organizations });
+  // Two confirmed volunteers on o1, none elsewhere — drives filledCount.
+  const participation: Row[] = [
+    { opportunity_id: "o1", volunteer_id: "v1" },
+    { opportunity_id: "o1", volunteer_id: "v2" },
+  ];
+  return makeDb({ opportunities, organizations, participation });
 }
 
 function claims(orgId: string): StaffClaims {
@@ -187,6 +192,22 @@ Deno.test("listOpportunitiesPublic filters by type and maps each card", async ()
   assertEquals(result.opportunities[0].orgLogoUrl, "https://cdn/green.png");
   assertEquals(result.opportunities[0].city, "Karachi");
   assertEquals(result.opportunities[0].computedStatus, "open");
+});
+
+Deno.test("card carries capacity, filledCount and the date fields", async () => {
+  const result = await listOpportunitiesPublic(seedDb(), { type: "environment" });
+  const card = result.opportunities[0];
+  assertEquals(card.id, "o1");
+  assertEquals(card.capacity, 40);
+  assertEquals(card.filledCount, 2);
+  assertEquals(card.applicationDeadline, "2099-03-01T00:00:00Z");
+  assertEquals(card.activityStartAt, "2099-03-10T00:00:00Z");
+  assertEquals(card.activityEndAt, "2099-03-12T00:00:00Z");
+});
+
+Deno.test("filledCount is 0 for an opportunity with no participation", async () => {
+  const result = await listOpportunitiesPublic(seedDb(), { type: "health" });
+  assertEquals(result.opportunities[0].filledCount, 0);
 });
 
 Deno.test("listOpportunitiesPublic filters by city", async () => {
