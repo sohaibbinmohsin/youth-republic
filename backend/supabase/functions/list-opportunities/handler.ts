@@ -28,6 +28,7 @@ export interface OpportunityCard {
   applicationDeadline: string | null;
   activityStartAt: string | null;
   activityEndAt: string | null;
+  deactivatedAt: string | null;
 }
 
 export interface ListOpportunitiesResult {
@@ -91,6 +92,7 @@ function toCard(o: Record<string, unknown>, filledCount: number): OpportunityCar
     applicationDeadline: (o.application_deadline ?? null) as string | null,
     activityStartAt: (o.activity_start_at ?? null) as string | null,
     activityEndAt: (o.activity_end_at ?? null) as string | null,
+    deactivatedAt: (o.deactivated_at ?? null) as string | null,
     computedStatus: computeOpportunityStatus({
       statusOverride: (o.status_override ?? null) as string | null,
       applicationOpenAt: (o.application_open_at ?? null) as string | null,
