@@ -199,6 +199,8 @@ async function seedDemoVolunteers(c: DemoClients): Promise<DemoVol[]> {
       degree_program: "BS",
       id_doc_type: "cnic",
       id_doc_number: `35202-${Math.floor(1000000 + rnd() * 8999999)}-${Math.floor(rnd() * 9)}`,
+      // decide-application requires an emergency contact before a volunteer can be selected
+      emergency_contact: { name: `${pick(["Amir", "Fatima", "Kamran", "Nadia"])} ${name.split(" ").pop()}`, phone: "0300 0000000" },
       status,
     }).select("id").single();
     ok(vErr, `insert demo volunteer ${name}`);

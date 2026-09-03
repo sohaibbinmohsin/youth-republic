@@ -12,24 +12,41 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ApplyForm } from "@/components/ApplyForm";
 import { ApplicationStatusBadge } from "@/components/ApplicationStatusBadge";
 import * as edgeFunctions from "@/lib/edgeFunctions";
+import type { OpportunityDetailRow } from "@/lib/opportunityData";
 import { APPLICATION_STATUSES, PARTICIPATION_STATUSES } from "./_helpers";
 
-vi.mock("@/lib/edgeFunctions");
+vi.mock("@/lib/edgeFunctions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/edgeFunctions")>();
+  return { ...actual, applyToOpportunity: vi.fn() };
+});
 
 const ACCESS_TOKEN = "test-access-token";
+
+// The opportunity-specific questions the admin published for this drive.
+const opportunity = {
+  id: "opp-1",
+  organization_id: "org-1",
+  application_form: {
+    version: 1,
+    fields: [
+      { id: "why", type: "long_text", label: "Why do you want to volunteer for this?", required: true },
+      { id: "consent", type: "checkbox", label: "I confirm the information above is accurate.", required: true },
+    ],
+  },
+} as unknown as OpportunityDetailRow;
 
 beforeEach(() => {
   vi.mocked(edgeFunctions.applyToOpportunity).mockReset();
 });
 
 describe("§5D Applying — reuses the stored profile, asks only opportunity-specific info", () => {
-  it("[5D] the apply form asks for a motivation statement and pre-fills stored profile info", () => {
+  it("[5D] the apply form renders the opportunity's own questions and pre-fills stored profile info", () => {
     render(
       <ApplyForm
         opportunityId="opp-1"
-        organizationId="org-1"
         accessToken={ACCESS_TOKEN}
         onSuccess={() => {}}
+        opportunity={opportunity}
         initialVolunteerProfile={{
           fullName: "Ayesha Khan",
           email: "ayesha.k@example.com",
@@ -43,11 +60,11 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     expect(screen.getByLabelText("Phone")).toHaveValue("0300 1234567");
   });
 
-  it("[5D] submitting sends only opportunity + org + motivation + answers — never a client-supplied volunteerId", async () => {
+  it("[5D] submitting sends the opportunity id + answers keyed by field id — never a client-supplied volunteerId", async () => {
     vi.mocked(edgeFunctions.applyToOpportunity).mockResolvedValue({ applicationId: "app-1" });
     const user = userEvent.setup();
     render(
-      <ApplyForm opportunityId="opp-1" organizationId="org-1" accessToken={ACCESS_TOKEN} onSuccess={() => {}} />,
+      <ApplyForm opportunityId="opp-1" accessToken={ACCESS_TOKEN} onSuccess={() => {}} opportunity={opportunity} />,
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "I ran a food bank at university.");
@@ -61,8 +78,6 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     expect(payload).toEqual(
       expect.objectContaining({
         opportunityId: "opp-1",
-        organizationId: "org-1",
-        motivationStatement: "I ran a food bank at university.",
         answers: expect.objectContaining({
           why: "I ran a food bank at university.",
           consent: true,
@@ -73,18 +88,18 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     expect(token).toBe(ACCESS_TOKEN);
   });
 
-  it("[5D] a rejected application attempt shows the server's reason (e.g. cnic_required)", async () => {
-    vi.mocked(edgeFunctions.applyToOpportunity).mockRejectedValue(new Error("cnic_required"));
+  it("[5D] a rejected application attempt shows the server's reason (e.g. id_doc_required)", async () => {
+    vi.mocked(edgeFunctions.applyToOpportunity).mockRejectedValue(new Error("id_doc_required"));
     const user = userEvent.setup();
     render(
-      <ApplyForm opportunityId="opp-1" organizationId="org-1" accessToken={ACCESS_TOKEN} onSuccess={() => {}} />,
+      <ApplyForm opportunityId="opp-1" accessToken={ACCESS_TOKEN} onSuccess={() => {}} opportunity={opportunity} />,
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "motivated");
     await user.click(screen.getByLabelText(/I confirm the information above is accurate/i));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
-    expect(await screen.findByText("cnic_required")).toBeInTheDocument();
+    expect(await screen.findByText("id_doc_required")).toBeInTheDocument();
   });
 });
 
