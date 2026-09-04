@@ -1,6 +1,6 @@
 import { getAdminClient } from "../_shared/supabaseAdmin.ts";
 import { verifyStaffToken } from "../_shared/verifyStaffToken.ts";
-import { getResendEmailClient } from "../_shared/sendEmail.ts";
+import { getEmailClient } from "../_shared/sendEmail.ts";
 import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 import { decideApplication } from "./handler.ts";
 
@@ -12,7 +12,7 @@ export async function handler(req: Request): Promise<Response> {
     const claims = await verifyStaffToken(req.headers.get("Authorization"));
     const supabase = getAdminClient();
     const input = await req.json();
-    const result = await decideApplication(supabase, claims, input, getResendEmailClient());
+    const result = await decideApplication(supabase, claims, input, getEmailClient());
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },

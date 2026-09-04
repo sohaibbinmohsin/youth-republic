@@ -561,9 +561,6 @@ async function seedOrganizations(clients: SeedClients): Promise<void> {
     }
   }
 
-  // Note: `staff_module_roles` is intentionally left empty — this seed provisions
-  // no delegated (module-scoped) staff, so there is nothing to re-grant there.
-
   // (b) Re-grant staff_org_roles on the admin project.
   const { data: superRows, error: superErr } = await clients.admin
     .from("staff")
@@ -611,6 +608,35 @@ async function seedOrganizations(clients: SeedClients): Promise<void> {
     .from("staff_org_roles")
     .upsert(grants, { onConflict: "staff_id,organization_id" });
   ok(grantErr, "re-grant staff_org_roles");
+
+  // (b2) Grant the org-'admin' staff an explicit module role so mint-staff-token
+  // actually puts youth-republic permissions in their JWT. mint-staff-token only
+  // expands module_access for `super_admin`-tier orgs or explicit
+  // staff_module_roles rows — an `admin`-tier org role alone yields an empty
+  // module_access (every staffHasPermission check then 403s). Give the admin the
+  // system 'Editor' role on youth-republic for Rizq.
+  const { data: editorRole, error: editorErr } = await clients.admin
+    .from("roles")
+    .select("id")
+    .eq("organization_id", ORG_IDS.rizq)
+    .eq("module_id", moduleId)
+    .eq("name", "Editor")
+    .maybeSingle();
+  ok(editorErr, "lookup youth-republic Editor role for Rizq");
+  if (editorRole) {
+    const { error: smrErr } = await clients.admin
+      .from("staff_module_roles")
+      .upsert(
+        {
+          staff_id: adminStaffId,
+          organization_id: ORG_IDS.rizq,
+          module_id: moduleId,
+          role_id: editorRole.id as string,
+        },
+        { onConflict: "staff_id,organization_id,module_id" },
+      );
+    ok(smrErr, "grant admin the youth-republic Editor role for Rizq");
+  }
 
   // (c) YR project: mirror the org rows. Direct service-role upsert (no token
   // dependency); columns per migration 0012 + 0016.

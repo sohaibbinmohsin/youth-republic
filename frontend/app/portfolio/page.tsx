@@ -25,7 +25,7 @@ interface VolunteerProfile {
   country?: string | null;
   institution: string;
   degree_program?: string | null;
-  cnic_number?: string | null;
+  id_doc_number?: string | null;
   status: string;
   created_at: string;
   emergency_contact?: { name: string; phone: string } | null;
@@ -132,7 +132,7 @@ export default function PortfolioPage() {
     try {
       const query = supabase
         .from("volunteers")
-        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, cnic_number, status, created_at, emergency_contact")
+        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, id_doc_number, status, created_at, emergency_contact")
         .eq("auth_user_id", authUserId);
       const result = typeof (query as any).maybeSingle === "function"
         ? await (query as any).maybeSingle()
