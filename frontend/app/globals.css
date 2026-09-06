@@ -421,7 +421,10 @@ select {
 
 /* ---------- 2-COLUMN DETAIL PANE ---------- */
 .pane { display: grid; gap: 2rem 2.25rem; align-items: start; }
-@media (min-width: 880px) { .pane { grid-template-columns: minmax(0, 1fr) 290px; } }
+@media (min-width: 880px) {
+  .pane { grid-template-columns: minmax(0, 1fr) 290px; }
+  .pane--summary-first { grid-template-columns: minmax(0, 1fr) 320px; gap: 2rem; }
+}
 .pane__aside {
   background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-card);
   padding: 1.25rem 1.35rem; font-size: .88rem;
@@ -661,7 +664,7 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
 .checks label { display: flex; align-items: center; gap: .55rem; font-size: .92rem; font-weight: 400; margin: 0; cursor: pointer; color: var(--ink); }
 .checks label input[type="radio"],
 .checks label input[type="checkbox"] { flex-shrink: 0; margin: 0; }
-.apply-form { max-width: 520px; width: 100%; }
+.apply-form { width: 100%; max-width: 100%; }
 .altline { font-size: .9rem; color: var(--ink-2); margin-top: 1rem; }
 
 .idcard { margin-top: 1.5rem; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 1.75rem; background: var(--bg-2); max-width: 460px; }

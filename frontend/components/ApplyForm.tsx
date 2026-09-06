@@ -822,11 +822,11 @@ export const ApplyForm = forwardRef<
       {children}
 
       {/* Form Actions: Submit & Save Draft */}
-      <div className="flex gap-3 flex-wrap pt-2">
+      <div className="flex flex-col sm:flex-row gap-3 pt-3 w-full">
         <button
           type="submit"
           disabled={submitting || savingDraft}
-          className="btn btn--primary flex-1 min-w-[180px]"
+          className="btn btn--primary flex-[2] min-w-[200px] py-3 text-base justify-center font-medium"
           id="applySubmit"
         >
           {submitting ? "Submitting application…" : "Submit application"}
@@ -836,7 +836,7 @@ export const ApplyForm = forwardRef<
           type="button"
           disabled={submitting || savingDraft}
           onClick={handleSaveDraft}
-          className="btn btn--ghost"
+          className="btn btn--ghost flex-1 sm:min-w-[160px] py-3 text-base justify-center"
           id="applySaveDraft"
         >
           {savingDraft ? "Saving draft…" : "Save draft"}
