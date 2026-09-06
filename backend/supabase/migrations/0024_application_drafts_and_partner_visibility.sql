@@ -23,8 +23,7 @@ where a.volunteer_id = v.id and a.auth_user_id is null;
 
 -- 5. Create index for fast draft/user lookups
 create unique index if not exists applications_auth_user_opportunity_idx
-  on applications (auth_user_id, opportunity_id)
-  where auth_user_id is not null;
+  on applications (auth_user_id, opportunity_id);
 
 -- 6. RLS Policies
 drop policy if exists applications_self_select on applications;
