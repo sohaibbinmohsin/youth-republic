@@ -10,7 +10,7 @@ interface Fixtures {
   volunteer: { id: string; full_name: string; city: string; institution: string; created_at: string };
   totalVerifiedHours: number;
   chapterLink?: { chapters: { name: string } } | null;
-  applications?: Array<{ id: string; status: string; opportunities: { name: string; type?: string; location?: string } | null; organizations?: { name: string } | null }>;
+  applications?: Array<{ id: string; opportunity_id?: string; status: string; opportunities: { id?: string; name: string; type?: string; location?: string } | null; organizations?: { name: string } | null }>;
   activityHours?: Array<{
     id: string;
     role: string | null;
@@ -127,6 +127,35 @@ describe("PortfolioPage", () => {
     expect(screen.getByText("Tree Plantation")).toBeInTheDocument();
     expect(screen.getByText("Under review")).toBeInTheDocument();
     expect(screen.getByText("Not selected")).toBeInTheDocument();
+  });
+
+  it("shows draft applications with Draft status pill and resume button", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBrowserSupabaseClient).mockReturnValue(
+      mockSupabase({
+        volunteer: { id: "vol-1", full_name: "Aisha Khan", city: "Lahore", institution: "LUMS", created_at: "2026-01-15T00:00:00Z" },
+        totalVerifiedHours: 0,
+        applications: [
+          {
+            id: "app-draft-1",
+            status: "draft",
+            opportunities: { id: "opp-comm-1", name: "Community Kitchen", type: "community", location: "Islamabad" },
+          },
+        ],
+      }) as never,
+    );
+
+    render(<PortfolioPage />);
+    await waitFor(() => expect(screen.getByText("Aisha Khan")).toBeInTheDocument());
+
+    const appsTab = screen.getByRole("button", { name: "Applications" });
+    await user.click(appsTab);
+
+    expect(await screen.findByText("Community Kitchen")).toBeInTheDocument();
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    const resumeLink = screen.getByRole("link", { name: "Resume" });
+    expect(resumeLink).toBeInTheDocument();
+    expect(resumeLink).toHaveAttribute("href", "/apply/opp-comm-1");
   });
 
   it("[6] shows programme cards and chronological activity sessions under Impact tab", async () => {

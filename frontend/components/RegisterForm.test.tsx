@@ -193,4 +193,16 @@ describe("RegisterForm", () => {
     expect(screen.queryByRole("option", { name: /CNIC \(National Identity Card\)/i })).not.toBeInTheDocument();
     await user.click(document.body); // close popup
   });
+
+  it("validates and highlights CNIC number when showCnicUpload is true and submitted empty", async () => {
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" showCnicUpload={true} />);
+
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
+
+    expect(edgeFunctions.registerVolunteer).not.toHaveBeenCalled();
+    const cnicInput = screen.getByLabelText("CNIC number");
+    expect(cnicInput).toHaveClass("input-error");
+    expect(screen.getByText("CNIC number is required")).toBeInTheDocument();
+  });
 });

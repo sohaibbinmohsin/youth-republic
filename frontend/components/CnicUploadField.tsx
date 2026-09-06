@@ -47,11 +47,18 @@ export function CnicUploadField({
 
     const uploadTask = (async () => {
       try {
+        const effectiveOwnerId =
+          ownerId && ownerId !== "00000000-0000-0000-0000-000000000000"
+            ? ownerId
+            : typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : "00000000-0000-0000-0000-000000000000";
+
         const { uploadUrl, attachmentId } = await requestAttachmentUpload(
           {
             domain: "identity_doc",
             ownerType: "volunteer",
-            ownerId: ownerId || "00000000-0000-0000-0000-000000000000",
+            ownerId: effectiveOwnerId,
             mimeType: file.type || "image/jpeg",
             sizeBytes: file.size,
             originalFilename: file.name,

@@ -34,6 +34,7 @@ interface VolunteerProfile {
 
 interface ApplicationItem {
   id: string;
+  opportunityId?: string;
   status: string;
   opportunityName: string;
   orgName: string;
@@ -176,7 +177,7 @@ export default function PortfolioPage() {
       try {
         const { data: appRows } = await supabase
           .from("applications")
-          .select("id, status, opportunities(name, type, location), organizations(name, brand_color)")
+          .select("id, status, opportunity_id, opportunities(id, name, type, location), organizations(name, brand_color)")
           .order("applied_at", { ascending: false });
 
         const mappedApps: ApplicationItem[] = (appRows ?? []).map((r: any) => {
@@ -184,6 +185,7 @@ export default function PortfolioPage() {
           const org = r.organizations ?? {};
           return {
             id: r.id,
+            opportunityId: r.opportunity_id || opp.id,
             status: r.status ?? "submitted",
             opportunityName: opp.name ?? "Volunteer Drive",
             orgName: org.name ?? "Youth Republic Partner",
@@ -321,9 +323,35 @@ export default function PortfolioPage() {
         is_unregistered: true,
       });
       setTotalVerifiedHours(0);
-      setApplications([]);
       setProgrammes([]);
       setCompletedList([]);
+
+      // Unregistered volunteers can still have drafts
+      try {
+        const { data: appRows } = await supabase
+          .from("applications")
+          .select("id, status, opportunity_id, opportunities(id, name, type, location), organizations(name, brand_color)")
+          .order("applied_at", { ascending: false });
+
+        const mappedApps: ApplicationItem[] = (appRows ?? []).map((r: any) => {
+          const opp = r.opportunities ?? {};
+          const org = r.organizations ?? {};
+          return {
+            id: r.id,
+            opportunityId: r.opportunity_id || opp.id,
+            status: r.status ?? "draft",
+            opportunityName: opp.name ?? "Volunteer Drive",
+            orgName: org.name ?? "Youth Republic Partner",
+            orgInitials: getOrgInitials(org.name),
+            orgColor: org.brand_color ?? getOrgColor(org.name),
+            type: opp.type ?? "community",
+            location: opp.location ?? "Pakistan",
+          };
+        });
+        setApplications(mappedApps);
+      } catch {
+        setApplications([]);
+      }
     }
   }
 
@@ -676,14 +704,18 @@ export default function PortfolioPage() {
             <div className="list">
               {applications.map((app) => {
                 const statusPillClass =
-                  app.status === "selected" || app.status === "approved"
+                  app.status === "draft"
+                    ? "pill--neu"
+                    : app.status === "selected" || app.status === "approved"
                     ? "pill--pos"
                     : app.status === "under_review" || app.status === "submitted" || app.status === "waitlisted"
                     ? "pill--pend"
                     : "pill--neg";
 
                 const displayStatus =
-                  app.status === "under_review"
+                  app.status === "draft"
+                    ? "Draft"
+                    : app.status === "under_review"
                     ? "Under review"
                     : app.status === "selected"
                     ? "Selected"
@@ -705,7 +737,17 @@ export default function PortfolioPage() {
                         </div>
                       </div>
                     </div>
-                    <span className={`pill ${statusPillClass}`}>{displayStatus}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span className={`pill ${statusPillClass}`}>{displayStatus}</span>
+                      {app.status === "draft" && app.opportunityId && (
+                        <Link
+                          href={`/apply/${app.opportunityId}`}
+                          className="btn btn--primary btn--sm"
+                        >
+                          Resume
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -790,7 +832,7 @@ export default function PortfolioPage() {
               />
 
               <div style={{ marginTop: "1.25rem" }}>
-                <CnicUploadField accessToken={accessToken} onUploaded={() => loadAll()} />
+                <CnicUploadField accessToken={accessToken} ownerId={volunteer.id} onUploaded={() => loadAll()} />
               </div>
             </div>
           )}

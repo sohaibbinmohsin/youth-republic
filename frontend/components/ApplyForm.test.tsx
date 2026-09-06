@@ -5,9 +5,35 @@ import { ApplyForm } from "./ApplyForm";
 import * as edgeFunctions from "@/lib/edgeFunctions";
 import type { OpportunityDetailRow } from "@/lib/opportunityData";
 
+vi.mock("@/lib/supabase/browserClient", () => ({
+  getBrowserSupabaseClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: "u-1", email: "ayesha.k@example.com" } } }),
+    },
+    from: vi.fn(() => ({
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        })),
+      })),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      update: vi.fn(() => ({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      })),
+    })),
+  })),
+}));
+
 vi.mock("@/lib/edgeFunctions", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/edgeFunctions")>();
-  return { ...actual, applyToOpportunity: vi.fn(), requestAttachmentUpload: vi.fn(), finalizeAttachment: vi.fn() };
+  return {
+    ...actual,
+    applyToOpportunity: vi.fn(),
+    registerVolunteer: vi.fn().mockResolvedValue({ volunteerId: "v-new", volunteerCode: "YR-123" }),
+    requestAttachmentUpload: vi.fn(),
+    finalizeAttachment: vi.fn(),
+  };
 });
 
 const opportunity = {
@@ -27,6 +53,7 @@ const opportunity = {
 
 describe("ApplyForm (dynamic)", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.mocked(edgeFunctions.applyToOpportunity).mockReset();
   });
 
@@ -144,5 +171,54 @@ describe("ApplyForm (dynamic)", () => {
     await user.click(within(listbox).getByText("Weekday evenings"));
 
     expect(trigger).toHaveTextContent("Weekday evenings");
+  });
+
+  it("renders pending profile details section when hasPendingDetails is true", () => {
+    render(
+      <ApplyForm
+        opportunityId="opp1"
+        accessToken="session-token"
+        onSuccess={vi.fn()}
+        opportunity={opportunity}
+        initialVolunteerProfile={{
+          fullName: "Bilal Ahmed",
+          email: "bilal@example.com",
+          hasPendingDetails: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Your Profile Details")).toBeInTheDocument();
+    expect(screen.getByText("Pending Details")).toBeInTheDocument();
+    expect(screen.getByLabelText("Date of birth *")).toBeInTheDocument();
+    expect(screen.getByLabelText("Gender *")).toBeInTheDocument();
+    expect(screen.getByLabelText("City *")).toBeInTheDocument();
+    expect(screen.getByLabelText("Institution / University *")).toBeInTheDocument();
+    expect(screen.getByLabelText("Degree program *")).toBeInTheDocument();
+    expect(screen.getByLabelText(/CNIC Number/)).toBeInTheDocument();
+  });
+
+  it("saves draft to cloud and shows confirmation notice when clicking Save draft", async () => {
+    const user = userEvent.setup();
+    render(
+      <ApplyForm
+        opportunityId="opp1"
+        accessToken="session-token"
+        onSuccess={vi.fn()}
+        opportunity={opportunity}
+        initialVolunteerProfile={{
+          fullName: "Ayesha Khan",
+          email: "ayesha.k@example.com",
+          phone: "0300 1234567",
+        }}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "Draft answers here.");
+    const saveBtn = screen.getByRole("button", { name: "Save draft" });
+    await user.click(saveBtn);
+
+    expect(await screen.findByText(/Draft saved/i)).toBeInTheDocument();
+    expect(edgeFunctions.applyToOpportunity).not.toHaveBeenCalled();
   });
 });
