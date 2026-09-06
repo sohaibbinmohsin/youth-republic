@@ -66,22 +66,59 @@ export async function applyToOpportunity(
     if (!ok) throw new Error("bad_attachment");
   }
 
-  const { data: app, error: iErr } = await supabase.from("applications").insert({
-    volunteer_id: volunteer.id,
-    opportunity_id: opp.id,
-    organization_id: opp.organization_id,
-    answers: input.answers,
-    form_snapshot: form,
-    applicant_name: volunteer.full_name,
-    applicant_email: volunteer.email,
-    applicant_phone: volunteer.phone,
-    consent_accepted: resolveConsent(form, input.answers),
-  }).select("id").single();
-  if (iErr) throw iErr;
+  // Check if an existing application or draft exists for this opportunity and volunteer/user
+  const query = supabase
+    .from("applications")
+    .select("id, status")
+    .eq("opportunity_id", opp.id)
+    .or(`volunteer_id.eq.${volunteer.id},auth_user_id.eq.${input.authUserId}`);
+  
+  const { data: existingApp } = typeof (query as any).maybeSingle === "function"
+    ? await (query as any).maybeSingle()
+    : { data: null };
+
+  let applicationId: string;
+  if (existingApp) {
+    if (existingApp.status !== "draft") {
+      throw new Error("already_applied");
+    }
+    const { data: updatedApp, error: uErr } = await supabase.from("applications").update({
+      volunteer_id: volunteer.id,
+      auth_user_id: input.authUserId,
+      status: "submitted",
+      applied_at: new Date().toISOString(),
+      answers: input.answers,
+      form_snapshot: form,
+      applicant_name: volunteer.full_name,
+      applicant_email: volunteer.email,
+      applicant_phone: volunteer.phone,
+      consent_accepted: resolveConsent(form, input.answers),
+      draft_profile: {},
+    }).eq("id", existingApp.id).select("id").single();
+    if (uErr) throw uErr;
+    applicationId = updatedApp.id;
+  } else {
+    const { data: app, error: iErr } = await supabase.from("applications").insert({
+      volunteer_id: volunteer.id,
+      auth_user_id: input.authUserId,
+      opportunity_id: opp.id,
+      organization_id: opp.organization_id,
+      status: "submitted",
+      answers: input.answers,
+      form_snapshot: form,
+      applicant_name: volunteer.full_name,
+      applicant_email: volunteer.email,
+      applicant_phone: volunteer.phone,
+      consent_accepted: resolveConsent(form, input.answers),
+      draft_profile: {},
+    }).select("id").single();
+    if (iErr) throw iErr;
+    applicationId = app.id;
+  }
 
   if (attachmentIds.length > 0) {
     await supabase.from("attachments")
-      .update({ owner_id: app.id, organization_id: opp.organization_id })
+      .update({ owner_id: applicationId, organization_id: opp.organization_id })
       .in("id", attachmentIds);
   }
 
@@ -90,5 +127,5 @@ export async function applyToOpportunity(
     p_volunteer_id: volunteer.id,
   });
 
-  return { applicationId: app.id };
+  return { applicationId };
 }

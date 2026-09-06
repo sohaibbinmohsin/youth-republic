@@ -110,3 +110,92 @@ Deno.test("uses R2 client when provided", async () => {
   assertEquals(r.uploadUrl.startsWith("https://r2.test/volunteer/own-1/"), true);
 });
 
+Deno.test("pre-registration requester bypasses per-owner count check even if count is at cap", async () => {
+  const countStub = {
+    eq() { return this; },
+    then(resolve: (val: unknown) => unknown) {
+      return resolve({ count: 10, error: null });
+    },
+  };
+  const sb = fakeSupabase({
+    from() {
+      return {
+        select(_cols: unknown, opts?: { count?: string; head?: boolean }) {
+          if (opts?.count) return countStub;
+          return this;
+        },
+        eq() { return this; },
+        in() { return this; },
+        insert() { return { select() { return { async single() { return { data: { id: "att-new" }, error: null }; } }; } }; },
+      };
+    },
+  });
+
+  const r = await requestAttachmentUpload(
+    sb,
+    { authUserId: "auth-1", preRegistration: true },
+    {
+      domain: "identity_doc",
+      ownerType: "volunteer",
+      ownerId: "00000000-0000-0000-0000-000000000000",
+      mimeType: "image/png",
+      sizeBytes: 100,
+    },
+  );
+  assertEquals(r.attachmentId, "att-new");
+});
+
+Deno.test("volunteer requester with placeholder ownerId adopts requester volunteerId", async () => {
+  const r = await requestAttachmentUpload(
+    fakeSupabase(),
+    { authUserId: "u", volunteerId: "v-real" },
+    {
+      domain: "identity_doc",
+      ownerType: "volunteer",
+      ownerId: "00000000-0000-0000-0000-000000000000",
+      mimeType: "image/png",
+      sizeBytes: 100,
+    },
+  );
+  assertEquals(r.attachmentId, "att-new");
+  assertEquals(r.storagePath.startsWith("volunteer/v-real/"), true);
+});
+
+Deno.test("volunteer requester throws too_many_files when ready count reaches cap", async () => {
+  const countStub = {
+    eq() { return this; },
+    then(resolve: (val: unknown) => unknown) {
+      return resolve({ count: 1, error: null });
+    },
+  };
+  const sb = fakeSupabase({
+    from() {
+      return {
+        select(_cols: unknown, opts?: { count?: string; head?: boolean }) {
+          if (opts?.count) return countStub;
+          return this;
+        },
+        eq() { return this; },
+        in() { return this; },
+        insert() { return { select() { return { async single() { return { data: { id: "att-new" }, error: null }; } }; } }; },
+      };
+    },
+  });
+
+  await assertRejects(
+    () => requestAttachmentUpload(
+      sb,
+      { authUserId: "u", volunteerId: "v-real" },
+      {
+        domain: "identity_doc",
+        ownerType: "volunteer",
+        ownerId: "v-real",
+        mimeType: "image/png",
+        sizeBytes: 100,
+      },
+    ),
+    Error,
+    "too_many_files",
+  );
+});
+

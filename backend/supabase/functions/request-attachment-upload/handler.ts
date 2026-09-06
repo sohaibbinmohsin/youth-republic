@@ -55,6 +55,9 @@ export async function requestAttachmentUpload(
     if (!mayUploadIdentityDoc || input.ownerType !== "volunteer") throw new Error("forbidden");
     // owner_id is a client-chosen uuid for the volunteer row about to be created,
     // or the volunteer's own id for a re-upload. Accept both; re-point happens later.
+    if (isVolunteer && (!input.ownerId || input.ownerId === "00000000-0000-0000-0000-000000000000")) {
+      input.ownerId = requester.volunteerId!;
+    }
   } else if (input.domain === "session_photo") {
     if (!isVolunteer || input.ownerType !== "activity_hours") throw new Error("forbidden");
   } else if (input.domain === "application_file") {
@@ -72,10 +75,13 @@ export async function requestAttachmentUpload(
   }
 
   // Per-owner file count cap (only meaningful once the row is re-pointed; a soft check).
-  const { count } = await supabase.from("attachments")
-    .select("id", { count: "exact", head: true })
-    .eq("owner_type", input.ownerType).eq("owner_id", input.ownerId).eq("status", "ready");
-  if ((count ?? 0) >= policy.maxFilesPerOwner) throw new Error("too_many_files");
+  // Skip check for pre-registration requesters or placeholder ownerId since the row hasn't been re-pointed yet.
+  if (!requester.preRegistration && input.ownerId !== "00000000-0000-0000-0000-000000000000") {
+    const { count } = await supabase.from("attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_type", input.ownerType).eq("owner_id", input.ownerId).eq("status", "ready");
+    if ((count ?? 0) >= policy.maxFilesPerOwner) throw new Error("too_many_files");
+  }
 
   const attachmentId = crypto.randomUUID();
   const ext = EXT_BY_MIME[input.mimeType] ?? "bin";

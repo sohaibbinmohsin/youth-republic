@@ -6,7 +6,7 @@ import { CustomSelect } from "@/components/CustomSelect";
 import { registerVolunteer, ValidationError, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
 import { isMinor } from "@/lib/ageUtils";
 import { formatPhoneNumber } from "@/lib/phoneUtils";
-import { formatCnic } from "@/lib/cnicUtils";
+import { formatCnic, isValidCnic } from "@/lib/cnicUtils";
 import { INSTITUTIONS, CITIES, PAKISTAN_PROVINCES, COUNTRIES } from "@/lib/formDatasets";
 import { GuardianConsentFields, type GuardianConsentValue } from "./GuardianConsentFields";
 import { DateOfBirthInput } from "./DateOfBirthInput";
@@ -158,6 +158,25 @@ export function RegisterForm({
     checkRequired("province", "Province");
     checkRequired("country", "Country");
     checkRequired("degreeProgram", "Degree program");
+
+    if (showCnicUpload) {
+      const docLabel =
+        form.idDocType === "passport"
+          ? "Passport number"
+          : form.idDocType === "b_form"
+          ? "B-Form number"
+          : "CNIC number";
+      if (!form.idDocNumber || form.idDocNumber.trim() === "") {
+        errors.idDocNumber = `${docLabel} is required`;
+        missingLabels.push(docLabel);
+      } else if (
+        (form.idDocType === "cnic" || form.idDocType === "b_form") &&
+        !isValidCnic(form.idDocNumber)
+      ) {
+        errors.idDocNumber = "Must be a 13-digit number (XXXXX-XXXXXXX-X)";
+        missingLabels.push(docLabel);
+      }
+    }
 
     return {
       isValid: Object.keys(errors).length === 0,
@@ -406,25 +425,21 @@ export function RegisterForm({
 
         <div className={`field ${fieldErrors.gender ? "has-error" : ""}`}>
           <label htmlFor="gender">Gender</label>
-          <select
+          <CustomSelect
             id="gender"
             name="gender"
-            required
+            required={true}
+            placeholder="Select gender…"
             value={form.gender}
-            onChange={(e) => updateField("gender", e.target.value)}
-            className={fieldErrors.gender ? "input-error" : ""}
-            style={{
-              color: form.gender === "" ? "var(--placeholder)" : "var(--ink)",
-            }}
-          >
-            <option value="" style={{ color: "var(--placeholder)" }}>
-              Select gender
-            </option>
-            <option value="female" style={{ color: "var(--ink)" }}>Female</option>
-            <option value="male" style={{ color: "var(--ink)" }}>Male</option>
-            <option value="other" style={{ color: "var(--ink)" }}>Other</option>
-            <option value="prefer_not_to_say" style={{ color: "var(--ink)" }}>Prefer not to say</option>
-          </select>
+            onChange={(val: string) => updateField("gender", val)}
+            error={!!fieldErrors.gender}
+            options={[
+              { value: "female", label: "Female" },
+              { value: "male", label: "Male" },
+              { value: "other", label: "Other" },
+              { value: "prefer_not_to_say", label: "Prefer not to say" },
+            ]}
+          />
           {fieldErrors.gender && <p className="field__error" role="alert">{fieldErrors.gender}</p>}
         </div>
 
@@ -593,6 +608,7 @@ export function RegisterForm({
               <input
                 id="idDocNumber"
                 type="text"
+                required={showCnicUpload}
                 inputMode={form.idDocType === "passport" ? "text" : "numeric"}
                 value={form.idDocNumber}
                 onChange={(e) => {

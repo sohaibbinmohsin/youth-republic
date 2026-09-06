@@ -13,10 +13,11 @@ const form = {
 interface SbOpts {
   oppForm?: unknown;
   volunteer?: Record<string, unknown>;
+  existingApp?: Record<string, unknown> | null;
   deactivatedAt?: string | null;
   statusOverride?: string | null;
   applicationDeadline?: string | null;
-  capture?: { application?: Record<string, unknown> };
+  capture?: { application?: Record<string, unknown>; updatedApp?: Record<string, unknown> };
 }
 
 function sb(opts: SbOpts = {}) {
@@ -27,8 +28,13 @@ function sb(opts: SbOpts = {}) {
       const api = {
         select() { return api; },
         eq() { return api; },
+        or() { return api; },
         in() { return api; },
         is() { return api; },
+        async maybeSingle() {
+          if (table === "applications") return { data: opts.existingApp ?? null, error: null };
+          return { data: null, error: null };
+        },
         async single() {
           if (table === "opportunities") {
             return {
@@ -47,13 +53,21 @@ function sb(opts: SbOpts = {}) {
             };
           }
           if (table === "volunteers") return { data: volunteer, error: null };
+          if (table === "applications") return { data: { id: "app-new" }, error: null };
           return { data: null, error: null };
         },
         insert(payload: Record<string, unknown>) {
           if (table === "applications" && opts.capture) opts.capture.application = payload;
           return { select() { return { async single() { return { data: { id: "app-new" }, error: null }; } }; } };
         },
-        update() { return api; },
+        update(payload: Record<string, unknown>) {
+          if (table === "applications" && opts.capture) opts.capture.updatedApp = payload;
+          return {
+            eq() {
+              return { select() { return { async single() { return { data: { id: "app-updated" }, error: null }; } }; } };
+            },
+          };
+        },
         async then(res: (v: unknown) => void) { res({ error: null }); },
       };
       return api;
@@ -138,6 +152,36 @@ Deno.test("rejects referenced attachments that are not this user's ready applica
     Error,
     "bad_attachment",
   );
+});
+
+Deno.test("rejects if already submitted application exists", async () => {
+  await assertRejects(
+    () =>
+      applyToOpportunity(sb({ existingApp: { id: "app-1", status: "submitted" } }), {
+        volunteerId: "v1",
+        authUserId: "u1",
+        opportunityId: "opp1",
+        answers: { why: "I care", consent: true },
+      }),
+    Error,
+    "already_applied",
+  );
+});
+
+Deno.test("updates existing draft application to submitted", async () => {
+  const capture: { updatedApp?: Record<string, unknown> } = {};
+  const r = await applyToOpportunity(
+    sb({ existingApp: { id: "app-draft-1", status: "draft" }, capture }),
+    {
+      volunteerId: "v1",
+      authUserId: "u1",
+      opportunityId: "opp1",
+      answers: { why: "I care", consent: true },
+    },
+  );
+  assertEquals(r.applicationId, "app-updated");
+  assertEquals(capture.updatedApp?.status, "submitted");
+  assertEquals(capture.updatedApp?.applicant_name, "Ayesha");
 });
 
 Deno.test("happy path snapshots the form and promotes the applicant columns", async () => {

@@ -346,7 +346,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
               summaryCard={summaryContent}
             />
           ) : (
-            <div className="done-card" style={{ maxWidth: "520px" }}>
+            <div className="done-card" style={{ maxWidth: "100%" }}>
               <div
                 style={{
                   display: "inline-block",
