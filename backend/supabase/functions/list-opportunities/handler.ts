@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { getOpportunityTier, isClosingSoon } from "../_shared/opportunityStatus.ts";
 
 export interface ListOpportunitiesInput {
   organizationId?: string;
@@ -29,6 +30,7 @@ export interface OpportunityCard {
   activityStartAt: string | null;
   activityEndAt: string | null;
   deactivatedAt: string | null;
+  createdAt: string | null;
 }
 
 export interface ListOpportunitiesResult {
@@ -67,7 +69,7 @@ export function computeOpportunityStatus(o: OpportunityStatusInputs): string {
 const CARD_SELECT =
   "id, name, type, description, location, is_online, status_override, capacity, " +
   "application_open_at, application_deadline, activity_start_at, activity_end_at, " +
-  "deactivated_at, organization_id, organizations(name, logo_url)";
+  "deactivated_at, created_at, organization_id, organizations(name, logo_url)";
 
 interface QueryScope {
   // When set, the query (and its facets) is confined to this org.
@@ -93,6 +95,7 @@ function toCard(o: Record<string, unknown>, filledCount: number): OpportunityCar
     activityStartAt: (o.activity_start_at ?? null) as string | null,
     activityEndAt: (o.activity_end_at ?? null) as string | null,
     deactivatedAt: (o.deactivated_at ?? null) as string | null,
+    createdAt: (o.created_at ?? null) as string | null,
     computedStatus: computeOpportunityStatus({
       statusOverride: (o.status_override ?? null) as string | null,
       applicationOpenAt: (o.application_open_at ?? null) as string | null,
@@ -176,17 +179,9 @@ async function runOpportunityQuery(
     query = query.or(`name.ilike.%${input.search}%,description.ilike.%${input.search}%`);
   }
 
-  switch (input.sort) {
-    case "closing_soon":
-      query = query.order("application_deadline", { ascending: true, nullsFirst: false });
-      break;
-    case "az":
-      query = query.order("name", { ascending: true });
-      break;
-    default:
-      query = query.order("created_at", { ascending: false });
-      break;
-  }
+  // Note: For custom multi-tier sorting (open -> coming soon -> in progress -> completed),
+  // opportunities are sorted in memory after fetching.
+  query = query.order("created_at", { ascending: false });
 
   const { data, error, count } = await query.range(offset, offset + limit - 1);
   if (error) throw error;
@@ -196,13 +191,51 @@ async function runOpportunityQuery(
   let opportunities = rows.map((r) => toCard(r, filled.get(r.id as string) ?? 0));
   const facets = await computeFacets(supabase, scope);
 
-  // status is computed in JS (not filterable in SQL), so a status filter
-  // applies after the fact. total then reflects the filtered set's true
-  // size only when no status filter is given; with one, total is the
-  // filtered page count — acceptable at Phase 1 scale per the spec's §8
-  // no-scale-optimization decision.
+  const now = Date.now();
+
+  // Status filtering
   if (input.status) {
-    opportunities = opportunities.filter((o) => o.computedStatus === input.status);
+    if (input.status === "closing_soon") {
+      opportunities = opportunities.filter((o) => isClosingSoon(o, now));
+    } else {
+      opportunities = opportunities.filter((o) => o.computedStatus === input.status);
+    }
+  }
+
+  // Sorting
+  if (input.sort === "closing_soon") {
+    // Filter to closing soon (< 5 days) and sort by closest deadline first
+    opportunities = opportunities.filter((o) => isClosingSoon(o, now));
+    opportunities.sort((a, b) => {
+      const deadlineA = a.applicationDeadline ? new Date(a.applicationDeadline).getTime() : Infinity;
+      const deadlineB = b.applicationDeadline ? new Date(b.applicationDeadline).getTime() : Infinity;
+      if (deadlineA !== deadlineB) return deadlineA - deadlineB;
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return a.name.localeCompare(b.name);
+    });
+  } else if (input.sort === "az") {
+    opportunities.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    // Default: "newest" with status tier priority
+    // 1. Applications open
+    // 2. Coming soon
+    // 3. Applications closed but in progress
+    // 4. Closed (not in progress)
+    // 5. Drive completed
+    opportunities.sort((a, b) => {
+      const tierA = getOpportunityTier(a, now);
+      const tierB = getOpportunityTier(b, now);
+      if (tierA !== tierB) return tierA - tierB;
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  if (input.status || input.sort === "closing_soon") {
     return { opportunities, total: opportunities.length, facets };
   }
 

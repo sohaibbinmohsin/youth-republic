@@ -5,6 +5,8 @@ import {
   getApplicationStatusLabel,
   getOpportunityBadgeConfig,
   isOpportunityLive,
+  getOpportunityTier,
+  isClosingSoon,
 } from "./opportunityStatus";
 
 describe("computeOpportunityStatus", () => {
@@ -95,6 +97,90 @@ describe("getOpportunityBadgeConfig", () => {
       label: "Open",
       pillClass: "pill--pos",
     });
+  });
+});
+
+describe("getOpportunityTier", () => {
+  const BASE_TIME = 1757200000000; // Fixed timestamp for reproducible tests
+
+  it("assigns Tier 1 to opportunities with applications open", () => {
+    // Open without deadline
+    expect(getOpportunityTier({ computedStatus: "open", applicationDeadline: null }, BASE_TIME)).toBe(1);
+    // Open with future deadline
+    expect(getOpportunityTier({
+      computedStatus: "open",
+      applicationDeadline: new Date(BASE_TIME + 86400000).toISOString(),
+    }, BASE_TIME)).toBe(1);
+    // In progress with future deadline (accepting applications)
+    expect(getOpportunityTier({
+      computedStatus: "in_progress",
+      applicationDeadline: new Date(BASE_TIME + 86400000).toISOString(),
+    }, BASE_TIME)).toBe(1);
+  });
+
+  it("assigns Tier 2 to opportunities with coming_soon", () => {
+    expect(getOpportunityTier({ computedStatus: "coming_soon" }, BASE_TIME)).toBe(2);
+  });
+
+  it("assigns Tier 3 to opportunities in_progress with applications closed", () => {
+    // In progress with passed deadline
+    expect(getOpportunityTier({
+      computedStatus: "in_progress",
+      applicationDeadline: new Date(BASE_TIME - 86400000).toISOString(),
+    }, BASE_TIME)).toBe(3);
+    // In progress with no deadline
+    expect(getOpportunityTier({
+      computedStatus: "in_progress",
+      applicationDeadline: null,
+    }, BASE_TIME)).toBe(3);
+  });
+
+  it("assigns Tier 4 to closed opportunities", () => {
+    expect(getOpportunityTier({ computedStatus: "closed" }, BASE_TIME)).toBe(4);
+  });
+
+  it("assigns Tier 5 to completed drives", () => {
+    expect(getOpportunityTier({ computedStatus: "completed" }, BASE_TIME)).toBe(5);
+  });
+});
+
+describe("isClosingSoon", () => {
+  const BASE_TIME = 1757200000000;
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+  it("returns true for open opportunities with deadline within 5 days", () => {
+    const deadline2Days = new Date(BASE_TIME + 2 * ONE_DAY_MS).toISOString();
+    expect(isClosingSoon({ computedStatus: "open", applicationDeadline: deadline2Days }, BASE_TIME)).toBe(true);
+
+    const deadline5Days = new Date(BASE_TIME + 5 * ONE_DAY_MS).toISOString();
+    expect(isClosingSoon({ computedStatus: "open", applicationDeadline: deadline5Days }, BASE_TIME)).toBe(true);
+  });
+
+  it("returns true for in_progress opportunities with deadline within 5 days", () => {
+    const deadline3Days = new Date(BASE_TIME + 3 * ONE_DAY_MS).toISOString();
+    expect(isClosingSoon({ computedStatus: "in_progress", applicationDeadline: deadline3Days }, BASE_TIME)).toBe(true);
+  });
+
+  it("returns false if deadline is more than 5 days away", () => {
+    const deadline6Days = new Date(BASE_TIME + 6 * ONE_DAY_MS).toISOString();
+    expect(isClosingSoon({ computedStatus: "open", applicationDeadline: deadline6Days }, BASE_TIME)).toBe(false);
+  });
+
+  it("returns false if deadline has already passed", () => {
+    const pastDeadline = new Date(BASE_TIME - 1000).toISOString();
+    expect(isClosingSoon({ computedStatus: "open", applicationDeadline: pastDeadline }, BASE_TIME)).toBe(false);
+  });
+
+  it("returns false if there is no deadline", () => {
+    expect(isClosingSoon({ computedStatus: "open", applicationDeadline: null }, BASE_TIME)).toBe(false);
+    expect(isClosingSoon({ computedStatus: "open", applicationDeadline: undefined }, BASE_TIME)).toBe(false);
+  });
+
+  it("returns false for completed, closed, or coming_soon opportunities even if deadline is <= 5 days", () => {
+    const deadline2Days = new Date(BASE_TIME + 2 * ONE_DAY_MS).toISOString();
+    expect(isClosingSoon({ computedStatus: "completed", applicationDeadline: deadline2Days }, BASE_TIME)).toBe(false);
+    expect(isClosingSoon({ computedStatus: "closed", applicationDeadline: deadline2Days }, BASE_TIME)).toBe(false);
+    expect(isClosingSoon({ computedStatus: "coming_soon", applicationDeadline: deadline2Days }, BASE_TIME)).toBe(false);
   });
 });
 
