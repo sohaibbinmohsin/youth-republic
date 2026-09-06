@@ -131,26 +131,28 @@ export default function ChangePasswordPage() {
 
   return (
     <section className="route-centered">
-      <button
-        type="button"
-        onClick={() => {
-          if (typeof window !== "undefined" && window.history.length > 1) {
-            router.back();
-          } else {
-            router.push("/portfolio");
-          }
-        }}
-        className="crumb hover:text-[var(--ink)] cursor-pointer"
-        style={{
-          background: "transparent",
-          border: 0,
-          padding: 0,
-          font: "inherit",
-        }}
-        aria-label="Go back"
-      >
-        ← Back
-      </button>
+      <div className="w-full max-w-[860px] mx-auto flex justify-start">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/portfolio");
+            }
+          }}
+          className="crumb hover:text-[var(--ink)] cursor-pointer"
+          style={{
+            background: "transparent",
+            border: 0,
+            padding: 0,
+            font: "inherit",
+          }}
+          aria-label="Go back"
+        >
+          ← Back
+        </button>
+      </div>
 
       <div className="pane">
         <div className="auth-head">

@@ -11,6 +11,7 @@ export interface OpportunitySummary {
   description?: string | null;
   computedStatus?: string;
   isOnline?: boolean;
+  applicationDeadline?: string | null;
 }
 
 const ORG_CONFIG: Record<string, { monogram: string; color: string }> = {
@@ -29,7 +30,13 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
 
   const status = opportunity.computedStatus ?? "open";
   const typeClass = `type-${opportunity.type.toLowerCase()}`;
-  const badge = getOpportunityBadgeConfig(status);
+  const isDeadlinePassed = opportunity.applicationDeadline
+    ? new Date(opportunity.applicationDeadline).getTime() < Date.now()
+    : false;
+  const isAcceptingApplications =
+    status === "open" ||
+    (status === "in_progress" && opportunity.applicationDeadline != null && !isDeadlinePassed);
+  const badge = getOpportunityBadgeConfig(status, isAcceptingApplications);
   const isLive = isOpportunityLive(status);
 
   const locationDisplay = opportunity.isOnline

@@ -76,6 +76,10 @@ describe("getOpportunityBadgeConfig", () => {
       label: "Closed",
       pillClass: "pill--neu",
     });
+    expect(getOpportunityBadgeConfig("in_progress", false)).toEqual({
+      label: "Closed",
+      pillClass: "pill--neu",
+    });
     expect(getOpportunityBadgeConfig("closed")).toEqual({
       label: "Closed",
       pillClass: "pill--neu",
@@ -83,6 +87,13 @@ describe("getOpportunityBadgeConfig", () => {
     expect(getOpportunityBadgeConfig(null)).toEqual({
       label: "Closed",
       pillClass: "pill--neu",
+    });
+  });
+
+  it("returns 'Open' with positive pill style for in_progress when accepting applications", () => {
+    expect(getOpportunityBadgeConfig("in_progress", true)).toEqual({
+      label: "Open",
+      pillClass: "pill--pos",
     });
   });
 });
