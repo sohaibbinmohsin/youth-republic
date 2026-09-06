@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { OpportunityCard } from "./OpportunityCard";
+import { getOpportunityTier, isClosingSoon } from "@/lib/opportunityStatus";
 
 export interface OpportunityItem {
   id: string;
@@ -9,7 +10,7 @@ export interface OpportunityItem {
   type: string;
   location: string | null;
   isOnline?: boolean;
-  description: string | null;
+  description?: string | null;
   organizationId: string;
   organizationName: string;
   computedStatus: string;
@@ -93,10 +94,17 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
     setSelectedCities([]);
     setSelectedStatuses([]);
     setFormatFilter("all");
+    setSortBy("newest");
   }
 
   const filteredOpportunities = useMemo(() => {
+    const now = Date.now();
     return (initialOpportunities ?? []).filter((opp) => {
+      // Closing soon filter active via sortBy
+      if (sortBy === "closing_soon" && !isClosingSoon(opp, now)) {
+        return false;
+      }
+
       // Search term
       if (searchTerm.trim() !== "") {
         const q = searchTerm.toLowerCase();
@@ -131,7 +139,10 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
 
       // Status
       if (selectedStatuses.length > 0) {
-        if (!selectedStatuses.includes(opp.computedStatus)) return false;
+        const matchesStatus =
+          selectedStatuses.includes(opp.computedStatus) ||
+          (selectedStatuses.includes("closing_soon") && isClosingSoon(opp, now));
+        if (!matchesStatus) return false;
       }
 
       // Format
@@ -140,8 +151,41 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
 
       return true;
     }).sort((a, b) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      return 0;
+      if (sortBy === "name") {
+        return a.name.localeCompare(b.name);
+      }
+
+      if (sortBy === "closing_soon") {
+        const deadlineA = a.applicationDeadline ? new Date(a.applicationDeadline).getTime() : Infinity;
+        const deadlineB = b.applicationDeadline ? new Date(b.applicationDeadline).getTime() : Infinity;
+        if (deadlineA !== deadlineB) {
+          return deadlineA - deadlineB;
+        }
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA !== timeB) {
+          return timeB - timeA;
+        }
+        return a.name.localeCompare(b.name);
+      }
+
+      // Default: "newest"
+      // 1. Applications open first
+      // 2. Coming soon
+      // 3. Applications closed but in progress
+      // 4. Closed (not in progress)
+      // 5. Drive completed
+      const tierA = getOpportunityTier(a, now);
+      const tierB = getOpportunityTier(b, now);
+      if (tierA !== tierB) {
+        return tierA - tierB;
+      }
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeA !== timeB) {
+        return timeB - timeA;
+      }
+      return a.name.localeCompare(b.name);
     });
   }, [
     initialOpportunities,
@@ -290,6 +334,14 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
             <label>
               <input
                 type="checkbox"
+                checked={selectedStatuses.includes("closing_soon")}
+                onChange={() => toggleStatus("closing_soon")}
+              />
+              Closing soon
+            </label>
+            <label>
+              <input
+                type="checkbox"
                 checked={selectedStatuses.includes("coming_soon")}
                 onChange={() => toggleStatus("coming_soon")}
               />
@@ -369,7 +421,11 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
         <div>
           <div className="results-bar">
             <span className="count">
-              {isLoading ? "" : `${filteredOpportunities.length} open opportunities`}
+              {isLoading
+                ? ""
+                : sortBy === "closing_soon" || selectedStatuses.includes("closing_soon")
+                ? `${filteredOpportunities.length} closing soon ${filteredOpportunities.length === 1 ? "opportunity" : "opportunities"}`
+                : `${filteredOpportunities.length} ${filteredOpportunities.length === 1 ? "opportunity" : "opportunities"}`}
             </span>
             <label>
               Sort

@@ -22,7 +22,7 @@ truncate table
 restart identity cascade;
 
 -- volunteer_code default is `generate_volunteer_code()` which pulls from this
--- sequence (migration 0001). Reset it so re-seeded volunteers start at VOL-YYYY-000001.
+-- sequence (migration 0001). Reset it so re-seeded volunteers start at YR-YYYY-000001.
 alter sequence volunteer_code_seq restart with 1;
 
 -- `truncate volunteers ... cascade` does not reach `auth.users` (the FK cascades

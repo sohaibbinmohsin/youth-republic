@@ -119,10 +119,12 @@ export function RegisterForm({
   const minor = form.dob !== "" && isMinor(form.dob);
   const showGuardianFields = minor;
 
-  // Auto set document type to b_form for minors
+  // Auto set document type to b_form for minors, and cnic for adults if previously b_form
   useEffect(() => {
     if (minor && form.idDocType !== "b_form") {
       setForm((prev) => ({ ...prev, idDocType: "b_form" }));
+    } else if (!minor && form.idDocType === "b_form") {
+      setForm((prev) => ({ ...prev, idDocType: "cnic" }));
     }
   }, [minor, form.idDocType]);
 
@@ -162,6 +164,10 @@ export function RegisterForm({
     checkRequired("degreeProgram", "Degree program");
 
     if (showCnicUpload) {
+      if (!minor && form.idDocType === "b_form") {
+        errors.idDocType = "B-Form is only allowed for volunteers 18 years or younger";
+        missingLabels.push("Document type");
+      }
       const docLabel =
         form.idDocType === "passport"
           ? "Passport number"
@@ -318,8 +324,32 @@ export function RegisterForm({
             ...prev,
             ...errMap,
           }));
+        } else if (message === "b_form_not_allowed_for_adult") {
+          errMap.idDocType = "B-Form is only allowed for volunteers 18 years or younger.";
+          setFieldErrors((prev) => ({
+            ...prev,
+            ...errMap,
+          }));
+        } else if (message === "id_doc_already_registered") {
+          errMap.idDocNumber = "This identification number is already registered with another account.";
+          setFieldErrors((prev) => ({
+            ...prev,
+            ...errMap,
+          }));
+        } else if (message === "phone_already_registered") {
+          errMap.phone = "This phone number is already registered with another account.";
+          setFieldErrors((prev) => ({
+            ...prev,
+            ...errMap,
+          }));
+        } else if (message === "email_already_registered") {
+          errMap.email = "This email address is already registered with another account.";
+          setFieldErrors((prev) => ({
+            ...prev,
+            ...errMap,
+          }));
         } else if (message === "minor_consent_required") {
-          errMap.guardianConsent = "Guardian consent is mandatory for minors under 18";
+          errMap.guardianConsent = "Guardian consent is mandatory for volunteers 18 years or younger";
           setFieldErrors((prev) => ({
             ...prev,
             ...errMap,
@@ -514,30 +544,28 @@ export function RegisterForm({
       </div>
 
       {showGuardianFields && (
-        <div className="consent">
-          <GuardianConsentFields
-            guardianName={guardian.guardianName}
-            guardianContact={guardian.guardianContact}
-            guardianConsent={guardian.guardianConsent}
-            onChange={(newVal) => {
-              setGuardian(newVal);
-              if (fieldErrors.guardianName || fieldErrors.guardianContact || fieldErrors.guardianConsent) {
-                setFieldErrors((prev) => {
-                  const next = { ...prev };
-                  delete next.guardianName;
-                  delete next.guardianContact;
-                  delete next.guardianConsent;
-                  return next;
-                });
-              }
-            }}
-          />
-          {fieldErrors.guardianConsent && (
-            <p className="field__error" role="alert" style={{ marginTop: "0.5rem" }}>
-              {fieldErrors.guardianConsent}
-            </p>
-          )}
-        </div>
+        <GuardianConsentFields
+          guardianName={guardian.guardianName}
+          guardianContact={guardian.guardianContact}
+          guardianConsent={guardian.guardianConsent}
+          errors={{
+            guardianName: fieldErrors.guardianName,
+            guardianContact: fieldErrors.guardianContact,
+            guardianConsent: fieldErrors.guardianConsent,
+          }}
+          onChange={(newVal) => {
+            setGuardian(newVal);
+            if (fieldErrors.guardianName || fieldErrors.guardianContact || fieldErrors.guardianConsent) {
+              setFieldErrors((prev) => {
+                const next = { ...prev };
+                delete next.guardianName;
+                delete next.guardianContact;
+                delete next.guardianConsent;
+                return next;
+              });
+            }
+          }}
+        />
       )}
 
       {showCnicUpload && (
@@ -559,7 +587,7 @@ export function RegisterForm({
               <p style={{ margin: "0.2rem 0 0", fontSize: "0.8rem", color: "var(--ink-2)" }}>
                 {minor
                   ? "Minors under 18 provide a B-Form number and document scan for verification."
-                  : "Provide your identification details (CNIC, B-Form, or Passport) and attach your document for verification."}
+                  : "Provide your identification details (CNIC or Passport) and attach your document for verification."}
               </p>
             </div>
             {form.idDocAttachmentId ? (
@@ -589,7 +617,6 @@ export function RegisterForm({
                     ? [{ value: "b_form", label: "B-Form (Child Registration Certificate)" }]
                     : [
                         { value: "cnic", label: "CNIC (National Identity Card)" },
-                        { value: "b_form", label: "B-Form (Child Registration Certificate)" },
                         { value: "passport", label: "Passport" },
                       ]
                 }

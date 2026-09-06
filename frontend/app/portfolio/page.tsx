@@ -26,6 +26,7 @@ interface VolunteerProfile {
   country?: string | null;
   institution: string;
   degree_program?: string | null;
+  id_doc_type?: string | null;
   id_doc_number?: string | null;
   status: string;
   created_at: string;
@@ -135,7 +136,7 @@ export default function PortfolioPage() {
     try {
       const query = supabase
         .from("volunteers")
-        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, id_doc_number, status, created_at, emergency_contact")
+        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, status, created_at, emergency_contact")
         .eq("auth_user_id", authUserId);
       const result = typeof (query as any).maybeSingle === "function"
         ? await (query as any).maybeSingle()
@@ -830,6 +831,47 @@ export default function PortfolioPage() {
                 currentValue={volunteer.phone}
                 accessToken={accessToken}
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, phone: String(newValue) } : v))}
+              />
+
+              <div className="field">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="mb-0">Identification type</label>
+                  <span className="pill pill--pos text-[0.7rem] py-0.5 px-2">
+                    {volunteer.id_doc_type === "passport"
+                      ? "Passport"
+                      : volunteer.id_doc_type === "b_form"
+                      ? "B-Form"
+                      : "CNIC"}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    volunteer.id_doc_type === "passport"
+                      ? "Passport"
+                      : volunteer.id_doc_type === "b_form"
+                      ? "B-Form (Child Registration Certificate)"
+                      : "CNIC (National Identity Card)"
+                  }
+                  className="bg-gray-50 cursor-not-allowed"
+                />
+              </div>
+
+              <SensitiveFieldEditor
+                fieldName="id_doc_number"
+                fieldLabel={
+                  volunteer.id_doc_type === "passport"
+                    ? "Passport number"
+                    : volunteer.id_doc_type === "b_form"
+                    ? "B-Form number"
+                    : "CNIC number"
+                }
+                currentValue={volunteer.id_doc_number ?? ""}
+                accessToken={accessToken}
+                onUpdated={(newValue) =>
+                  setVolunteer((v) => (v ? { ...v, id_doc_number: String(newValue) } : v))
+                }
               />
 
               <ProfileFieldEditor

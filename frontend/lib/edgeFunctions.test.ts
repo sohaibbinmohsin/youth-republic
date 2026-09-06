@@ -28,7 +28,7 @@ function lastCall() {
 describe("registerVolunteer", () => {
   it("serialises the id-doc fields into the request body", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-      new Response(JSON.stringify({ volunteerId: "v1", volunteerCode: "VOL-2026-000001" }), { status: 201 }),
+      new Response(JSON.stringify({ volunteerId: "v1", volunteerCode: "YR-2026-000001" }), { status: 201 }),
     );
 
     const result = await registerVolunteer(
@@ -248,7 +248,7 @@ describe("getVolunteerPortfolio", () => {
     const portfolio = {
       volunteer: {
         fullName: "Aisha",
-        volunteerCode: "VOL-2026-000001",
+        volunteerCode: "YR-2026-000001",
         city: "Lahore",
         institution: "IBA",
         chapterName: null,

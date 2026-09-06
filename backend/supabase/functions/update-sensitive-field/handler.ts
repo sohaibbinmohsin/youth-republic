@@ -53,11 +53,60 @@ export async function updateSensitiveField(
 
   const oldValue = (volunteer as Record<string, unknown>)[input.fieldName];
 
+  if (input.fieldName === "id_doc_number") {
+    if (typeof input.newValue === "string" && input.newValue.trim() !== "") {
+      const trimmed = input.newValue.trim();
+      const { data: existingDoc } = await supabase
+        .from("volunteers")
+        .select("id")
+        .eq("id_doc_number", trimmed)
+        .neq("id", input.volunteerId)
+        .maybeSingle();
+
+      if (existingDoc) {
+        throw new Error("id_doc_already_registered");
+      }
+    }
+  }
+
+  if (input.fieldName === "phone") {
+    if (typeof input.newValue === "string" && input.newValue.trim() !== "") {
+      const trimmed = input.newValue.trim();
+      const { data: existingPhone } = await supabase
+        .from("volunteers")
+        .select("id")
+        .eq("phone", trimmed)
+        .neq("id", input.volunteerId)
+        .maybeSingle();
+
+      if (existingPhone) {
+        throw new Error("phone_already_registered");
+      }
+    }
+  }
+
   const { error: updateError } = await supabase
     .from("volunteers")
     .update({ [input.fieldName]: input.newValue })
     .eq("id", input.volunteerId);
-  if (updateError) throw updateError;
+
+  if (updateError) {
+    const msg = updateError.message || "";
+    if (
+      updateError.code === "23505" ||
+      msg.includes("volunteers_cnic_number_key") ||
+      msg.includes("id_doc_number")
+    ) {
+      throw new Error("id_doc_already_registered");
+    }
+    if (
+      updateError.code === "23505" &&
+      (msg.includes("volunteers_phone_key") || msg.includes("phone"))
+    ) {
+      throw new Error("phone_already_registered");
+    }
+    throw updateError;
+  }
 
   const { error: logError } = await supabase.from("profile_field_changes").insert({
     volunteer_id: input.volunteerId,

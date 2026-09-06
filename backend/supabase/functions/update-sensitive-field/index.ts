@@ -18,7 +18,11 @@ export async function handler(req: Request): Promise<Response> {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown_error";
-    const status = message === "unauthorized" ? 401 : 400;
+    const status = message === "unauthorized"
+      ? 401
+      : ["id_doc_already_registered", "phone_already_registered"].includes(message)
+      ? 422
+      : 400;
     return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });
   }
 }
