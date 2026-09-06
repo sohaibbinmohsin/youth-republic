@@ -57,14 +57,14 @@ describe("RegisterPage", () => {
 
     await user.type(screen.getByLabelText("Full name"), "Ayesha Khan");
     await user.type(screen.getByLabelText("Email"), "ayesha@example.com");
-    await user.type(screen.getByLabelText("Password"), "password123");
-    await user.type(screen.getByLabelText("Confirm password"), "password123");
+    await user.type(screen.getByLabelText("Password"), "Password123!");
+    await user.type(screen.getByLabelText("Confirm password"), "Password123!");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
       expect(signUp).toHaveBeenCalledWith({
         email: "ayesha@example.com",
-        password: "password123",
+        password: "Password123!",
         options: {
           data: {
             full_name: "Ayesha Khan",
@@ -79,11 +79,26 @@ describe("RegisterPage", () => {
     render(<RegisterPage />);
 
     await user.type(screen.getByLabelText("Email"), "ayesha@example.com");
-    await user.type(screen.getByLabelText("Password"), "password123");
-    await user.type(screen.getByLabelText("Confirm password"), "password123");
+    await user.type(screen.getByLabelText("Password"), "Password123!");
+    await user.type(screen.getByLabelText("Confirm password"), "Password123!");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByText("Please enter your full name")).toBeInTheDocument();
+  });
+
+  it("validates password complexity (requires uppercase, lowercase, number, symbol)", async () => {
+    const user = userEvent.setup();
+    render(<RegisterPage />);
+
+    await user.type(screen.getByLabelText("Full name"), "Ayesha Khan");
+    await user.type(screen.getByLabelText("Email"), "ayesha@example.com");
+    await user.type(screen.getByLabelText("Password"), "simplepass");
+    await user.type(screen.getByLabelText("Confirm password"), "simplepass");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    const errorElements = await screen.findAllByText(/password must contain at least one uppercase letter/i);
+    expect(errorElements.length).toBeGreaterThan(0);
+    expect(signUp).not.toHaveBeenCalled();
   });
 
   it("preserves redirectTo query destination for Step 2 Skip action", async () => {

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { RegisterForm } from "@/components/RegisterForm";
 import { getEffectiveReturnUrl, clearReturnUrl } from "@/lib/returnUrl";
+import { validatePassword } from "@/lib/passwordUtils";
 
 function RegisterContent() {
   const router = useRouter();
@@ -52,9 +53,12 @@ function RegisterContent() {
     if (!password) {
       errors.password = "Password is required";
       if (!firstError) firstError = "Please enter a password";
-    } else if (password.length < 8) {
-      errors.password = "Must be at least 8 characters";
-      if (!firstError) firstError = "Password must be at least 8 characters";
+    } else {
+      const pwdResult = validatePassword(password);
+      if (!pwdResult.isValid) {
+        errors.password = pwdResult.errorMessage || "Password does not meet requirements";
+        if (!firstError) firstError = pwdResult.errorMessage || "Password does not meet requirements";
+      }
     }
     if (!confirmPassword) {
       errors.confirmPassword = "Confirm password is required";
@@ -221,7 +225,7 @@ function RegisterContent() {
                 {fieldErrors.password ? (
                   <p className="field__error" role="alert">{fieldErrors.password}</p>
                 ) : (
-                  <p className="hint">At least 8 characters.</p>
+                  <p className="hint">Min 8 characters with uppercase, lowercase, number, and symbol.</p>
                 )}
               </div>
 
