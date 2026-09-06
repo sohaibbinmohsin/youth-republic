@@ -28,7 +28,7 @@ describe("CnicUploadField", () => {
     render(<CnicUploadField accessToken="session-token" onUploaded={onUploaded} />);
 
     const file = new File(["fake-image-bytes"], "cnic.jpg", { type: "image/jpeg" });
-    await user.upload(screen.getByLabelText("CNIC / B-Form document"), file);
+    await user.upload(screen.getByLabelText(/document/i), file);
 
     await waitFor(() => expect(onUploaded).toHaveBeenCalledWith("att-123"));
     const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
@@ -43,8 +43,14 @@ describe("CnicUploadField", () => {
     render(<CnicUploadField accessToken="session-token" onUploaded={vi.fn()} />);
 
     const file = new File(["fake-image-bytes"], "cnic.jpg", { type: "image/jpeg" });
-    await user.upload(screen.getByLabelText("CNIC / B-Form document"), file);
+    await user.upload(screen.getByLabelText(/document/i), file);
 
     expect(await screen.findByText("unauthorized")).toBeInTheDocument();
+  });
+
+  it("renders passport-specific label and instructions when docType is passport", () => {
+    render(<CnicUploadField accessToken="session-token" onUploaded={vi.fn()} docType="passport" />);
+    expect(screen.getByLabelText("Passport document")).toBeInTheDocument();
+    expect(screen.getByText(/upload a clear scan or photo of your passport/i)).toBeInTheDocument();
   });
 });
