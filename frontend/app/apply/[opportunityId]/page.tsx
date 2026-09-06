@@ -140,7 +140,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
         ← Back to opportunity
       </Link>
 
-      <div className="pane pane--summary-first">
+      <div style={{ maxWidth: "640px", margin: "0 auto" }}>
         {/* Left Column: Form or Closed State */}
         <div>
           <h1 className="display" style={{ fontSize: "2rem", marginBottom: ".3rem" }}>
@@ -162,62 +162,9 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
               initialVolunteerProfile={volunteerProfile}
               opportunity={opportunity}
               onSuccess={() => setSubmitted(true)}
-            />
-          ) : (
-            <div className="done-card" style={{ maxWidth: "520px" }}>
-              <div
-                style={{
-                  display: "inline-block",
-                  padding: "0.25rem 0.65rem",
-                  borderRadius: "999px",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  marginBottom: "0.85rem",
-                  background: status === "coming_soon" ? "var(--st-pend-bg)" : "var(--st-neg-bg)",
-                  color: status === "coming_soon" ? "var(--st-pend-fg)" : "var(--st-neg-fg)",
-                }}
-              >
-                {status === "coming_soon" ? "Coming soon" : "Applications closed"}
-              </div>
-
-              <h2>
-                {status === "coming_soon"
-                  ? "Applications are not open yet"
-                  : status === "in_progress"
-                  ? "Activity in progress"
-                  : status === "completed"
-                  ? "Activity completed"
-                  : "Applications are closed"}
-              </h2>
-
-              <p style={{ color: "var(--ink-2)", fontSize: "0.95rem", lineHeight: 1.5, margin: "0 0 1.5rem" }}>
-                {status === "coming_soon"
-                  ? `Applications for ${opportunity.name} will open on ${formatOpportunityDates(opportunity.application_open_at)}.`
-                  : status === "in_progress"
-                  ? `This volunteer activity is currently in progress. Applications are closed.`
-                  : status === "completed"
-                  ? `This volunteer activity has concluded. Applications are closed.`
-                  : opportunity.application_deadline
-                  ? `The application deadline was ${formatOpportunityDates(opportunity.application_deadline)}. Applications are no longer being accepted.`
-                  : `Applications for this opportunity are currently closed.`}
-              </p>
-
-              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                <Link className="btn btn--primary" href={`/opportunities/${opportunity.id}`}>
-                  View opportunity details
-                </Link>
-                <Link className="btn btn--ghost" href="/opportunities">
-                  Browse open opportunities
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column: Aside Summary Card */}
-        <aside className="pane__aside" id="applyAside">
+            >
+                      {/* Right Column: Aside Summary Card */}
+        <aside className="pane__aside" id="applyAside" style={{ marginBottom: "1.5rem" }}>
           <h3>You’re applying to</h3>
           <div className="pcard__id" style={{ marginBottom: ".9rem" }}>
             <span
@@ -251,20 +198,20 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
                   background:
                     status === "open"
                       ? "var(--st-pos-bg)"
-                      : status === "coming_soon"
+                      : (status as string) === "coming_soon"
                       ? "var(--st-pend-bg)"
                       : "var(--st-neg-bg)",
                   color:
                     status === "open"
                       ? "var(--st-pos-fg)"
-                      : status === "coming_soon"
+                      : (status as string) === "coming_soon"
                       ? "var(--st-pend-fg)"
                       : "var(--st-neg-fg)",
                 }}
               >
                 {status === "open"
                   ? "Open"
-                  : status === "coming_soon"
+                  : (status as string) === "coming_soon"
                   ? "Coming soon"
                   : status === "in_progress"
                   ? "In progress"
@@ -315,6 +262,61 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
             )}
           </dl>
         </aside>
+            </ApplyForm>
+          ) : (
+            <div className="done-card" style={{ maxWidth: "520px" }}>
+              <div
+                style={{
+                  display: "inline-block",
+                  padding: "0.25rem 0.65rem",
+                  borderRadius: "999px",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: "0.85rem",
+                  background: (status as string) === "coming_soon" ? "var(--st-pend-bg)" : "var(--st-neg-bg)",
+                  color: (status as string) === "coming_soon" ? "var(--st-pend-fg)" : "var(--st-neg-fg)",
+                }}
+              >
+                {(status as string) === "coming_soon" ? "Coming soon" : "Applications closed"}
+              </div>
+
+              <h2>
+                {(status as string) === "coming_soon"
+                  ? "Applications are not open yet"
+                  : status === "in_progress"
+                  ? "Activity in progress"
+                  : status === "completed"
+                  ? "Activity completed"
+                  : "Applications are closed"}
+              </h2>
+
+              <p style={{ color: "var(--ink-2)", fontSize: "0.95rem", lineHeight: 1.5, margin: "0 0 1.5rem" }}>
+                {(status as string) === "coming_soon"
+                  ? `Applications for ${opportunity.name} will open on ${formatOpportunityDates(opportunity.application_open_at)}.`
+                  : status === "in_progress"
+                  ? `This volunteer activity is currently in progress. Applications are closed.`
+                  : status === "completed"
+                  ? `This volunteer activity has concluded. Applications are closed.`
+                  : opportunity.application_deadline
+                  ? `The application deadline was ${formatOpportunityDates(opportunity.application_deadline)}. Applications are no longer being accepted.`
+                  : `Applications for this opportunity are currently closed.`}
+              </p>
+
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                <Link className="btn btn--primary" href={`/opportunities/${opportunity.id}`}>
+                  View opportunity details
+                </Link>
+                <Link className="btn btn--ghost" href="/opportunities">
+                  Browse open opportunities
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+
       </div>
 
       {/* Application Submitted Modal */}

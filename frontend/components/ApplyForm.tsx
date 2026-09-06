@@ -36,7 +36,9 @@ export function ApplyForm({
   onSuccess,
   initialVolunteerProfile,
   opportunity,
+  children,
 }: {
+  children?: React.ReactNode;
   opportunityId: string;
   // kept for call-site compatibility; the backend derives the org from the opportunity
   organizationId?: string;
@@ -57,6 +59,7 @@ export function ApplyForm({
   });
   const [filesByField, setFilesByField] = useState<Record<string, File[]>>({});
   const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -204,6 +207,20 @@ export function ApplyForm({
           fileNames={(filesByField[field.id] ?? []).map((f) => f.name)}
         />
       ))}
+
+      {children}
+
+      <div className="field chk" style={{ marginTop: "1rem" }}>
+        <label>
+          <input
+            type="checkbox"
+            required
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+          />
+          I confirm my details are accurate and I meet the eligibility criteria.
+        </label>
+      </div>
 
       <button
         type="submit"
