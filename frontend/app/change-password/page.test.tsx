@@ -181,7 +181,7 @@ describe("ChangePasswordPage", () => {
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  it("validates password complexity (requires uppercase, lowercase, number, symbol)", async () => {
+  it("validates password complexity (requires uppercase, lowercase, number)", async () => {
     mockGetSession.mockResolvedValueOnce({
       data: {
         session: {

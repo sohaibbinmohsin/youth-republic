@@ -86,7 +86,7 @@ describe("RegisterPage", () => {
     expect(await screen.findByText("Please enter your full name")).toBeInTheDocument();
   });
 
-  it("validates password complexity (requires uppercase, lowercase, number, symbol)", async () => {
+  it("validates password complexity (requires uppercase, lowercase, number)", async () => {
     const user = userEvent.setup();
     render(<RegisterPage />);
 

@@ -246,7 +246,7 @@ function RegisterContent() {
                 {fieldErrors.password ? (
                   <p className="field__error" role="alert">{fieldErrors.password}</p>
                 ) : (
-                  <p className="hint">Min 8 characters with uppercase, lowercase, number, and symbol.</p>
+                  <p className="hint">Min 8 characters with uppercase, lowercase, and number.</p>
                 )}
               </div>
 

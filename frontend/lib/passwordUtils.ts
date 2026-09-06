@@ -4,7 +4,7 @@ export interface PasswordValidationResult {
   hasLowercase: boolean;
   hasUppercase: boolean;
   hasDigit: boolean;
-  hasSymbol: boolean;
+  hasSymbol?: boolean;
   errorMessage?: string;
 }
 
@@ -15,7 +15,7 @@ export function validatePassword(password: string): PasswordValidationResult {
   const hasDigit = /[0-9]/.test(password);
   const hasSymbol = /[^A-Za-z0-9]/.test(password);
 
-  const isValid = hasMinLength && hasLowercase && hasUppercase && hasDigit && hasSymbol;
+  const isValid = hasMinLength && hasLowercase && hasUppercase && hasDigit;
 
   let errorMessage: string | undefined;
   if (!password) {
@@ -28,8 +28,6 @@ export function validatePassword(password: string): PasswordValidationResult {
     errorMessage = "Password must contain at least one uppercase letter.";
   } else if (!hasDigit) {
     errorMessage = "Password must contain at least one number.";
-  } else if (!hasSymbol) {
-    errorMessage = "Password must contain at least one symbol (e.g. !@#$%^&*).";
   }
 
   return {

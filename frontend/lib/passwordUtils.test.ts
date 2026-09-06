@@ -36,14 +36,14 @@ describe("validatePassword", () => {
     expect(result.errorMessage).toBe("Password must contain at least one number.");
   });
 
-  it("rejects passwords missing symbols", () => {
-    const result = validatePassword("NoSymbols123");
-    expect(result.isValid).toBe(false);
+  it("accepts passwords without symbols as long as uppercase, lowercase, number, and min length are met", () => {
+    const result = validatePassword("ValidPass123");
+    expect(result.isValid).toBe(true);
     expect(result.hasSymbol).toBe(false);
-    expect(result.errorMessage).toBe("Password must contain at least one symbol (e.g. !@#$%^&*).");
+    expect(result.errorMessage).toBeUndefined();
   });
 
-  it("accepts passwords fulfilling all 5 criteria", () => {
+  it("accepts passwords with symbols as well", () => {
     const result = validatePassword("StrongPass123!");
     expect(result.isValid).toBe(true);
     expect(result.hasMinLength).toBe(true);

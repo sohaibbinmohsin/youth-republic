@@ -329,16 +329,6 @@ export default function ChangePasswordPage() {
               <div className="flex items-center gap-1.5">
                 <span
                   style={{
-                    color: pwdValidation.hasSymbol ? "var(--st-pos-fg, #3B6D11)" : "inherit",
-                    fontWeight: pwdValidation.hasSymbol ? 600 : 400,
-                  }}
-                >
-                  {pwdValidation.hasSymbol ? "✓" : "•"} At least one symbol (!, @, #, $, etc.)
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span
-                  style={{
                     color: isMatching ? "var(--st-pos-fg, #3B6D11)" : "inherit",
                     fontWeight: isMatching ? 600 : 400,
                   }}
