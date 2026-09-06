@@ -91,7 +91,7 @@ describe("RegisterForm", () => {
   });
 
   it("shows the new Volunteer ID instead of calling onSuccess immediately, then calls it once the volunteer continues", async () => {
-    vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v1", volunteerCode: "VOL-2026-000001" });
+    vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v1", volunteerCode: "YR-2026-000001" });
     const onSuccess = vi.fn();
     const user = userEvent.setup();
     render(<RegisterForm accessToken={accessToken} email="test@example.com" onSuccess={onSuccess} />);
@@ -100,7 +100,7 @@ describe("RegisterForm", () => {
     await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
     await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
 
-    expect(await screen.findByText("VOL-2026-000001")).toBeInTheDocument();
+    expect(await screen.findByText("YR-2026-000001")).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -144,7 +144,7 @@ describe("RegisterForm", () => {
   });
 
   it("updates labels, placeholders, and payload when Passport is selected", async () => {
-    vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v2", volunteerCode: "VOL-2026-000002" });
+    vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v2", volunteerCode: "YR-2026-000002" });
     const user = userEvent.setup();
     render(<RegisterForm accessToken={accessToken} email="test@example.com" showCnicUpload={true} />);
 
@@ -192,6 +192,32 @@ describe("RegisterForm", () => {
     expect(screen.queryByRole("option", { name: /Passport/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /CNIC \(National Identity Card\)/i })).not.toBeInTheDocument();
     await user.click(document.body); // close popup
+  });
+
+  it("restricts document type for adults to CNIC and Passport only (no B-Form)", async () => {
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" showCnicUpload={true} />);
+
+    // Default DOB is adult or empty -> not minor
+    const docTypeSelect = screen.getByRole("combobox", { name: /Document type/i });
+    await user.click(docTypeSelect); // open popup
+    expect(screen.getByRole("option", { name: /CNIC \(National Identity Card\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Passport/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /B-Form/i })).not.toBeInTheDocument();
+    await user.click(document.body); // close popup
+  });
+
+  it("displays field error when id_doc_already_registered is returned by server", async () => {
+    vi.mocked(edgeFunctions.registerVolunteer).mockRejectedValue(new Error("id_doc_already_registered"));
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" showCnicUpload={true} />);
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText("Date of birth"), "1999-01-01");
+    await user.type(screen.getByLabelText("CNIC number"), "35202-1234567-1");
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
+
+    expect(await screen.findByText("This identification number is already registered with another account.")).toBeInTheDocument();
   });
 
   it("validates and highlights CNIC number when showCnicUpload is true and submitted empty", async () => {

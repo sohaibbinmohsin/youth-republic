@@ -3,6 +3,19 @@
 import { useState } from "react";
 import { updateSensitiveField, type SensitiveFieldName } from "@/lib/edgeFunctions";
 
+function formatErrorMessage(err: string): string {
+  if (err === "id_doc_already_registered") {
+    return "This identification number is already registered with another account.";
+  }
+  if (err === "phone_already_registered") {
+    return "This phone number is already registered with another account.";
+  }
+  if (err === "unauthorized") {
+    return "Session expired. Please sign in again.";
+  }
+  return err;
+}
+
 export function SensitiveFieldEditor({
   fieldName,
   fieldLabel,
@@ -40,9 +53,9 @@ export function SensitiveFieldEditor({
         <input id={fieldName} className="mt-1 w-full rounded border px-3 py-2" value={value} onChange={(e) => setValue(e.target.value)} />
       </div>
       <button type="button" onClick={handleSave} disabled={saving} className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50">
-        Save
+        {saving ? "Saving..." : "Save"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600">{formatErrorMessage(error)}</p>}
     </div>
   );
 }

@@ -28,7 +28,15 @@ export async function handler(req: Request): Promise<Response> {
     const message = err instanceof Error ? err.message : "unknown_error";
     const status = message === "unauthorized"
       ? 401
-      : ["minor_consent_required", "b_form_required_for_minor", "id_doc_attachment_required"].includes(message)
+      : [
+          "minor_consent_required",
+          "b_form_required_for_minor",
+          "b_form_not_allowed_for_adult",
+          "id_doc_already_registered",
+          "phone_already_registered",
+          "email_already_registered",
+          "id_doc_attachment_required",
+        ].includes(message)
       ? 422
       : 400;
     return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });

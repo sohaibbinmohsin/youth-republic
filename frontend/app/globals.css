@@ -298,9 +298,28 @@ select {
   font: 700 .58rem/22px "Oswald", sans-serif; text-align: center; letter-spacing: .02em;
   display: inline-block;
 }
-.oc h3 { font-size: 1.05rem; line-height: 1.25; font-weight: 600; color: var(--ink); }
+.oc h3 {
+  font-size: 1.05rem;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
 .oc .loc { font-size: .82rem; color: var(--ink); font-weight: 500; }
-.oc .meta { color: var(--ink-2); font-size: .85rem; line-height: 1.45; }
+.oc .meta {
+  color: var(--ink-2);
+  font-size: .85rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
 .oc .foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: auto; padding-top: .35rem; }
 
 .ttag { display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--ink-2); }

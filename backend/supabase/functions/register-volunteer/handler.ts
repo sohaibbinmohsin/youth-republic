@@ -69,6 +69,24 @@ export async function registerVolunteer(
     if (input.idDocType && input.idDocType !== "b_form") {
       throw new Error("b_form_required_for_minor");
     }
+  } else {
+    if (input.idDocType === "b_form") {
+      throw new Error("b_form_not_allowed_for_adult");
+    }
+  }
+
+  if (input.idDocNumber && input.idDocNumber.trim() !== "") {
+    const trimmed = input.idDocNumber.trim();
+    const { data: existingDoc } = await supabase
+      .from("volunteers")
+      .select("id")
+      .eq("id_doc_number", trimmed)
+      .neq("auth_user_id", input.authUserId)
+      .maybeSingle();
+
+    if (existingDoc) {
+      throw new Error("id_doc_already_registered");
+    }
   }
 
   if (input.idDocAttachmentId) {
@@ -111,7 +129,29 @@ export async function registerVolunteer(
     .select("id, volunteer_code")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    const msg = error.message || "";
+    if (
+      error.code === "23505" ||
+      msg.includes("volunteers_cnic_number_key") ||
+      msg.includes("id_doc_number")
+    ) {
+      throw new Error("id_doc_already_registered");
+    }
+    if (
+      error.code === "23505" &&
+      (msg.includes("volunteers_phone_key") || msg.includes("phone"))
+    ) {
+      throw new Error("phone_already_registered");
+    }
+    if (
+      error.code === "23505" &&
+      (msg.includes("volunteers_email_key") || msg.includes("email"))
+    ) {
+      throw new Error("email_already_registered");
+    }
+    throw error;
+  }
 
   if (input.idDocAttachmentId) {
     await supabase

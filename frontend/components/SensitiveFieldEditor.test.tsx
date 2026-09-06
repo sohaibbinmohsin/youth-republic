@@ -39,4 +39,27 @@ describe("SensitiveFieldEditor", () => {
       expect(onUpdated).toHaveBeenCalledWith("0300-9998888");
     });
   });
+
+  it("shows friendly error message when id_doc_already_registered occurs", async () => {
+    vi.mocked(edgeFunctions.updateSensitiveField).mockRejectedValue(new Error("id_doc_already_registered"));
+    const onUpdated = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <SensitiveFieldEditor
+        fieldName="id_doc_number"
+        fieldLabel="CNIC number"
+        currentValue="35202-1111111-1"
+        accessToken="session-token"
+        onUpdated={onUpdated}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("This identification number is already registered with another account.")).toBeInTheDocument();
+      expect(onUpdated).not.toHaveBeenCalled();
+    });
+  });
 });
