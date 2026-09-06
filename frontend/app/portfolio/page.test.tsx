@@ -158,6 +158,45 @@ describe("PortfolioPage", () => {
     expect(resumeLink).toHaveAttribute("href", "/apply/opp-comm-1");
   });
 
+  it("hides city and shows 'Online' when application opportunity is online, and picks up browser drafts", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      "yr_apply_draft_89942817-bbab-4490-980c-a62e47364206",
+      JSON.stringify({ answers: { motivation: "Helping out" } }),
+    );
+
+    vi.mocked(getBrowserSupabaseClient).mockReturnValue(
+      mockSupabase({
+        volunteer: { id: "vol-1", full_name: "Aisha Khan", city: "Lahore", institution: "LUMS", created_at: "2026-01-15T00:00:00Z" },
+        totalVerifiedHours: 0,
+        applications: [
+          {
+            id: "app-online-1",
+            status: "draft",
+            opportunities: { id: "opp-online", name: "Digital Literacy Campaign", type: "education", location: "Islamabad", is_online: true } as any,
+          },
+        ],
+      }) as never,
+    );
+
+    render(<PortfolioPage />);
+    await waitFor(() => expect(screen.getByText("Aisha Khan")).toBeInTheDocument());
+
+    const appsTab = screen.getByRole("button", { name: "Applications" });
+    await user.click(appsTab);
+
+    expect(await screen.findByText("Digital Literacy Campaign")).toBeInTheDocument();
+    const onlineCard = screen.getByText("Digital Literacy Campaign").closest(".rowcard");
+    expect(onlineCard).toHaveTextContent("Online");
+    expect(onlineCard).not.toHaveTextContent("Islamabad");
+
+    // Local storage draft should also appear
+    const localDraftCard = screen.getByText("Riverbank Cleanup").closest(".rowcard");
+    expect(localDraftCard).toBeInTheDocument();
+    expect(localDraftCard).toHaveTextContent("Islamabad");
+    localStorage.clear();
+  });
+
   it("[6] shows programme cards and chronological activity sessions under Impact tab", async () => {
     vi.mocked(getBrowserSupabaseClient).mockReturnValue(
       mockSupabase({

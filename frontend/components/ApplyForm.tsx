@@ -291,7 +291,7 @@ export const ApplyForm = forwardRef<
 
       const draftPayload = {
         opportunity_id: opportunityId,
-        organization_id: opportunity?.organization_id,
+        organization_id: opportunity?.organization_id || opportunity?.organizations?.id || null,
         auth_user_id: currentUserId,
         volunteer_id: profile.id || null,
         status: "draft",
@@ -302,11 +302,14 @@ export const ApplyForm = forwardRef<
         applicant_phone: profileDraft.phone || profile.phone || "",
       };
 
+      let cloudSaved = false;
       const { error: upsertErr } = await supabase
         .from("applications")
         .upsert(draftPayload, { onConflict: "auth_user_id,opportunity_id" });
 
-      if (upsertErr) {
+      if (!upsertErr) {
+        cloudSaved = true;
+      } else {
         // Fallback: update if exists or insert
         const { data: existing } = await supabase
           .from("applications")
@@ -316,9 +319,16 @@ export const ApplyForm = forwardRef<
           .maybeSingle();
 
         if (existing) {
-          await supabase.from("applications").update(draftPayload).eq("id", existing.id);
+          const { error: updateErr } = await supabase
+            .from("applications")
+            .update(draftPayload)
+            .eq("id", existing.id);
+          if (!updateErr) cloudSaved = true;
         } else {
-          await supabase.from("applications").insert(draftPayload);
+          const { error: insertErr } = await supabase
+            .from("applications")
+            .insert(draftPayload);
+          if (!insertErr) cloudSaved = true;
         }
       }
 
@@ -333,7 +343,11 @@ export const ApplyForm = forwardRef<
 
       setIsDirty(false);
       onDirtyChange?.(false);
-      setSaveNotice("Draft saved to your portfolio! You can leave and resume anytime.");
+      if (cloudSaved) {
+        setSaveNotice("Draft saved to your portfolio! You can leave and resume anytime.");
+      } else {
+        setSaveNotice("Draft saved in this browser. You can continue editing.");
+      }
       return true;
     } catch (err) {
       setSaveNotice("Draft saved in this browser. You can continue editing.");

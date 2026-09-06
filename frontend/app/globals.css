@@ -1224,3 +1224,101 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
   background: var(--bg);
 }
 
+/* Modal Dialog & Scrim */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(36, 38, 45, 0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.modal-scrim.open {
+  display: flex;
+}
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 3rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  font: 600 0.82rem / 1 "Oswald", sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.modal__close {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink-2);
+  padding: 0.35rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.modal__close:hover {
+  color: var(--ink);
+  background: var(--bg-2);
+}
+.modal__body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+.modal__foot {
+  display: flex;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.modal__foot--wrap {
+  flex-wrap: wrap;
+}
+.modal__foot--wrap .btn {
+  flex: 1 1 190px;
+}
+@media (max-width: 640px) {
+  .modal-scrim {
+    padding: 0;
+    align-items: stretch;
+  }
+  .modal {
+    max-width: none;
+    max-height: none;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+  .modal__body {
+    flex: 1 1 auto;
+  }
+  .modal__foot {
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+  .modal__foot .btn {
+    width: 100%;
+    flex: none;
+  }
+}
+
+

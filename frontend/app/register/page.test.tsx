@@ -101,23 +101,21 @@ describe("RegisterPage", () => {
     expect(signUp).not.toHaveBeenCalled();
   });
 
-  it("preserves redirectTo query destination for Step 2 Skip action", async () => {
+  it("omits Skip for now and shows Step 3 Apply when redirectTo is an apply route", async () => {
     mockSearchParams = new URLSearchParams("redirectTo=%2Fapply%2Fopp123");
     getSession.mockResolvedValue({
       data: {
         session: { access_token: "tok123", user: { email: "ayesha@example.com", user_metadata: { full_name: "Ayesha Khan" } } },
       },
     });
-    const user = userEvent.setup();
     render(<RegisterPage />);
 
-    const skipButton = await screen.findByRole("button", { name: "Skip for now" });
-    await user.click(skipButton);
-
-    expect(pushMock).toHaveBeenCalledWith("/apply/opp123");
+    expect(await screen.findByRole("button", { name: "Save & continue to apply" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skip for now" })).not.toBeInTheDocument();
+    expect(screen.getByText("Apply")).toBeInTheDocument();
   });
 
-  it("preserves recorded session journey for Step 2 Skip action", async () => {
+  it("preserves recorded session journey for Step 2 Skip action when not an apply route", async () => {
     recordReturnUrl("/opportunities/ffd9cb51-8b8d-4914-9906-4a9dc124c59e");
     getSession.mockResolvedValue({
       data: {
