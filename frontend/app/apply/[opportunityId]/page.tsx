@@ -200,7 +200,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
 
   const locationDisplay = opportunity.is_online
     ? "Online"
-    : `${opportunity.location ?? "Islamabad"} · in person`;
+    : (opportunity.location ?? "Islamabad");
 
   const summaryContent = (
     <>

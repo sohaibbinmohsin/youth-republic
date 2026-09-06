@@ -67,7 +67,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
 
   const locationDisplay = opp.is_online
     ? "Online"
-    : `${opp.location ?? "Lahore"} · In person`;
+    : (opp.location ?? "Lahore");
 
   const words = opp.name.trim().split(/\s+/);
   const prefix = words.length > 1 ? words.slice(0, -1).join(" ") + " " : "";

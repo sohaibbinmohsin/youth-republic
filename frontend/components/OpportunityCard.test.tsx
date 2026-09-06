@@ -27,7 +27,7 @@ describe("OpportunityCard", () => {
         }}
       />,
     );
-    expect(screen.getByText("Lahore · In person")).toBeInTheDocument();
+    expect(screen.getByText("Lahore")).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
   });
 
@@ -45,7 +45,7 @@ describe("OpportunityCard", () => {
         }}
       />,
     );
-    expect(screen.getByText("Rawalpindi · In person")).toBeInTheDocument();
+    expect(screen.getByText("Rawalpindi")).toBeInTheDocument();
     expect(screen.getByText("Closed")).toBeInTheDocument();
 
     const liveBtn = screen.getByRole("button", { name: /Ongoing program information/i });
@@ -75,7 +75,7 @@ describe("OpportunityCard", () => {
         }}
       />,
     );
-    expect(screen.getByText("Lahore · In person")).toBeInTheDocument();
+    expect(screen.getByText("Lahore")).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
   });
 
@@ -92,7 +92,7 @@ describe("OpportunityCard", () => {
         }}
       />,
     );
-    expect(screen.getByText("Murree · In person")).toBeInTheDocument();
+    expect(screen.getByText("Murree")).toBeInTheDocument();
     expect(screen.getByText("Drive completed")).toBeInTheDocument();
   });
 
@@ -109,7 +109,7 @@ describe("OpportunityCard", () => {
         }}
       />,
     );
-    expect(screen.getByText("Karachi · In person")).toBeInTheDocument();
+    expect(screen.getByText("Karachi")).toBeInTheDocument();
     expect(screen.getByText("Coming soon")).toBeInTheDocument();
   });
 

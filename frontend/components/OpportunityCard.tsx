@@ -41,7 +41,7 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
 
   const locationDisplay = opportunity.isOnline
     ? "Online"
-    : `${opportunity.location ?? "Lahore"} · In person`;
+    : (opportunity.location ?? "Lahore");
   const typeLabel = opportunity.type ? opportunity.type.charAt(0).toUpperCase() + opportunity.type.slice(1) : "";
 
   const words = opportunity.name.trim().split(/\s+/);
