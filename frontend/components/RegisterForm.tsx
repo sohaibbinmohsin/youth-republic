@@ -66,6 +66,7 @@ export function RegisterForm({
   initialInstitution = "",
   initialCountry = "",
   showCnicUpload = false,
+  submitLabel,
   onSuccess,
   onSkip,
 }: {
@@ -77,6 +78,7 @@ export function RegisterForm({
   initialInstitution?: string;
   initialCountry?: string;
   showCnicUpload?: boolean;
+  submitLabel?: string;
   onSuccess?: () => void;
   onSkip?: () => void;
 }) {
@@ -344,12 +346,12 @@ export function RegisterForm({
         </p>
         <button
           type="button"
-          aria-label="Continue"
+          aria-label={submitLabel ? "Continue to application" : "Continue"}
           onClick={() => onSuccess?.()}
           className="btn btn--primary btn--block"
           style={{ marginTop: "1.25rem" }}
         >
-          Continue
+          {submitLabel ? "Continue to application" : "Continue"}
         </button>
       </div>
     );
@@ -669,11 +671,11 @@ export function RegisterForm({
 
         <button
           type="submit"
-          aria-label="Save details"
+          aria-label={submitLabel || "Save details"}
           disabled={submitting}
           className="btn btn--primary w-full sm:w-auto"
         >
-          {submitting ? "Saving details..." : "Save & build portfolio"}
+          {submitting ? "Saving details..." : submitLabel || "Save & build portfolio"}
         </button>
       </div>
     </form>

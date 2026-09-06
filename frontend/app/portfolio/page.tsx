@@ -10,6 +10,7 @@ import { ProfileFieldEditor } from "@/components/ProfileFieldEditor";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
 import { getAvatarInitials } from "@/lib/coolNames";
+import { PROTOTYPE_SEED_OPPORTUNITIES } from "@/lib/opportunityData";
 import PortfolioLoading from "./loading";
 
 interface VolunteerProfile {
@@ -42,6 +43,7 @@ interface ApplicationItem {
   orgColor: string;
   type: string;
   location: string | null;
+  isOnline?: boolean;
 }
 
 interface ActivitySession {
@@ -143,6 +145,81 @@ export default function PortfolioPage() {
       volunteerRow = null;
     }
 
+    async function loadApplications(): Promise<ApplicationItem[]> {
+      try {
+        const { data: appRows } = await supabase
+          .from("applications")
+          .select("id, status, opportunity_id, applied_at, opportunities(id, name, type, location, is_online), organizations(name, brand_color)")
+          .order("applied_at", { ascending: false });
+
+        const dbApps: ApplicationItem[] = (appRows ?? []).map((r: any) => {
+          let opp = r.opportunities ?? {};
+          let org = r.organizations ?? {};
+          if (!opp.name && r.opportunity_id) {
+            const seedOpp =
+              PROTOTYPE_SEED_OPPORTUNITIES[r.opportunity_id] ||
+              Object.values(PROTOTYPE_SEED_OPPORTUNITIES).find((o) => o.id === r.opportunity_id);
+            if (seedOpp) {
+              opp = seedOpp;
+              org = seedOpp.organizations ?? org;
+            }
+          }
+          return {
+            id: r.id,
+            opportunityId: r.opportunity_id || opp.id,
+            status: r.status ?? "submitted",
+            opportunityName: opp.name ?? "Volunteer Drive",
+            orgName: org.name ?? "Youth Republic Partner",
+            orgInitials: getOrgInitials(org.name),
+            orgColor: org.brand_color ?? getOrgColor(org.name),
+            type: opp.type ?? "community",
+            location: opp.location ?? "Pakistan",
+            isOnline: Boolean(opp.is_online),
+          };
+        });
+
+        // Merge any drafts from localStorage not yet present in DB
+        if (typeof window !== "undefined") {
+          try {
+            const knownOppIds = new Set(dbApps.map((a) => a.opportunityId).filter(Boolean));
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith("yr_apply_draft_")) {
+                const rest = key.replace("yr_apply_draft_", "");
+                const oppId = rest.split("_")[0];
+                if (oppId && !knownOppIds.has(oppId)) {
+                  knownOppIds.add(oppId);
+                  const seedOpp =
+                    PROTOTYPE_SEED_OPPORTUNITIES[oppId] ||
+                    Object.values(PROTOTYPE_SEED_OPPORTUNITIES).find((o) => o.id === oppId);
+                  const oppName = seedOpp?.name ?? "Volunteer Drive";
+                  const orgName = seedOpp?.organizations?.name ?? "Youth Republic Partner";
+                  dbApps.unshift({
+                    id: `local-draft-${oppId}`,
+                    opportunityId: oppId,
+                    status: "draft",
+                    opportunityName: oppName,
+                    orgName: orgName,
+                    orgInitials: getOrgInitials(orgName),
+                    orgColor: seedOpp?.organizations?.brand_color ?? getOrgColor(orgName),
+                    type: seedOpp?.type ?? "community",
+                    location: seedOpp?.location ?? "Pakistan",
+                    isOnline: Boolean(seedOpp?.is_online),
+                  });
+                }
+              }
+            }
+          } catch {
+            // ignore localStorage errors
+          }
+        }
+
+        return dbApps;
+      } catch {
+        return [];
+      }
+    }
+
     if (volunteerRow) {
       setVolunteer({
         ...volunteerRow,
@@ -173,32 +250,7 @@ export default function PortfolioPage() {
         setTotalVerifiedHours(0);
       }
 
-      // Load Applications
-      try {
-        const { data: appRows } = await supabase
-          .from("applications")
-          .select("id, status, opportunity_id, opportunities(id, name, type, location), organizations(name, brand_color)")
-          .order("applied_at", { ascending: false });
-
-        const mappedApps: ApplicationItem[] = (appRows ?? []).map((r: any) => {
-          const opp = r.opportunities ?? {};
-          const org = r.organizations ?? {};
-          return {
-            id: r.id,
-            opportunityId: r.opportunity_id || opp.id,
-            status: r.status ?? "submitted",
-            opportunityName: opp.name ?? "Volunteer Drive",
-            orgName: org.name ?? "Youth Republic Partner",
-            orgInitials: getOrgInitials(org.name),
-            orgColor: org.brand_color ?? getOrgColor(org.name),
-            type: opp.type ?? "community",
-            location: opp.location ?? "Pakistan",
-          };
-        });
-        setApplications(mappedApps);
-      } catch {
-        setApplications([]);
-      }
+      setApplications(await loadApplications());
 
       // Load Completed Participations
       try {
@@ -327,31 +379,7 @@ export default function PortfolioPage() {
       setCompletedList([]);
 
       // Unregistered volunteers can still have drafts
-      try {
-        const { data: appRows } = await supabase
-          .from("applications")
-          .select("id, status, opportunity_id, opportunities(id, name, type, location), organizations(name, brand_color)")
-          .order("applied_at", { ascending: false });
-
-        const mappedApps: ApplicationItem[] = (appRows ?? []).map((r: any) => {
-          const opp = r.opportunities ?? {};
-          const org = r.organizations ?? {};
-          return {
-            id: r.id,
-            opportunityId: r.opportunity_id || opp.id,
-            status: r.status ?? "draft",
-            opportunityName: opp.name ?? "Volunteer Drive",
-            orgName: org.name ?? "Youth Republic Partner",
-            orgInitials: getOrgInitials(org.name),
-            orgColor: org.brand_color ?? getOrgColor(org.name),
-            type: opp.type ?? "community",
-            location: opp.location ?? "Pakistan",
-          };
-        });
-        setApplications(mappedApps);
-      } catch {
-        setApplications([]);
-      }
+      setApplications(await loadApplications());
     }
   }
 
@@ -733,7 +761,7 @@ export default function PortfolioPage() {
                         <div className="pcard__name">{app.opportunityName}</div>
                         <div className="pcard__org">
                           {app.orgName} · <span className={`ttag type-${app.type}`}>{app.type}</span>
-                          {app.location && ` · ${app.location}`}
+                          {app.isOnline ? " · Online" : app.location ? ` · ${app.location}` : ""}
                         </div>
                       </div>
                     </div>

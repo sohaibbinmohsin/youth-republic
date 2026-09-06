@@ -130,5 +130,23 @@ describe("OpportunityCard", () => {
     expect(screen.getByText("Online")).toBeInTheDocument();
     expect(screen.getByText("Closed")).toBeInTheDocument();
   });
+
+  it("hides the city and renders 'Online' when isOnline is true even if city is specified", () => {
+    render(
+      <OpportunityCard
+        opportunity={{
+          id: "opp7",
+          name: "Virtual Coding Mentorship",
+          type: "education",
+          location: "Islamabad",
+          isOnline: true,
+          organizationName: "Youth Republic",
+          computedStatus: "open",
+        }}
+      />,
+    );
+    expect(screen.getByText("Online")).toBeInTheDocument();
+    expect(screen.queryByText(/Islamabad/)).not.toBeInTheDocument();
+  });
 });
 

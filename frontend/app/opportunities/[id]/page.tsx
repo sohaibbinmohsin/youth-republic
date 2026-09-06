@@ -27,6 +27,12 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const opp = await fetchOpportunity(id);
   if (!opp) notFound();
 
+  const supabase = await getServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const isSignedIn = Boolean(user);
+
   const status = computeOpportunityStatus({
     statusOverride: opp.status_override,
     applicationOpenAt: opp.application_open_at,
@@ -60,7 +66,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const isLive = isOpportunityLive(status);
 
   const locationDisplay = opp.is_online
-    ? (!opp.location || opp.location.toLowerCase() === "online" ? "Online" : `${opp.location} · Online`)
+    ? "Online"
     : `${opp.location ?? "Lahore"} · In person`;
 
   const words = opp.name.trim().split(/\s+/);
@@ -207,8 +213,12 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
 
           <h3>Key details</h3>
           <dl className="facts">
-            <dt>City</dt>
-            <dd>{opp.location ?? "Lahore"}</dd>
+            {!opp.is_online && (
+              <>
+                <dt>City</dt>
+                <dd>{opp.location ?? "Lahore"}</dd>
+              </>
+            )}
 
             <dt>Format</dt>
             <dd>{opp.is_online ? "Online" : "In person"}</dd>
@@ -267,11 +277,13 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                 <Link className="btn btn--primary btn--block text-center" href={`/apply/${opp.id}`}>
                   Apply
                 </Link>
-                <p className="hint text-center">
-                  {status === "in_progress"
-                    ? "This drive is underway and accepting applications."
-                    : "You’ll be asked to sign in to apply."}
-                </p>
+                {(!isSignedIn || status === "in_progress") && (
+                  <p className="hint text-center">
+                    {status === "in_progress"
+                      ? "This drive is underway and accepting applications."
+                      : "You’ll be asked to sign in to apply."}
+                  </p>
+                )}
               </>
             )}
 

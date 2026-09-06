@@ -199,9 +199,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
   const isOpen = status === "open" || (status === "in_progress" && !isDeadlinePassed);
 
   const locationDisplay = opportunity.is_online
-    ? (!opportunity.location || opportunity.location.toLowerCase() === "online"
-        ? "Online"
-        : `${opportunity.location} · Online`)
+    ? "Online"
     : `${opportunity.location ?? "Islamabad"} · in person`;
 
   const summaryContent = (

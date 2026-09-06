@@ -40,7 +40,7 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
   const isLive = isOpportunityLive(status);
 
   const locationDisplay = opportunity.isOnline
-    ? (!opportunity.location || opportunity.location.toLowerCase() === "online" ? "Online" : `${opportunity.location} · Online`)
+    ? "Online"
     : `${opportunity.location ?? "Lahore"} · In person`;
   const typeLabel = opportunity.type ? opportunity.type.charAt(0).toUpperCase() + opportunity.type.slice(1) : "";
 
