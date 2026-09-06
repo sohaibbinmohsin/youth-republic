@@ -1,22 +1,75 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   applyToOpportunity,
   finalizeAttachment,
+  registerVolunteer,
   requestAttachmentUpload,
+  updateSensitiveField,
   ValidationError,
+  type SensitiveFieldName,
 } from "@/lib/edgeFunctions";
 import { type FieldDef, type FormDefinition, validateAnswers } from "@/lib/forms";
 import type { OpportunityDetailRow } from "@/lib/opportunityData";
 import { CustomSelect } from "@/components/CustomSelect";
+import { DateOfBirthInput } from "@/components/DateOfBirthInput";
+import { AutocompleteInput } from "@/components/AutocompleteInput";
+import { CnicUploadField } from "@/components/CnicUploadField";
+import { GuardianConsentFields, type GuardianConsentValue } from "@/components/GuardianConsentFields";
+import { isMinor } from "@/lib/ageUtils";
+import { formatPhoneNumber } from "@/lib/phoneUtils";
+import { formatCnic, isValidCnic } from "@/lib/cnicUtils";
+import { INSTITUTIONS, CITIES, PAKISTAN_PROVINCES, COUNTRIES } from "@/lib/formDatasets";
+import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 
 export interface VolunteerInitialProfile {
+  id?: string;
+  authUserId?: string;
   fullName?: string;
   email?: string;
   phone?: string;
+  dob?: string;
+  gender?: string;
+  city?: string;
+  province?: string;
+  country?: string;
+  institution?: string;
+  degreeProgram?: string;
+  idDocType?: "cnic" | "b_form" | "passport" | string;
+  idDocNumber?: string;
+  idDocAttachmentId?: string;
+  guardianName?: string;
+  guardianContact?: string;
+  guardianConsent?: boolean;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  status?: string;
+  hasPendingDetails?: boolean;
+}
+
+export interface ProfileDraftState {
+  fullName: string;
+  email: string;
+  phone: string;
+  dob: string;
+  gender: string;
+  country: string;
+  province: string;
+  city: string;
+  institution: string;
+  degreeProgram: string;
+  idDocType: "cnic" | "b_form" | "passport";
+  idDocNumber: string;
+  idDocAttachmentId: string;
+  guardianName: string;
+  guardianContact: string;
+  guardianConsent: boolean;
+}
+
+export interface ApplyFormHandle {
+  saveDraft: () => Promise<boolean>;
+  isDirty: boolean;
 }
 
 type AnswerValue = string | number | boolean | string[];
@@ -30,41 +83,141 @@ function initialAnswer(field: FieldDef): AnswerValue {
   return "";
 }
 
-export function ApplyForm({
-  opportunityId,
-  accessToken,
-  onSuccess,
-  initialVolunteerProfile,
-  opportunity,
-  children,
-}: {
-  children?: React.ReactNode;
-  opportunityId: string;
-  // kept for call-site compatibility; the backend derives the org from the opportunity
-  organizationId?: string;
-  accessToken: string;
-  onSuccess: () => void;
-  initialVolunteerProfile?: VolunteerInitialProfile | null;
-  opportunity?: OpportunityDetailRow | null;
-}) {
+export const ApplyForm = forwardRef<
+  ApplyFormHandle,
+  {
+    opportunityId: string;
+    organizationId?: string;
+    accessToken: string;
+    onSuccess: () => void;
+    initialVolunteerProfile?: VolunteerInitialProfile | null;
+    opportunity?: OpportunityDetailRow | null;
+    initialAnswers?: Record<string, AnswerValue> | null;
+    initialProfileDraft?: Partial<ProfileDraftState> | null;
+    onDirtyChange?: (dirty: boolean) => void;
+    children?: React.ReactNode;
+    summaryCard?: React.ReactNode;
+  }
+>(function ApplyForm(
+  {
+    opportunityId,
+    accessToken,
+    onSuccess,
+    initialVolunteerProfile,
+    opportunity,
+    initialAnswers,
+    initialProfileDraft,
+    onDirtyChange,
+    children,
+    summaryCard,
+  },
+  ref,
+) {
   const form: FormDefinition = useMemo(() => {
     const f = opportunity?.application_form;
     return f && Array.isArray(f.fields) ? f : EMPTY_FORM;
   }, [opportunity]);
 
+  const profile = initialVolunteerProfile ?? {};
+  const showPendingDetails = Boolean(profile.hasPendingDetails);
+
+  const authUserId = profile.authUserId || profile.id || "";
+  const storageKey = authUserId
+    ? `yr_apply_draft_${opportunityId}_${authUserId}`
+    : `yr_apply_draft_${opportunityId}`;
+
+  // 1. Initialize form answers
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>(() => {
     const seed: Record<string, AnswerValue> = {};
     for (const field of form.fields) seed[field.id] = initialAnswer(field);
+
+    if (initialAnswers && typeof initialAnswers === "object") {
+      Object.assign(seed, initialAnswers);
+    }
     return seed;
   });
+
+  // 2. Initialize pending profile details draft
+  const [profileDraft, setProfileDraft] = useState<ProfileDraftState>(() => {
+    const defaults: ProfileDraftState = {
+      fullName: profile.fullName || "",
+      email: profile.email || "",
+      phone: profile.phone || "",
+      dob: profile.dob || "",
+      gender: profile.gender || "",
+      country: profile.country || "Pakistan",
+      province: profile.province || "",
+      city: profile.city || "",
+      institution: profile.institution || "",
+      degreeProgram: profile.degreeProgram || "",
+      idDocType: (profile.idDocType as "cnic" | "b_form" | "passport") || "cnic",
+      idDocNumber: profile.idDocNumber || "",
+      idDocAttachmentId: profile.idDocAttachmentId || "",
+      guardianName: profile.guardianName || "",
+      guardianContact: profile.guardianContact || "",
+      guardianConsent: Boolean(profile.guardianConsent),
+    };
+
+    if (initialProfileDraft && typeof initialProfileDraft === "object") {
+      Object.assign(defaults, initialProfileDraft);
+    }
+    return defaults;
+  });
+
   const [filesByField, setFilesByField] = useState<Record<string, File[]>>({});
   const [error, setError] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Load from local storage on mount if newer than initial props
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.answers) {
+          setAnswers((prev) => ({ ...prev, ...parsed.answers }));
+        }
+        if (parsed?.profileDraft) {
+          setProfileDraft((prev) => ({ ...prev, ...parsed.profileDraft }));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [storageKey]);
+
+  // Continuous auto-save to localStorage
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const updateDraftLocally = (
+    nextAnswers: Record<string, AnswerValue>,
+    nextProfile: ProfileDraftState,
+  ) => {
+    setIsDirty(true);
+    onDirtyChange?.(true);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({ answers: nextAnswers, profileDraft: nextProfile, updatedAt: Date.now() }),
+        );
+      } catch {
+        // ignore
+      }
+    }, 400);
+  };
 
   function setAnswer(id: string, value: AnswerValue) {
-    setAnswers((prev) => ({ ...prev, [id]: value }));
+    setAnswers((prev) => {
+      const next = { ...prev, [id]: value };
+      updateDraftLocally(next, profileDraft);
+      return next;
+    });
     setFieldErrors((prev) => {
       if (!prev[id]) return prev;
       const next = { ...prev };
@@ -76,9 +229,28 @@ export function ApplyForm({
   function toggleInArray(id: string, value: string) {
     setAnswers((prev) => {
       const cur = Array.isArray(prev[id]) ? (prev[id] as string[]) : [];
-      return { ...prev, [id]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] };
+      const updated = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
+      const next = { ...prev, [id]: updated };
+      updateDraftLocally(next, profileDraft);
+      return next;
     });
   }
+
+  function setProfileField<K extends keyof ProfileDraftState>(key: K, val: ProfileDraftState[K]) {
+    setProfileDraft((prev) => {
+      const next = { ...prev, [key]: val };
+      updateDraftLocally(answers, next);
+      return next;
+    });
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  const isMinorApplicant = Boolean(profileDraft.dob && isMinor(profileDraft.dob));
 
   async function uploadFilesForField(field: FieldDef): Promise<string[]> {
     const files = filesByField[field.id] ?? [];
@@ -88,7 +260,6 @@ export function ApplyForm({
         {
           domain: "application_file",
           ownerType: "application",
-          // draft owner id — apply-to-opportunity re-points it to the new application row
           ownerId: crypto.randomUUID(),
           mimeType: file.type || "application/octet-stream",
           sizeBytes: file.size,
@@ -107,14 +278,119 @@ export function ApplyForm({
     return ids;
   }
 
+  // Explicit Cloud Save
+  async function handleSaveDraft(): Promise<boolean> {
+    setSavingDraft(true);
+    setError(null);
+    setSaveNotice(null);
+
+    try {
+      const supabase = getBrowserSupabaseClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUserId = userData.user?.id || authUserId;
+
+      const draftPayload = {
+        opportunity_id: opportunityId,
+        organization_id: opportunity?.organization_id,
+        auth_user_id: currentUserId,
+        volunteer_id: profile.id || null,
+        status: "draft",
+        answers,
+        draft_profile: profileDraft,
+        applicant_name: profileDraft.fullName || profile.fullName || "",
+        applicant_email: profileDraft.email || profile.email || userData.user?.email || "",
+        applicant_phone: profileDraft.phone || profile.phone || "",
+      };
+
+      const { error: upsertErr } = await supabase
+        .from("applications")
+        .upsert(draftPayload, { onConflict: "auth_user_id,opportunity_id" });
+
+      if (upsertErr) {
+        // Fallback: update if exists or insert
+        const { data: existing } = await supabase
+          .from("applications")
+          .select("id")
+          .eq("opportunity_id", opportunityId)
+          .eq("auth_user_id", currentUserId)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase.from("applications").update(draftPayload).eq("id", existing.id);
+        } else {
+          await supabase.from("applications").insert(draftPayload);
+        }
+      }
+
+      try {
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify({ answers, profileDraft, updatedAt: Date.now() }),
+        );
+      } catch {
+        // ignore
+      }
+
+      setIsDirty(false);
+      onDirtyChange?.(false);
+      setSaveNotice("Draft saved to your portfolio! You can leave and resume anytime.");
+      return true;
+    } catch (err) {
+      setSaveNotice("Draft saved in this browser. You can continue editing.");
+      return false;
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
+  useImperativeHandle(ref, () => ({
+    saveDraft: handleSaveDraft,
+    isDirty,
+  }));
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSaveNotice(null);
     setFieldErrors({});
     setSubmitting(true);
 
     try {
-      // 1. Upload any files, folding their attachment ids into the answers.
+      const currentErrors: Record<string, string> = {};
+
+      // 1. Validate pending profile details if requested
+      if (showPendingDetails) {
+        if (!profileDraft.fullName.trim()) currentErrors.fullName = "Full name is required";
+        if (!profileDraft.phone.trim()) currentErrors.phone = "Phone number is required";
+        if (!profileDraft.dob.trim()) currentErrors.dob = "Date of birth is required";
+        if (!profileDraft.gender.trim()) currentErrors.gender = "Gender is required";
+        if (!profileDraft.country.trim()) currentErrors.country = "Country is required";
+        if (!profileDraft.province.trim()) currentErrors.province = "Province is required";
+        if (!profileDraft.city.trim()) currentErrors.city = "City is required";
+        if (!profileDraft.institution.trim()) currentErrors.institution = "Institution is required";
+        if (!profileDraft.degreeProgram.trim()) currentErrors.degreeProgram = "Degree program is required";
+        if (!profileDraft.idDocNumber.trim()) {
+          currentErrors.idDocNumber = "ID document number is required";
+        } else if (
+          (profileDraft.idDocType === "cnic" || profileDraft.idDocType === "b_form") &&
+          !isValidCnic(profileDraft.idDocNumber)
+        ) {
+          currentErrors.idDocNumber = "Must be a 13-digit number (XXXXX-XXXXXXX-X)";
+        }
+
+        if (isMinorApplicant) {
+          if (!profileDraft.guardianName.trim()) currentErrors.guardianName = "Guardian name is required";
+          if (!profileDraft.guardianContact.trim()) currentErrors.guardianContact = "Guardian contact is required";
+          if (!profileDraft.guardianConsent) {
+            currentErrors.guardianConsent = "Guardian consent is required for volunteers under 18";
+          }
+          if (profileDraft.idDocType !== "b_form") {
+            currentErrors.idDocType = "Volunteers under 18 must provide a B-Form";
+          }
+        }
+      }
+
+      // 2. Upload any application form files
       const finalAnswers: Record<string, unknown> = { ...answers };
       const allAttachmentIds: string[] = [];
       for (const field of form.fields) {
@@ -123,23 +399,66 @@ export function ApplyForm({
         finalAnswers[field.id] = ids;
         allAttachmentIds.push(...ids);
       }
-      // number answers -> number for validation
+
       for (const field of form.fields) {
         if (field.type === "number" && finalAnswers[field.id] !== "" && finalAnswers[field.id] != null) {
           finalAnswers[field.id] = Number(finalAnswers[field.id]);
         }
       }
 
-      // 2. Client-side validate against the form the admin published.
+      // 3. Client-side validate dynamic questions
       const result = validateAnswers(form, finalAnswers);
       if (!result.ok) {
-        setFieldErrors(result.fieldErrors);
+        Object.assign(currentErrors, result.fieldErrors);
+      }
+
+      if (Object.keys(currentErrors).length > 0) {
+        setFieldErrors(currentErrors);
         setError("Please fix the highlighted fields.");
         setSubmitting(false);
         return;
       }
 
-      // 3. Submit.
+      // 4. If user was missing profile details, register or update their volunteer profile
+      if (showPendingDetails) {
+        const supabase = getBrowserSupabaseClient();
+        const { data: authData } = await supabase.auth.getUser();
+        const currentUserId = authData.user?.id || authUserId;
+
+        if (!profile.id) {
+          await registerVolunteer(
+            {
+              fullName: profileDraft.fullName.trim(),
+              email: profileDraft.email.trim(),
+              phone: profileDraft.phone.trim(),
+              dob: profileDraft.dob,
+              gender: profileDraft.gender,
+              city: profileDraft.city.trim(),
+              province: profileDraft.province.trim(),
+              country: profileDraft.country.trim(),
+              institution: profileDraft.institution.trim(),
+              degreeProgram: profileDraft.degreeProgram.trim(),
+              idDocType: profileDraft.idDocType,
+              idDocNumber: profileDraft.idDocNumber.trim(),
+              idDocAttachmentId: profileDraft.idDocAttachmentId || undefined,
+              guardianName: isMinorApplicant ? profileDraft.guardianName.trim() : undefined,
+              guardianContact: isMinorApplicant ? profileDraft.guardianContact.trim() : undefined,
+              guardianConsent: isMinorApplicant ? profileDraft.guardianConsent : undefined,
+            },
+            accessToken,
+          );
+        } else {
+          // If already registered but was missing id_doc_number or other fields
+          if (!profile.idDocNumber && profileDraft.idDocNumber) {
+            await updateSensitiveField(
+              { fieldName: "id_doc_number", newValue: profileDraft.idDocNumber.trim() },
+              accessToken,
+            );
+          }
+        }
+      }
+
+      // 5. Submit the application
       await applyToOpportunity(
         {
           opportunityId,
@@ -148,6 +467,15 @@ export function ApplyForm({
         },
         accessToken,
       );
+
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // ignore
+      }
+
+      setIsDirty(false);
+      onDirtyChange?.(false);
       onSuccess();
     } catch (err) {
       if (err instanceof ValidationError) {
@@ -161,8 +489,6 @@ export function ApplyForm({
     }
   }
 
-  const profile = initialVolunteerProfile ?? {};
-
   return (
     <form onSubmit={handleSubmit} className="apply-form" id="applyForm" noValidate>
       {error && (
@@ -174,23 +500,275 @@ export function ApplyForm({
         </div>
       )}
 
-      {/* Identity — sourced from the volunteer's profile, not editable here. */}
-      <div className="grid-2">
-        <div className="field">
-          <label htmlFor="a-name">Full name</label>
-          <input id="a-name" value={profile.fullName ?? ""} readOnly />
+      {saveNotice && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-sm text-emerald-800"
+        >
+          {saveNotice}
         </div>
-        <div className="field">
-          <label htmlFor="a-phone">Phone</label>
-          <input id="a-phone" value={profile.phone ?? ""} readOnly />
-        </div>
-      </div>
-      <div className="field">
-        <label htmlFor="a-email">Email</label>
-        <input id="a-email" type="email" value={profile.email ?? ""} readOnly />
-        <p className="hint">These come from your profile. Update them in Profile if they&rsquo;ve changed.</p>
-      </div>
+      )}
 
+      {/* Profile Details Section */}
+      {!showPendingDetails ? (
+        /* Completed Profile - Compact Summary */
+        <>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="a-name">Full name</label>
+              <input id="a-name" value={profile.fullName ?? ""} readOnly />
+            </div>
+            <div className="field">
+              <label htmlFor="a-phone">Phone</label>
+              <input id="a-phone" value={profile.phone ?? ""} readOnly />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="a-email">Email</label>
+            <input id="a-email" type="email" value={profile.email ?? ""} readOnly />
+            <p className="hint">These come from your profile. Update them in Profile if they&rsquo;ve changed.</p>
+          </div>
+        </>
+      ) : (
+        /* Incomplete Profile - Collect Missing Details directly in application */
+        <div className="mb-6 rounded-xl border border-[var(--line)] bg-[var(--bg-2)] p-4 sm:p-6 space-y-4">
+          <div>
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+              <h3 className="text-base font-semibold text-[var(--ink)] m-0">Your Profile Details</h3>
+              <span className="pill pill--pend text-[0.7rem] py-0.5 px-2">Pending Details</span>
+            </div>
+            <p className="text-xs text-[var(--ink-2)] m-0">
+              Please complete your basic profile details so we can issue your verified volunteer credentials and attach them to your application.
+            </p>
+          </div>
+
+          <div className="grid-2">
+            <div className={`field ${fieldErrors.fullName ? "has-error" : ""}`}>
+              <label htmlFor="a-name">Full name *</label>
+              <input
+                id="a-name"
+                value={profileDraft.fullName}
+                onChange={(e) => setProfileField("fullName", e.target.value)}
+                placeholder="e.g. Ayesha Khan"
+              />
+              {fieldErrors.fullName && <p className="field__error">{fieldErrors.fullName}</p>}
+            </div>
+
+            <div className={`field ${fieldErrors.phone ? "has-error" : ""}`}>
+              <label htmlFor="a-phone">Phone *</label>
+              <input
+                id="a-phone"
+                type="tel"
+                value={profileDraft.phone}
+                onChange={(e) => setProfileField("phone", formatPhoneNumber(e.target.value))}
+                placeholder="e.g. 0300 1234567"
+              />
+              {fieldErrors.phone && <p className="field__error">{fieldErrors.phone}</p>}
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="a-email">Email</label>
+            <input id="a-email" type="email" value={profileDraft.email} readOnly />
+          </div>
+
+          <div className="grid-2">
+            <div className={`field ${fieldErrors.dob ? "has-error" : ""}`}>
+              <label htmlFor="a-dob">Date of birth *</label>
+              <DateOfBirthInput
+                id="a-dob"
+                value={profileDraft.dob}
+                onChange={(val) => setProfileField("dob", val)}
+              />
+              {fieldErrors.dob && <p className="field__error">{fieldErrors.dob}</p>}
+            </div>
+
+            <div className={`field ${fieldErrors.gender ? "has-error" : ""}`}>
+              <label htmlFor="a-gender">Gender *</label>
+              <select
+                id="a-gender"
+                className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)]"
+                value={profileDraft.gender}
+                onChange={(e) => setProfileField("gender", e.target.value)}
+              >
+                <option value="">Select gender…</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Other</option>
+                <option value="prefer_not_to_say">Prefer not to say</option>
+              </select>
+              {fieldErrors.gender && <p className="field__error">{fieldErrors.gender}</p>}
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className={`field ${fieldErrors.country ? "has-error" : ""}`}>
+              <label htmlFor="a-country">Country *</label>
+              <AutocompleteInput
+                id="a-country"
+                value={profileDraft.country}
+                dataset={COUNTRIES}
+                onChange={(val) => setProfileField("country", val)}
+                placeholder="Select or type country…"
+              />
+              {fieldErrors.country && <p className="field__error">{fieldErrors.country}</p>}
+            </div>
+
+            <div className={`field ${fieldErrors.province ? "has-error" : ""}`}>
+              <label htmlFor="a-province">Province / State *</label>
+              {profileDraft.country.toLowerCase() === "pakistan" ? (
+                <AutocompleteInput
+                  id="a-province"
+                  value={profileDraft.province}
+                  dataset={PAKISTAN_PROVINCES}
+                  onChange={(val) => setProfileField("province", val)}
+                  placeholder="Select province…"
+                />
+              ) : (
+                <input
+                  id="a-province"
+                  value={profileDraft.province}
+                  onChange={(e) => setProfileField("province", e.target.value)}
+                  placeholder="Province or State"
+                />
+              )}
+              {fieldErrors.province && <p className="field__error">{fieldErrors.province}</p>}
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className={`field ${fieldErrors.city ? "has-error" : ""}`}>
+              <label htmlFor="a-city">City *</label>
+              <AutocompleteInput
+                id="a-city"
+                value={profileDraft.city}
+                dataset={CITIES}
+                onChange={(val) => setProfileField("city", val)}
+                placeholder="Select or type city…"
+              />
+              {fieldErrors.city && <p className="field__error">{fieldErrors.city}</p>}
+            </div>
+
+            <div className={`field ${fieldErrors.institution ? "has-error" : ""}`}>
+              <label htmlFor="a-institution">Institution / University *</label>
+              <AutocompleteInput
+                id="a-institution"
+                value={profileDraft.institution}
+                dataset={INSTITUTIONS}
+                onChange={(val) => setProfileField("institution", val)}
+                placeholder="Select or type institution…"
+              />
+              {fieldErrors.institution && <p className="field__error">{fieldErrors.institution}</p>}
+            </div>
+          </div>
+
+          <div className={`field ${fieldErrors.degreeProgram ? "has-error" : ""}`}>
+            <label htmlFor="a-degree">Degree program *</label>
+            <input
+              id="a-degree"
+              value={profileDraft.degreeProgram}
+              onChange={(e) => setProfileField("degreeProgram", e.target.value)}
+              placeholder="e.g. BS Computer Science, A-Levels, FSc"
+            />
+            {fieldErrors.degreeProgram && <p className="field__error">{fieldErrors.degreeProgram}</p>}
+          </div>
+
+          {/* ID Document Selection & Input */}
+          <div className="space-y-3 pt-2">
+            <label className="block text-sm font-semibold text-[var(--ink)]">Identity Document *</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="a-idDocType"
+                  value="cnic"
+                  disabled={isMinorApplicant}
+                  checked={profileDraft.idDocType === "cnic" && !isMinorApplicant}
+                  onChange={() => setProfileField("idDocType", "cnic")}
+                />
+                <span>CNIC (Adult)</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="a-idDocType"
+                  value="b_form"
+                  checked={profileDraft.idDocType === "b_form" || isMinorApplicant}
+                  onChange={() => setProfileField("idDocType", "b_form")}
+                />
+                <span>B-Form {isMinorApplicant && "(Under 18)"}</span>
+              </label>
+
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="a-idDocType"
+                  value="passport"
+                  disabled={isMinorApplicant}
+                  checked={profileDraft.idDocType === "passport" && !isMinorApplicant}
+                  onChange={() => setProfileField("idDocType", "passport")}
+                />
+                <span>Passport</span>
+              </label>
+            </div>
+
+            <div className={`field ${fieldErrors.idDocNumber ? "has-error" : ""}`}>
+              <label htmlFor="a-id-num">
+                {profileDraft.idDocType === "passport"
+                  ? "Passport Number *"
+                  : profileDraft.idDocType === "b_form"
+                  ? "B-Form Number *"
+                  : "CNIC Number *"}
+              </label>
+              <input
+                id="a-id-num"
+                value={profileDraft.idDocNumber}
+                onChange={(e) => {
+                  const val =
+                    profileDraft.idDocType === "passport"
+                      ? e.target.value.toUpperCase().trim()
+                      : formatCnic(e.target.value);
+                  setProfileField("idDocNumber", val);
+                }}
+                placeholder={
+                  profileDraft.idDocType === "passport" ? "e.g. AB1234567" : "35202-1234567-1"
+                }
+              />
+              {fieldErrors.idDocNumber && <p className="field__error">{fieldErrors.idDocNumber}</p>}
+            </div>
+
+            <CnicUploadField
+              accessToken={accessToken}
+              docType={profileDraft.idDocType}
+              onUploaded={(attId) => setProfileField("idDocAttachmentId", attId)}
+            />
+          </div>
+
+          {/* Minor Guardian Consent Fields */}
+          {isMinorApplicant && (
+            <GuardianConsentFields
+              guardianName={profileDraft.guardianName}
+              guardianContact={profileDraft.guardianContact}
+              guardianConsent={profileDraft.guardianConsent}
+              onChange={(val: GuardianConsentValue) => {
+                setProfileDraft((prev) => {
+                  const next = {
+                    ...prev,
+                    guardianName: val.guardianName,
+                    guardianContact: val.guardianContact,
+                    guardianConsent: val.guardianConsent,
+                  };
+                  updateDraftLocally(answers, next);
+                  return next;
+                });
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Dynamic Opportunity Form Questions */}
       {form.fields.length === 0 && (
         <p className="hint">This opportunity has no extra questions — just confirm below and submit.</p>
       )}
@@ -208,31 +786,65 @@ export function ApplyForm({
         />
       ))}
 
-      {children}
-
-      <div className="field chk" style={{ marginTop: "1rem" }}>
-        <label>
+      <div style={{ margin: "1rem 0" }}>
+        <label className="checkline" style={{ cursor: "pointer" }}>
           <input
             type="checkbox"
             required
             checked={confirmed}
-            onChange={(e) => setConfirmed(e.target.checked)}
+            onChange={(e) => {
+              setConfirmed(e.target.checked);
+              if (fieldErrors.confirmed) {
+                setFieldErrors((prev) => {
+                  const n = { ...prev };
+                  delete n.confirmed;
+                  return n;
+                });
+              }
+            }}
+            style={{ marginTop: "2px" }}
           />
-          I confirm my details are accurate and I meet the eligibility criteria.
+          <span>I confirm my details are accurate and I meet the eligibility criteria.</span>
         </label>
+        {fieldErrors.confirmed && (
+          <p className="field__error" style={{ marginTop: "0.25rem" }}>
+            {fieldErrors.confirmed}
+          </p>
+        )}
       </div>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="btn btn--primary btn--block"
-        id="applySubmit"
-      >
-        {submitting ? "Submitting application…" : "Submit application"}
-      </button>
+      {summaryCard && (
+        <div className="apply-summary-mobile pane__aside" style={{ marginBottom: "1.25rem" }}>
+          {summaryCard}
+        </div>
+      )}
+
+      {children}
+
+      {/* Form Actions: Submit & Save Draft */}
+      <div className="flex gap-3 flex-wrap pt-2">
+        <button
+          type="submit"
+          disabled={submitting || savingDraft}
+          className="btn btn--primary flex-1 min-w-[180px]"
+          id="applySubmit"
+        >
+          {submitting ? "Submitting application…" : "Submit application"}
+        </button>
+
+        <button
+          type="button"
+          disabled={submitting || savingDraft}
+          onClick={handleSaveDraft}
+          className="btn btn--ghost"
+          id="applySaveDraft"
+        >
+          {savingDraft ? "Saving draft…" : "Save draft"}
+        </button>
+      </div>
     </form>
   );
-}
+});
 
 function ApplyField({
   field,
