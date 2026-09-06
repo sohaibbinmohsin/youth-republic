@@ -202,5 +202,6 @@ describe("ChangePasswordPage", () => {
 
     const backBtn = await screen.findByRole("button", { name: /go back/i });
     expect(backBtn).toHaveTextContent("← Back");
+    expect(backBtn.parentElement).toHaveClass("flex", "justify-start");
   });
 });

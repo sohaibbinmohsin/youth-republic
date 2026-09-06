@@ -36,7 +36,13 @@ export function getProgramStatusLabel(status?: string | null): string | null {
   }
 }
 
-export function getApplicationStatusLabel(status?: string | null): "Open" | "Closed" {
+export function getApplicationStatusLabel(
+  status?: string | null,
+  isAcceptingApplications?: boolean
+): "Open" | "Closed" {
+  if (isAcceptingApplications !== undefined) {
+    return isAcceptingApplications ? "Open" : "Closed";
+  }
   return status === "open" ? "Open" : "Closed";
 }
 
@@ -49,7 +55,10 @@ export interface OpportunityBadgeConfig {
   pillClass: string;
 }
 
-export function getOpportunityBadgeConfig(status?: string | null): OpportunityBadgeConfig {
+export function getOpportunityBadgeConfig(
+  status?: string | null,
+  isAcceptingApplications?: boolean
+): OpportunityBadgeConfig {
   switch (status) {
     case "open":
       return { label: "Open", pillClass: "pill--pos" };
@@ -58,6 +67,10 @@ export function getOpportunityBadgeConfig(status?: string | null): OpportunityBa
     case "completed":
       return { label: "Drive completed", pillClass: "pill--comp" };
     case "in_progress":
+      if (isAcceptingApplications) {
+        return { label: "Open", pillClass: "pill--pos" };
+      }
+      return { label: "Closed", pillClass: "pill--neu" };
     case "closed":
     default:
       return { label: "Closed", pillClass: "pill--neu" };

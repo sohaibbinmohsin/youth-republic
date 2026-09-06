@@ -36,6 +36,12 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     deactivatedAt: opp.deactivated_at,
   });
 
+  const isDeadlinePassed = opp.application_deadline
+    ? new Date(opp.application_deadline).getTime() < Date.now()
+    : false;
+  const isAcceptingApplications =
+    status === "open" || (status === "in_progress" && !isDeadlinePassed);
+
   const org = opp.organizations ?? { name: "Youth Republic Partner", brand_color: "#8A7A10", about: null };
   const orgColor = org.brand_color ?? "#8A7A10";
   const orgInitials = (org.name ?? "YR")
@@ -50,7 +56,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     color: "#941A80",
   };
 
-  const badge = getOpportunityBadgeConfig(status);
+  const badge = getOpportunityBadgeConfig(status, isAcceptingApplications);
   const isLive = isOpportunityLive(status);
 
   const locationDisplay = opp.is_online
@@ -61,7 +67,12 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const prefix = words.length > 1 ? words.slice(0, -1).join(" ") + " " : "";
   const lastWord = words.length > 0 ? words[words.length - 1] : "";
 
-  const badgeLabel = badge.label === "Closed" ? "Applications closed" : badge.label;
+  const badgeLabel =
+    status === "in_progress" && isAcceptingApplications
+      ? "Applications open"
+      : badge.label === "Closed"
+      ? "Applications closed"
+      : badge.label;
 
   return (
     <section data-route="opportunity" className="pb-12">
@@ -251,12 +262,16 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
 
           {/* CTA & Status handling */}
           <div className="pt-2">
-            {status === "open" && (
+            {isAcceptingApplications && (
               <>
                 <Link className="btn btn--primary btn--block text-center" href={`/apply/${opp.id}`}>
                   Apply
                 </Link>
-                <p className="hint text-center">You’ll be asked to sign in to apply.</p>
+                <p className="hint text-center">
+                  {status === "in_progress"
+                    ? "This drive is underway and accepting applications."
+                    : "You’ll be asked to sign in to apply."}
+                </p>
               </>
             )}
 
@@ -277,7 +292,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               </>
             )}
 
-            {status === "in_progress" && (
+            {status === "in_progress" && !isAcceptingApplications && (
               <>
                 <button
                   type="button"

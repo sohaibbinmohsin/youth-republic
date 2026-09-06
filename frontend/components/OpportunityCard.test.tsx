@@ -60,6 +60,25 @@ describe("OpportunityCard", () => {
     expect(screen.queryByText("This volunteer drive is currently active and in progress.")).not.toBeInTheDocument();
   });
 
+  it("renders 'Open' pill when in_progress and application deadline has not passed", () => {
+    const futureDeadline = new Date(Date.now() + 86400000).toISOString();
+    render(
+      <OpportunityCard
+        opportunity={{
+          id: "opp-live-open",
+          name: "Active Relief Camp",
+          type: "health",
+          location: "Lahore",
+          organizationName: "Rizq",
+          computedStatus: "in_progress",
+          applicationDeadline: futureDeadline,
+        }}
+      />,
+    );
+    expect(screen.getByText("Lahore · In person")).toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
+  });
+
   it("renders 'Drive completed' badge when completed", () => {
     render(
       <OpportunityCard

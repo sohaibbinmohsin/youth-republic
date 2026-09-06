@@ -35,7 +35,13 @@ export async function applyToOpportunity(
     activityEndAt: opp.activity_end_at ?? null,
     deactivatedAt: opp.deactivated_at ?? null,
   });
-  if (status !== "open") throw new Error("opportunity_unavailable");
+
+  const isDeadlinePassed = opp.application_deadline
+    ? new Date(opp.application_deadline).getTime() < Date.now()
+    : false;
+  const isAcceptingApplications =
+    status === "open" || (status === "in_progress" && !isDeadlinePassed);
+  if (!isAcceptingApplications) throw new Error("opportunity_unavailable");
 
   const form = opp.application_form as FormDefinition;
   const result = validateAnswers(form, input.answers);

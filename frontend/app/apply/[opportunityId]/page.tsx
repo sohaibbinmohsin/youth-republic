@@ -117,7 +117,11 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
     activityEndAt: opportunity.activity_end_at,
     deactivatedAt: opportunity.deactivated_at,
   });
-  const isOpen = status === "open";
+
+  const isDeadlinePassed = opportunity.application_deadline
+    ? new Date(opportunity.application_deadline).getTime() < Date.now()
+    : false;
+  const isOpen = status === "open" || (status === "in_progress" && !isDeadlinePassed);
 
   const locationDisplay = opportunity.is_online
     ? (!opportunity.location || opportunity.location.toLowerCase() === "online"
