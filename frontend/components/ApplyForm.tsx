@@ -9,6 +9,7 @@ import {
 } from "@/lib/edgeFunctions";
 import { type FieldDef, type FormDefinition, validateAnswers } from "@/lib/forms";
 import type { OpportunityDetailRow } from "@/lib/opportunityData";
+import { CustomSelect } from "@/components/CustomSelect";
 
 export interface VolunteerInitialProfile {
   fullName?: string;
@@ -262,12 +263,16 @@ function ApplyField({
       return (
         <div className={cls}>
           <label htmlFor={`f-${field.id}`}>{labelNode}</label>
-          <select id={`f-${field.id}`} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)}>
-            <option value="">Choose one…</option>
-            {(field.options ?? []).map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          <CustomSelect
+            id={`f-${field.id}`}
+            value={String(value ?? "")}
+            options={field.options ?? []}
+            onChange={(val) => onChange(val)}
+            required={field.required}
+            error={Boolean(error)}
+            placeholder="Choose one…"
+            ariaLabel={field.label}
+          />
           {help}
           {err}
         </div>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 
+import { validatePassword } from "@/lib/passwordUtils";
+
 export default function ChangePasswordPage() {
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -16,20 +18,13 @@ export default function ChangePasswordPage() {
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const supabase = getBrowserSupabaseClient();
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) {
-        setIsAuthenticated(true);
-        setUserEmail(data.session.user.email ?? null);
-      } else {
-        setIsAuthenticated(false);
-        setUserEmail(null);
-      }
+      setIsAuthenticated(Boolean(data.session?.user));
       setCheckingAuth(false);
     });
 
@@ -37,7 +32,6 @@ export default function ChangePasswordPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session?.user));
-      setUserEmail(session?.user?.email ?? null);
       setCheckingAuth(false);
     });
 
@@ -56,8 +50,9 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters long.");
+    const pwdResult = validatePassword(newPassword);
+    if (!pwdResult.isValid) {
+      setError(pwdResult.errorMessage || "Password does not meet security requirements.");
       return;
     }
 
@@ -74,30 +69,6 @@ export default function ChangePasswordPage() {
     setLoading(true);
     try {
       const supabase = getBrowserSupabaseClient();
-      let email = userEmail;
-      if (!email) {
-        const { data: userData } = await supabase.auth.getUser();
-        email = userData?.user?.email ?? null;
-      }
-
-      if (!email) {
-        setError("User session not found. Please sign in again.");
-        setLoading(false);
-        return;
-      }
-
-      // Verify current password matches by re-authenticating against Supabase
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email,
-        password: currentPassword,
-      });
-
-      if (verifyError) {
-        setError("The current password you entered is incorrect.");
-        setLoading(false);
-        return;
-      }
-
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
         current_password: currentPassword,
@@ -120,7 +91,7 @@ export default function ChangePasswordPage() {
     }
   }
 
-  const isMinLength = newPassword.length >= 8;
+  const pwdValidation = validatePassword(newPassword);
   const isMatching = newPassword.length > 0 && newPassword === confirmPassword;
 
   if (checkingAuth) {
@@ -328,11 +299,41 @@ export default function ChangePasswordPage() {
               <div className="flex items-center gap-1.5">
                 <span
                   style={{
-                    color: isMinLength ? "var(--st-pos-fg, #3B6D11)" : "inherit",
-                    fontWeight: isMinLength ? 600 : 400,
+                    color: pwdValidation.hasMinLength ? "var(--st-pos-fg, #3B6D11)" : "inherit",
+                    fontWeight: pwdValidation.hasMinLength ? 600 : 400,
                   }}
                 >
-                  {isMinLength ? "✓" : "•"} At least 8 characters long
+                  {pwdValidation.hasMinLength ? "✓" : "•"} At least 8 characters long
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span
+                  style={{
+                    color: (pwdValidation.hasLowercase && pwdValidation.hasUppercase) ? "var(--st-pos-fg, #3B6D11)" : "inherit",
+                    fontWeight: (pwdValidation.hasLowercase && pwdValidation.hasUppercase) ? 600 : 400,
+                  }}
+                >
+                  {(pwdValidation.hasLowercase && pwdValidation.hasUppercase) ? "✓" : "•"} Uppercase & lowercase letters
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span
+                  style={{
+                    color: pwdValidation.hasDigit ? "var(--st-pos-fg, #3B6D11)" : "inherit",
+                    fontWeight: pwdValidation.hasDigit ? 600 : 400,
+                  }}
+                >
+                  {pwdValidation.hasDigit ? "✓" : "•"} At least one number
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span
+                  style={{
+                    color: pwdValidation.hasSymbol ? "var(--st-pos-fg, #3B6D11)" : "inherit",
+                    fontWeight: pwdValidation.hasSymbol ? 600 : 400,
+                  }}
+                >
+                  {pwdValidation.hasSymbol ? "✓" : "•"} At least one symbol (!, @, #, $, etc.)
                 </span>
               </div>
               <div className="flex items-center gap-1.5">

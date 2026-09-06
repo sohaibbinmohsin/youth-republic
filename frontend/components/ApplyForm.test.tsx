@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ApplyForm } from "./ApplyForm";
@@ -100,5 +100,47 @@ describe("ApplyForm (dynamic)", () => {
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
     expect(await screen.findByText("opportunity_unavailable")).toBeInTheDocument();
+  });
+
+  it("renders a select dropdown question with custom card and updates selected answer", async () => {
+    const user = userEvent.setup();
+    const oppWithSelect = {
+      id: "opp2",
+      organization_id: "org1",
+      application_form: {
+        version: 1,
+        fields: [
+          {
+            id: "availability",
+            type: "select",
+            label: "When are you available?",
+            required: true,
+            options: [
+              { value: "mornings", label: "Weekday mornings" },
+              { value: "evenings", label: "Weekday evenings" },
+            ],
+          },
+        ],
+      },
+    } as unknown as OpportunityDetailRow;
+
+    render(
+      <ApplyForm
+        opportunityId="opp2"
+        accessToken="session-token"
+        onSuccess={vi.fn()}
+        opportunity={oppWithSelect}
+      />,
+    );
+
+    expect(screen.getByText("When are you available? *")).toBeInTheDocument();
+    const trigger = screen.getByRole("combobox", { name: "When are you available?" });
+    await user.click(trigger);
+
+    const listbox = screen.getByRole("listbox");
+    expect(listbox).toBeInTheDocument();
+    await user.click(within(listbox).getByText("Weekday evenings"));
+
+    expect(trigger).toHaveTextContent("Weekday evenings");
   });
 });

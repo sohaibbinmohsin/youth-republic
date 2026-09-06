@@ -242,16 +242,18 @@ input[type="checkbox"]:checked::after {
 .results-bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem 1rem; margin-bottom: 1rem; font-size: .86rem; color: var(--ink-2); flex-wrap: wrap; }
 .results-bar .count { margin-right: auto; }
 .results-bar label { display: inline-flex; align-items: center; gap: .45rem; }
-.results-bar select { font: inherit; padding: .45rem 2rem .45rem .7rem; border: 1px solid var(--line); border-radius: 6px; background-color: var(--bg); }
+.results-bar select { font: inherit; padding: .45rem 2.5rem .45rem .7rem; border: 1px solid var(--line); border-radius: 6px; background-color: var(--bg); }
 
 /* select chevron */
 select {
   appearance: none; -webkit-appearance: none;
-  padding-right: 2.1rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B6B66' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  padding-right: 2.75rem;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B6B66' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right .7rem center;
-  background-size: 11px;
+  background-position: right 1.15rem center;
+  background-size: 13px;
+  cursor: pointer;
 }
 
 @media (max-width: 560px) {
@@ -520,10 +522,19 @@ select {
 .field label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: .35rem; }
 .field input, .field select, .field textarea {
   width: 100%; font: inherit; padding: .7rem .85rem; border: 1px solid var(--line);
-  border-radius: var(--radius-btn); background: var(--bg); color: var(--ink);
+  border-radius: var(--radius-btn); background-color: var(--bg); color: var(--ink);
 }
 .field textarea { min-height: 96px; resize: vertical; }
-.field select { padding-right: 2.1rem; background-color: var(--bg); }
+.field select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 2.75rem;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B6B66' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1.15rem center;
+  background-size: 13px;
+  cursor: pointer;
+}
 .field select option[value=""] { color: var(--placeholder); }
 .field select option:not([value=""]) { color: var(--ink); }
 .field input::placeholder, .field textarea::placeholder { color: var(--placeholder); }
@@ -806,6 +817,184 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
   font-size: 0.76rem;
   color: var(--ink-2);
   margin-top: 0.1rem;
+}
+
+/* Custom Dropdown / Select Card */
+.custom-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-native-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.7rem 0.85rem;
+  padding-right: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  background-color: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.custom-select-trigger:focus-visible,
+.custom-select-trigger.is-open {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(148, 26, 128, 0.18);
+}
+
+.custom-select-trigger.input-error {
+  border-color: var(--st-neg-fg) !important;
+  background-color: #FFF8F8 !important;
+}
+
+.custom-select-trigger.input-error:focus-visible,
+.custom-select-trigger.input-error.is-open {
+  border-color: var(--st-neg-fg) !important;
+  box-shadow: 0 0 0 3px rgba(163, 45, 45, 0.18) !important;
+}
+
+.custom-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.custom-select-placeholder {
+  color: var(--placeholder);
+}
+
+.custom-select-icon {
+  position: absolute;
+  right: 1.15rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-2);
+  pointer-events: none;
+}
+
+.custom-select-chevron {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-select-chevron--open {
+  transform: rotate(180deg);
+}
+
+.custom-select-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 60;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 10px 25px -4px rgba(36, 38, 45, 0.12), 0 4px 10px -2px rgba(36, 38, 45, 0.06);
+  padding: 0.4rem;
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  animation: selectCardFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.custom-select-card--bottom {
+  top: calc(100% + 6px);
+}
+
+.custom-select-card--top {
+  bottom: calc(100% + 6px);
+}
+
+@keyframes selectCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.custom-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.62rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  color: var(--ink);
+  transition: background-color 0.12s ease, color 0.12s ease;
+  user-select: none;
+  min-height: 38px;
+}
+
+.custom-select-option:hover,
+.custom-select-option.is-highlighted {
+  background-color: rgba(148, 26, 128, 0.06);
+  color: var(--blue-strong);
+}
+
+.custom-select-option.is-selected {
+  background-color: rgba(148, 26, 128, 0.1);
+  color: var(--blue-strong);
+  font-weight: 600;
+}
+
+.custom-select-option--placeholder {
+  color: var(--ink-2);
+  font-style: italic;
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 0.25rem;
+  border-radius: 6px;
+}
+
+.custom-select-check {
+  display: inline-flex;
+  align-items: center;
+  color: var(--blue);
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .custom-select-card {
+    max-height: 220px;
+    box-shadow: 0 12px 30px -4px rgba(36, 38, 45, 0.2);
+  }
+  .custom-select-option {
+    min-height: 42px; /* enhanced mobile touch target */
+    padding: 0.7rem 0.85rem;
+  }
 }
 
 /* =========================================================================

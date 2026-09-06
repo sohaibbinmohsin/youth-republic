@@ -181,17 +181,13 @@ describe("ChangePasswordPage", () => {
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  it("verifies current password matches and shows error if incorrect", async () => {
+  it("validates password complexity (requires uppercase, lowercase, number, symbol)", async () => {
     mockGetSession.mockResolvedValueOnce({
       data: {
         session: {
           user: { id: "user-123", email: "volunteer@example.com" },
         },
       },
-    });
-    mockSignInWithPassword.mockResolvedValueOnce({
-      data: { session: null },
-      error: { message: "Invalid login credentials" },
     });
 
     const user = userEvent.setup();
@@ -202,32 +198,23 @@ describe("ChangePasswordPage", () => {
     const confirmPassInput = screen.getByLabelText(/^confirm new password/i);
     const submitBtn = screen.getByRole("button", { name: /^update password/i });
 
-    await user.type(currPassInput, "WrongCurrentPass123!");
-    await user.type(newPassInput, "NewSecurePass123!");
-    await user.type(confirmPassInput, "NewSecurePass123!");
+    await user.type(currPassInput, "CurrentPassword123!");
+    await user.type(newPassInput, "simplepass123");
+    await user.type(confirmPassInput, "simplepass123");
     await user.click(submitBtn);
 
-    await waitFor(() => {
-      expect(mockSignInWithPassword).toHaveBeenCalledWith({
-        email: "volunteer@example.com",
-        password: "WrongCurrentPass123!",
-      });
-    });
-    expect(await screen.findByText(/current password you entered is incorrect/i)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/password must contain at least one uppercase letter/i);
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  it("submits new password to supabase updateUser on valid submission after verifying current password", async () => {
+  it("submits new password to supabase updateUser on valid submission", async () => {
     mockGetSession.mockResolvedValueOnce({
       data: {
         session: {
           user: { id: "user-123", email: "volunteer@example.com" },
         },
       },
-    });
-    mockSignInWithPassword.mockResolvedValueOnce({
-      data: { session: {} },
-      error: null,
     });
     mockUpdateUser.mockResolvedValueOnce({ error: null });
 
@@ -245,10 +232,6 @@ describe("ChangePasswordPage", () => {
     await user.click(submitBtn);
 
     await waitFor(() => {
-      expect(mockSignInWithPassword).toHaveBeenCalledWith({
-        email: "volunteer@example.com",
-        password: "CorrectCurrentPass123!",
-      });
       expect(mockUpdateUser).toHaveBeenCalledWith({
         password: "NewSecurePass123!",
         current_password: "CorrectCurrentPass123!",
@@ -265,12 +248,8 @@ describe("ChangePasswordPage", () => {
         },
       },
     });
-    mockSignInWithPassword.mockResolvedValueOnce({
-      data: { session: {} },
-      error: null,
-    });
     mockUpdateUser.mockResolvedValueOnce({
-      error: { message: "Password should contain at least one special character." },
+      error: { message: "The current password you entered is incorrect." },
     });
 
     const user = userEvent.setup();
@@ -281,13 +260,13 @@ describe("ChangePasswordPage", () => {
     const confirmPassInput = screen.getByLabelText(/^confirm new password/i);
     const submitBtn = screen.getByRole("button", { name: /^update password/i });
 
-    await user.type(currPassInput, "CurrentPassword123!");
-    await user.type(newPassInput, "NewPassword123");
-    await user.type(confirmPassInput, "NewPassword123");
+    await user.type(currPassInput, "WrongPassword123!");
+    await user.type(newPassInput, "NewPassword123!");
+    await user.type(confirmPassInput, "NewPassword123!");
     await user.click(submitBtn);
 
     expect(
-      await screen.findByText(/password should contain at least one special character/i),
+      await screen.findByText(/the current password you entered is incorrect/i),
     ).toBeInTheDocument();
   });
 
