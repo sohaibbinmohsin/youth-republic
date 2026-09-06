@@ -406,10 +406,16 @@ export const ApplyForm = forwardRef<
         }
       }
 
-      // 3. Client-side validate dynamic questions
-      const result = validateAnswers(form, finalAnswers);
+      // 3. Client-side validate dynamic questions (skip any legacy 'consent' field from DB — handled by fixed checkbox)
+      const filteredForm = { ...form, fields: form.fields.filter((f) => f.id !== "consent") };
+      const result = validateAnswers(filteredForm, finalAnswers);
       if (!result.ok) {
         Object.assign(currentErrors, result.fieldErrors);
+      }
+
+      // 4. Require the fixed consent checkbox
+      if (!confirmed) {
+        currentErrors.confirmed = "You must confirm before submitting.";
       }
 
       if (Object.keys(currentErrors).length > 0) {
@@ -585,18 +591,21 @@ export const ApplyForm = forwardRef<
 
             <div className={`field ${fieldErrors.gender ? "has-error" : ""}`}>
               <label htmlFor="a-gender">Gender *</label>
-              <select
+              <CustomSelect
                 id="a-gender"
-                className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)]"
+                name="gender"
+                required={true}
+                placeholder="Select gender…"
                 value={profileDraft.gender}
-                onChange={(e) => setProfileField("gender", e.target.value)}
-              >
-                <option value="">Select gender…</option>
-                <option value="female">Female</option>
-                <option value="male">Male</option>
-                <option value="other">Other</option>
-                <option value="prefer_not_to_say">Prefer not to say</option>
-              </select>
+                onChange={(val: string) => setProfileField("gender", val)}
+                error={!!fieldErrors.gender}
+                options={[
+                  { value: "female", label: "Female" },
+                  { value: "male", label: "Male" },
+                  { value: "other", label: "Other" },
+                  { value: "prefer_not_to_say", label: "Prefer not to say" },
+                ]}
+              />
               {fieldErrors.gender && <p className="field__error">{fieldErrors.gender}</p>}
             </div>
           </div>
@@ -674,52 +683,43 @@ export const ApplyForm = forwardRef<
           </div>
 
           {/* ID Document Selection & Input */}
-          <div className="space-y-3 pt-2">
-            <label className="block text-sm font-semibold text-[var(--ink)]">Identity Document *</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="a-idDocType"
-                  value="cnic"
-                  disabled={isMinorApplicant}
-                  checked={profileDraft.idDocType === "cnic" && !isMinorApplicant}
-                  onChange={() => setProfileField("idDocType", "cnic")}
-                />
-                <span>CNIC (Adult)</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="a-idDocType"
-                  value="b_form"
-                  checked={profileDraft.idDocType === "b_form" || isMinorApplicant}
-                  onChange={() => setProfileField("idDocType", "b_form")}
-                />
-                <span>B-Form {isMinorApplicant && "(Under 18)"}</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="a-idDocType"
-                  value="passport"
-                  disabled={isMinorApplicant}
-                  checked={profileDraft.idDocType === "passport" && !isMinorApplicant}
-                  onChange={() => setProfileField("idDocType", "passport")}
-                />
-                <span>Passport</span>
-              </label>
+          <div className="grid-2 pt-2">
+            <div className={`field ${fieldErrors.idDocType ? "has-error" : ""}`}>
+              <label htmlFor="a-idDocType">Document type *</label>
+              <CustomSelect
+                id="a-idDocType"
+                name="idDocType"
+                required={true}
+                ariaLabel="Document type"
+                value={profileDraft.idDocType}
+                onChange={(val: string) => {
+                  const nextType = val as "cnic" | "b_form" | "passport";
+                  setProfileField("idDocType", nextType);
+                  if (nextType === "cnic" || nextType === "b_form") {
+                    setProfileField("idDocNumber", formatCnic(profileDraft.idDocNumber));
+                  }
+                }}
+                error={!!fieldErrors.idDocType}
+                options={
+                  isMinorApplicant
+                    ? [{ value: "b_form", label: "B-Form (Under 18)" }]
+                    : [
+                        { value: "cnic", label: "CNIC (Adult)" },
+                        { value: "b_form", label: "B-Form (Under 18)" },
+                        { value: "passport", label: "Passport" },
+                      ]
+                }
+              />
+              {fieldErrors.idDocType && <p className="field__error">{fieldErrors.idDocType}</p>}
             </div>
 
             <div className={`field ${fieldErrors.idDocNumber ? "has-error" : ""}`}>
               <label htmlFor="a-id-num">
                 {profileDraft.idDocType === "passport"
-                  ? "Passport Number *"
+                  ? "Passport number *"
                   : profileDraft.idDocType === "b_form"
-                  ? "B-Form Number *"
-                  : "CNIC Number *"}
+                  ? "B-Form number *"
+                  : "CNIC number *"}
               </label>
               <input
                 id="a-id-num"
@@ -737,13 +737,13 @@ export const ApplyForm = forwardRef<
               />
               {fieldErrors.idDocNumber && <p className="field__error">{fieldErrors.idDocNumber}</p>}
             </div>
-
-            <CnicUploadField
-              accessToken={accessToken}
-              docType={profileDraft.idDocType}
-              onUploaded={(attId) => setProfileField("idDocAttachmentId", attId)}
-            />
           </div>
+
+          <CnicUploadField
+            accessToken={accessToken}
+            docType={profileDraft.idDocType}
+            onUploaded={(attId) => setProfileField("idDocAttachmentId", attId)}
+          />
 
           {/* Minor Guardian Consent Fields */}
           {isMinorApplicant && (
@@ -768,12 +768,12 @@ export const ApplyForm = forwardRef<
         </div>
       )}
 
-      {/* Dynamic Opportunity Form Questions */}
-      {form.fields.length === 0 && (
+      {/* Dynamic Opportunity Form Questions — filter out legacy 'consent' checkbox (handled by fixed checkbox below) */}
+      {form.fields.filter((f) => f.id !== "consent").length === 0 && (
         <p className="hint">This opportunity has no extra questions — just confirm below and submit.</p>
       )}
 
-      {form.fields.map((field) => (
+      {form.fields.filter((f) => f.id !== "consent").map((field) => (
         <ApplyField
           key={field.id}
           field={field}

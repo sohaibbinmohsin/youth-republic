@@ -30,7 +30,7 @@ const opportunity = {
     version: 1,
     fields: [
       { id: "why", type: "long_text", label: "Why do you want to volunteer for this?", required: true },
-      { id: "consent", type: "checkbox", label: "I confirm the information above is accurate.", required: true },
+      // Note: 'consent' field is no longer included in DB forms — the fixed checkbox in ApplyForm handles consent.
     ],
   },
 } as unknown as OpportunityDetailRow;
@@ -68,7 +68,7 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "I ran a food bank at university.");
-    await user.click(screen.getByLabelText(/I confirm the information above is accurate/i));
+    await user.click(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria."));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
     await waitFor(() => {
@@ -80,7 +80,6 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
         opportunityId: "opp-1",
         answers: expect.objectContaining({
           why: "I ran a food bank at university.",
-          consent: true,
         }),
       }),
     );
@@ -96,7 +95,7 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "motivated");
-    await user.click(screen.getByLabelText(/I confirm the information above is accurate/i));
+    await user.click(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria."));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
     expect(await screen.findByText("id_doc_required")).toBeInTheDocument();

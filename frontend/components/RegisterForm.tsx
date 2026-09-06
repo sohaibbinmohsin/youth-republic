@@ -425,25 +425,21 @@ export function RegisterForm({
 
         <div className={`field ${fieldErrors.gender ? "has-error" : ""}`}>
           <label htmlFor="gender">Gender</label>
-          <select
+          <CustomSelect
             id="gender"
             name="gender"
-            required
+            required={true}
+            placeholder="Select gender…"
             value={form.gender}
-            onChange={(e) => updateField("gender", e.target.value)}
-            className={fieldErrors.gender ? "input-error" : ""}
-            style={{
-              color: form.gender === "" ? "var(--placeholder)" : "var(--ink)",
-            }}
-          >
-            <option value="" style={{ color: "var(--placeholder)" }}>
-              Select gender
-            </option>
-            <option value="female" style={{ color: "var(--ink)" }}>Female</option>
-            <option value="male" style={{ color: "var(--ink)" }}>Male</option>
-            <option value="other" style={{ color: "var(--ink)" }}>Other</option>
-            <option value="prefer_not_to_say" style={{ color: "var(--ink)" }}>Prefer not to say</option>
-          </select>
+            onChange={(val: string) => updateField("gender", val)}
+            error={!!fieldErrors.gender}
+            options={[
+              { value: "female", label: "Female" },
+              { value: "male", label: "Male" },
+              { value: "other", label: "Other" },
+              { value: "prefer_not_to_say", label: "Prefer not to say" },
+            ]}
+          />
           {fieldErrors.gender && <p className="field__error" role="alert">{fieldErrors.gender}</p>}
         </div>
 

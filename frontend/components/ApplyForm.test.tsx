@@ -46,7 +46,7 @@ const opportunity = {
       { id: "shift", type: "radio", label: "Preferred shift", required: true, options: [
         { value: "am", label: "Morning" }, { value: "pm", label: "Evening" },
       ] },
-      { id: "consent", type: "checkbox", label: "I confirm my details are accurate.", required: true },
+      // 'consent' field is no longer stored in DB forms — the fixed confirmation checkbox in ApplyForm handles it.
     ],
   },
 } as unknown as OpportunityDetailRow;
@@ -73,7 +73,8 @@ describe("ApplyForm (dynamic)", () => {
     expect(screen.getByLabelText(/Why do you want to volunteer\?/)).toBeInTheDocument();
     expect(screen.getByText("Preferred shift *")).toBeInTheDocument();
     expect(screen.getByLabelText("Morning")).toBeInTheDocument();
-    expect(screen.getByText("I confirm my details are accurate. *")).toBeInTheDocument();
+    // Fixed consent checkbox is always rendered by ApplyForm regardless of DB form fields
+    expect(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria.")).toBeInTheDocument();
   });
 
   it("submits answers keyed by the form field ids and calls onSuccess", async () => {
@@ -87,7 +88,6 @@ describe("ApplyForm (dynamic)", () => {
 
     await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "I care about this cause.");
     await user.click(screen.getByLabelText("Evening"));
-    await user.click(screen.getByLabelText(/^I confirm my details are accurate\.\s*\*?$/));
     await user.click(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria."));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
@@ -95,7 +95,7 @@ describe("ApplyForm (dynamic)", () => {
       expect(edgeFunctions.applyToOpportunity).toHaveBeenCalledWith(
         expect.objectContaining({
           opportunityId: "opp1",
-          answers: expect.objectContaining({ why: "I care about this cause.", shift: "pm", consent: true }),
+          answers: expect.objectContaining({ why: "I care about this cause.", shift: "pm" }),
         }),
         "session-token",
       );
@@ -124,7 +124,6 @@ describe("ApplyForm (dynamic)", () => {
 
     await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "I want to help.");
     await user.click(screen.getByLabelText("Morning"));
-    await user.click(screen.getByLabelText(/^I confirm my details are accurate\.\s*\*?$/));
     await user.click(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria."));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
@@ -195,7 +194,7 @@ describe("ApplyForm (dynamic)", () => {
     expect(screen.getByLabelText("City *")).toBeInTheDocument();
     expect(screen.getByLabelText("Institution / University *")).toBeInTheDocument();
     expect(screen.getByLabelText("Degree program *")).toBeInTheDocument();
-    expect(screen.getByLabelText(/CNIC Number/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/CNIC number/i)).toBeInTheDocument();
   });
 
   it("saves draft to cloud and shows confirmation notice when clicking Save draft", async () => {
