@@ -1,10 +1,10 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
-import { ApplyForm, type VolunteerInitialProfile } from "@/components/ApplyForm";
+import { ApplyForm, type ApplyFormHandle, type VolunteerInitialProfile } from "@/components/ApplyForm";
 import { recordReturnUrl } from "@/lib/returnUrl";
 import {
   fetchOpportunityClient,
@@ -19,12 +19,18 @@ import ApplyLoading from "./loading";
 export default function ApplyPage({ params }: { params: Promise<{ opportunityId: string }> }) {
   const { opportunityId } = use(params);
   const router = useRouter();
+  const applyFormRef = useRef<ApplyFormHandle>(null);
 
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [opportunity, setOpportunity] = useState<OpportunityDetailRow | null>(null);
   const [volunteerProfile, setVolunteerProfile] = useState<VolunteerInitialProfile | null>(null);
+  const [initialDraftAnswers, setInitialDraftAnswers] = useState<Record<string, any> | null>(null);
+  const [initialProfileDraft, setInitialProfileDraft] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
+  const [isFormDirty, setIsFormDirty] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -40,19 +46,19 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
       setAccessToken(sessionData.session.access_token);
       const authUser = sessionData.session.user;
 
-      // 1. Fetch authenticated volunteer row to prefill profile
-      let initialProfile: VolunteerInitialProfile = {
+      // 1. Fetch authenticated volunteer row to check completeness
+      let loadedProfile: VolunteerInitialProfile = {
+        authUserId: authUser.id,
         fullName: (authUser.user_metadata?.full_name as string) || "",
         email: authUser.email || "",
         phone: "",
-        emergencyContactName: "",
-        emergencyContactPhone: "",
+        hasPendingDetails: true,
       };
 
       try {
         const query = supabase
           .from("volunteers")
-          .select("full_name, email, phone, emergency_contact")
+          .select("id, auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, guardian_name, guardian_contact, guardian_consent_at, status")
           .eq("auth_user_id", authUser.id);
 
         const res = typeof (query as any).maybeSingle === "function"
@@ -61,27 +67,69 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
 
         if (res?.data) {
           const v = res.data;
-          let ecName = "";
-          let ecPhone = "";
-          if (v.emergency_contact && typeof v.emergency_contact === "object") {
-            ecName = v.emergency_contact.name || "";
-            ecPhone = v.emergency_contact.phone || "";
-          }
+          const isComplete = Boolean(
+            v.full_name?.trim() &&
+            v.email?.trim() &&
+            v.phone?.trim() &&
+            v.dob &&
+            v.gender &&
+            v.city?.trim() &&
+            v.province?.trim() &&
+            v.country?.trim() &&
+            v.institution?.trim() &&
+            v.degree_program?.trim() &&
+            v.id_doc_number?.trim()
+          );
 
-          initialProfile = {
-            fullName: v.full_name || initialProfile.fullName,
-            email: v.email || initialProfile.email,
+          loadedProfile = {
+            id: v.id,
+            authUserId: v.auth_user_id || authUser.id,
+            fullName: v.full_name || loadedProfile.fullName,
+            email: v.email || loadedProfile.email,
             phone: v.phone || "",
-            emergencyContactName: ecName,
-            emergencyContactPhone: ecPhone,
+            dob: v.dob || "",
+            gender: v.gender || "",
+            city: v.city || "",
+            province: v.province || "",
+            country: v.country || "Pakistan",
+            institution: v.institution || "",
+            degreeProgram: v.degree_program || "",
+            idDocType: v.id_doc_type || "cnic",
+            idDocNumber: v.id_doc_number || "",
+            guardianName: v.guardian_name || "",
+            guardianContact: v.guardian_contact || "",
+            guardianConsent: Boolean(v.guardian_consent_at),
+            status: v.status,
+            hasPendingDetails: !isComplete,
           };
         }
       } catch {
-        // Fallback to authUser metadata
+        // Fallback to authUser metadata with pending details true
       }
-      setVolunteerProfile(initialProfile);
+      setVolunteerProfile(loadedProfile);
 
-      // 2. Fetch Opportunity Detail
+      // 2. Fetch any existing cloud draft from applications
+      try {
+        const draftQuery = supabase
+          .from("applications")
+          .select("id, status, answers, draft_profile")
+          .eq("opportunity_id", opportunityId)
+          .eq("auth_user_id", authUser.id)
+          .eq("status", "draft");
+
+        const draftRes = typeof (draftQuery as any).maybeSingle === "function"
+          ? await (draftQuery as any).maybeSingle()
+          : await (draftQuery as any).single();
+
+        if (draftRes?.data) {
+          setInitialDraftAnswers(draftRes.data.answers || null);
+          setInitialProfileDraft(draftRes.data.draft_profile || null);
+        }
+      } catch {
+        // ignore
+      }
+
+      // 3. Fetch Opportunity Detail
       const opp = await fetchOpportunityClient(opportunityId);
       setOpportunity(opp);
       setLoading(false);
@@ -89,6 +137,33 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
 
     load();
   }, [opportunityId, router]);
+
+  function handleBackClick(e: React.MouseEvent) {
+    if (isFormDirty || applyFormRef.current?.isDirty) {
+      e.preventDefault();
+      setShowExitModal(true);
+    }
+  }
+
+  async function handleSaveDraftAndLeave() {
+    setLeaving(true);
+    try {
+      if (applyFormRef.current) {
+        await applyFormRef.current.saveDraft();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLeaving(false);
+      setShowExitModal(false);
+      router.push(`/opportunities/${opportunityId}`);
+    }
+  }
+
+  function handleLeaveWithoutSaving() {
+    setShowExitModal(false);
+    router.push(`/opportunities/${opportunityId}`);
+  }
 
   if (loading || !accessToken || !opportunity) {
     return <ApplyLoading />;
@@ -129,6 +204,107 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
         : `${opportunity.location} · Online`)
     : `${opportunity.location ?? "Islamabad"} · in person`;
 
+  const summaryContent = (
+    <>
+      <h3>You’re applying to</h3>
+      <div className="pcard__id" style={{ marginBottom: ".9rem" }}>
+        <span
+          className="orglogo"
+          id="as-logo"
+          style={{ background: orgColor }}
+        >
+          {orgInitials}
+        </span>
+        <div>
+          <div className="pcard__name" id="as-name">
+            {opportunity.name}
+          </div>
+          <div className="pcard__org" id="as-org">
+            {org.name}
+          </div>
+        </div>
+      </div>
+
+      <dl className="facts">
+        <dt>Status</dt>
+        <dd id="as-status">
+          <span
+            style={{
+              display: "inline-block",
+              padding: "0.15rem 0.5rem",
+              borderRadius: "999px",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              background:
+                status === "open"
+                  ? "var(--st-pos-bg)"
+                  : (status as string) === "coming_soon"
+                  ? "var(--st-pend-bg)"
+                  : "var(--st-neg-bg)",
+              color:
+                status === "open"
+                  ? "var(--st-pos-fg)"
+                  : (status as string) === "coming_soon"
+                  ? "var(--st-pend-fg)"
+                  : "var(--st-neg-fg)",
+            }}
+          >
+            {status === "open"
+              ? "Open"
+              : status === "coming_soon"
+              ? "Coming soon"
+              : status === "in_progress"
+              ? "In progress"
+              : status === "completed"
+              ? "Completed"
+              : "Closed"}
+          </span>
+        </dd>
+
+        <dt>Type</dt>
+        <dd id="as-type">{typeConf.label}</dd>
+
+        <dt>Location</dt>
+        <dd id="as-loc">{locationDisplay}</dd>
+
+        {opportunity.application_open_at && (
+          <>
+            <dt>Applications open</dt>
+            <dd id="as-open">
+              {formatOpportunityDates(opportunity.application_open_at)}
+            </dd>
+          </>
+        )}
+
+        {opportunity.application_deadline && (
+          <>
+            <dt>Deadline</dt>
+            <dd id="as-deadline">
+              {formatOpportunityDates(opportunity.application_deadline)}
+            </dd>
+          </>
+        )}
+
+        {opportunity.activity_start_at && (
+          <>
+            <dt>Activity starts</dt>
+            <dd id="as-start">
+              {formatOpportunityDates(opportunity.activity_start_at)}
+            </dd>
+          </>
+        )}
+
+        {opportunity.capacity !== null && opportunity.capacity !== undefined && (
+          <>
+            <dt>Capacity</dt>
+            <dd id="as-capacity">{opportunity.capacity} volunteers</dd>
+          </>
+        )}
+      </dl>
+    </>
+  );
+
   return (
     <section data-route="apply" className="pb-12 font-['Jost']">
       {/* Breadcrumb */}
@@ -136,11 +312,12 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
         className="crumb"
         href={`/opportunities/${opportunity.id}`}
         id="applyCrumb"
+        onClick={handleBackClick}
       >
         ← Back to opportunity
       </Link>
 
-      <div style={{ maxWidth: "640px", margin: "0 auto" }}>
+      <div className="pane pane--summary-first">
         {/* Left Column: Form or Closed State */}
         <div>
           <h1 className="display" style={{ fontSize: "2rem", marginBottom: ".3rem" }}>
@@ -156,113 +333,18 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
 
           {isOpen ? (
             <ApplyForm
+              ref={applyFormRef}
               opportunityId={opportunity.id}
               organizationId={opportunity.organization_id}
               accessToken={accessToken}
               initialVolunteerProfile={volunteerProfile}
               opportunity={opportunity}
+              initialAnswers={initialDraftAnswers}
+              initialProfileDraft={initialProfileDraft}
+              onDirtyChange={setIsFormDirty}
               onSuccess={() => setSubmitted(true)}
-            >
-                      {/* Right Column: Aside Summary Card */}
-        <aside className="pane__aside" id="applyAside" style={{ marginBottom: "1.5rem" }}>
-          <h3>You’re applying to</h3>
-          <div className="pcard__id" style={{ marginBottom: ".9rem" }}>
-            <span
-              className="orglogo"
-              id="as-logo"
-              style={{ background: orgColor }}
-            >
-              {orgInitials}
-            </span>
-            <div>
-              <div className="pcard__name" id="as-name">
-                {opportunity.name}
-              </div>
-              <div className="pcard__org" id="as-org">
-                {org.name}
-              </div>
-            </div>
-          </div>
-
-          <dl className="facts">
-            <dt>Status</dt>
-            <dd id="as-status">
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "0.15rem 0.5rem",
-                  borderRadius: "999px",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  background:
-                    status === "open"
-                      ? "var(--st-pos-bg)"
-                      : (status as string) === "coming_soon"
-                      ? "var(--st-pend-bg)"
-                      : "var(--st-neg-bg)",
-                  color:
-                    status === "open"
-                      ? "var(--st-pos-fg)"
-                      : (status as string) === "coming_soon"
-                      ? "var(--st-pend-fg)"
-                      : "var(--st-neg-fg)",
-                }}
-              >
-                {status === "open"
-                  ? "Open"
-                  : (status as string) === "coming_soon"
-                  ? "Coming soon"
-                  : status === "in_progress"
-                  ? "In progress"
-                  : status === "completed"
-                  ? "Completed"
-                  : "Closed"}
-              </span>
-            </dd>
-
-            <dt>Type</dt>
-            <dd id="as-type">{typeConf.label}</dd>
-
-            <dt>Location</dt>
-            <dd id="as-loc">{locationDisplay}</dd>
-
-            {opportunity.application_open_at && (
-              <>
-                <dt>Applications open</dt>
-                <dd id="as-open">
-                  {formatOpportunityDates(opportunity.application_open_at)}
-                </dd>
-              </>
-            )}
-
-            {opportunity.application_deadline && (
-              <>
-                <dt>Deadline</dt>
-                <dd id="as-deadline">
-                  {formatOpportunityDates(opportunity.application_deadline)}
-                </dd>
-              </>
-            )}
-
-            {opportunity.activity_start_at && (
-              <>
-                <dt>Activity starts</dt>
-                <dd id="as-start">
-                  {formatOpportunityDates(opportunity.activity_start_at)}
-                </dd>
-              </>
-            )}
-
-            {opportunity.capacity !== null && opportunity.capacity !== undefined && (
-              <>
-                <dt>Capacity</dt>
-                <dd id="as-capacity">{opportunity.capacity} volunteers</dd>
-              </>
-            )}
-          </dl>
-        </aside>
-            </ApplyForm>
+              summaryCard={summaryContent}
+            />
           ) : (
             <div className="done-card" style={{ maxWidth: "520px" }}>
               <div
@@ -275,15 +357,15 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
                   marginBottom: "0.85rem",
-                  background: (status as string) === "coming_soon" ? "var(--st-pend-bg)" : "var(--st-neg-bg)",
-                  color: (status as string) === "coming_soon" ? "var(--st-pend-fg)" : "var(--st-neg-fg)",
+                  background: status === "coming_soon" ? "var(--st-pend-bg)" : "var(--st-neg-bg)",
+                  color: status === "coming_soon" ? "var(--st-pend-fg)" : "var(--st-neg-fg)",
                 }}
               >
-                {(status as string) === "coming_soon" ? "Coming soon" : "Applications closed"}
+                {status === "coming_soon" ? "Coming soon" : "Applications closed"}
               </div>
 
               <h2>
-                {(status as string) === "coming_soon"
+                {status === "coming_soon"
                   ? "Applications are not open yet"
                   : status === "in_progress"
                   ? "Activity in progress"
@@ -293,7 +375,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
               </h2>
 
               <p style={{ color: "var(--ink-2)", fontSize: "0.95rem", lineHeight: 1.5, margin: "0 0 1.5rem" }}>
-                {(status as string) === "coming_soon"
+                {status === "coming_soon"
                   ? `Applications for ${opportunity.name} will open on ${formatOpportunityDates(opportunity.application_open_at)}.`
                   : status === "in_progress"
                   ? `This volunteer activity is currently in progress. Applications are closed.`
@@ -316,8 +398,61 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
           )}
         </div>
 
-
+        {/* Right Column: Aside Summary Card (desktop only when apply form is active) */}
+        <aside className={`pane__aside ${isOpen ? "apply-aside-desktop" : ""}`} id="applyAside">
+          {summaryContent}
+        </aside>
       </div>
+
+      {/* Confirmation Modal when navigating back with unsaved edits */}
+      {showExitModal && (
+        <div className="modal-scrim open" id="applyDraftExitModal">
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="draftExitTitle">
+            <div className="modal__head">
+              <span id="draftExitTitle">Save your application draft?</span>
+              <button
+                type="button"
+                className="modal__close"
+                onClick={() => setShowExitModal(false)}
+                aria-label="Close"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="modal__body">
+              <p className="m-0 text-sm leading-relaxed text-[#6B6B66]">
+                You have unsaved changes in this application. Your progress is saved in this browser, but saving to the cloud lets you resume from any device and your portfolio.
+              </p>
+            </div>
+            <div className="modal__foot modal__foot--wrap">
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={leaving}
+                onClick={handleSaveDraftAndLeave}
+              >
+                {leaving ? "Saving draft…" : "Save draft & leave"}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={handleLeaveWithoutSaving}
+              >
+                Leave without saving
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost text-xs"
+                onClick={() => setShowExitModal(false)}
+              >
+                Keep editing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Application Submitted Modal */}
       {submitted && (

@@ -427,6 +427,22 @@ select {
   padding: 1.25rem 1.35rem; font-size: .88rem;
 }
 @media (min-width: 880px) { .pane__aside { position: sticky; top: 88px; } }
+
+/* Responsive summary card toggling between desktop aside and mobile form inline */
+.apply-aside-desktop {
+  display: none;
+}
+.apply-summary-mobile {
+  display: block;
+}
+@media (min-width: 880px) {
+  .apply-aside-desktop {
+    display: block;
+  }
+  .apply-summary-mobile {
+    display: none !important;
+  }
+}
 .pane__aside h3 { font-family: "Oswald", sans-serif; font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: .5rem; color: var(--ink); text-wrap: balance; }
 .pane__aside h3 + h3, .pane__aside .facts + h3 { margin-top: 1.15rem; }
 .pane__aside ol {
