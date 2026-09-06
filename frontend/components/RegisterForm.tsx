@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { CustomSelect } from "@/components/CustomSelect";
+
 import { registerVolunteer, ValidationError, type RegisterVolunteerPayload, type RegisterVolunteerResponse } from "@/lib/edgeFunctions";
 import { isMinor } from "@/lib/ageUtils";
 import { formatPhoneNumber } from "@/lib/phoneUtils";
@@ -553,28 +555,28 @@ export function RegisterForm({
           <div className="grid-2" style={{ marginBottom: "1rem" }}>
             <div className={`field ${fieldErrors.idDocType ? "has-error" : ""}`} style={{ marginBottom: 0 }}>
               <label htmlFor="idDocType">Document type</label>
-              <select
+              <CustomSelect
                 id="idDocType"
+                ariaLabel="Document type"
                 value={form.idDocType}
-                onChange={(e) => {
-                  const nextType = e.target.value as "cnic" | "b_form" | "passport";
+                onChange={(val: string) => {
+                  const nextType = val as "cnic" | "b_form" | "passport";
                   updateField("idDocType", nextType);
                   if (nextType === "cnic" || nextType === "b_form") {
                     updateField("idDocNumber", formatCnic(form.idDocNumber));
                   }
                 }}
-                className={fieldErrors.idDocType ? "input-error" : ""}
-              >
-                {minor ? (
-                  <option value="b_form">B-Form (Child Registration Certificate)</option>
-                ) : (
-                  <>
-                    <option value="cnic">CNIC (National Identity Card)</option>
-                    <option value="b_form">B-Form (Child Registration Certificate)</option>
-                    <option value="passport">Passport</option>
-                  </>
-                )}
-              </select>
+                error={!!fieldErrors.idDocType}
+                options={
+                  minor
+                    ? [{ value: "b_form", label: "B-Form (Child Registration Certificate)" }]
+                    : [
+                        { value: "cnic", label: "CNIC (National Identity Card)" },
+                        { value: "b_form", label: "B-Form (Child Registration Certificate)" },
+                        { value: "passport", label: "Passport" },
+                      ]
+                }
+              />
               {fieldErrors.idDocType && (
                 <p className="field__error" role="alert">{fieldErrors.idDocType}</p>
               )}

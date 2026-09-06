@@ -151,8 +151,9 @@ describe("RegisterForm", () => {
     expect(screen.getByText("Identity Details & Document")).toBeInTheDocument();
     expect(screen.getByLabelText("CNIC number")).toBeInTheDocument();
 
-    const docTypeSelect = screen.getByLabelText("Document type");
-    await user.selectOptions(docTypeSelect, "passport");
+    const docTypeSelect = screen.getByRole("combobox", { name: /Document type/i });
+    await user.click(docTypeSelect);
+    await user.click(screen.getByRole("option", { name: /Passport/i }));
 
     const passportInput = screen.getByLabelText("Passport number");
     expect(passportInput).toBeInTheDocument();
@@ -185,9 +186,11 @@ describe("RegisterForm", () => {
 
     expect(screen.getByText("B-Form Details & Document")).toBeInTheDocument();
     expect(screen.getByLabelText("B-Form number")).toBeInTheDocument();
-    const docTypeSelect = screen.getByLabelText("Document type");
+    const docTypeSelect = screen.getByRole("combobox", { name: /Document type/i });
+    await user.click(docTypeSelect); // open popup
     expect(screen.getByRole("option", { name: /B-Form/i })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Passport/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /CNIC \(National Identity Card\)/i })).not.toBeInTheDocument();
+    await user.click(document.body); // close popup
   });
 });

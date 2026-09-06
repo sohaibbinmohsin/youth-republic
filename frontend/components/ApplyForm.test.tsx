@@ -60,7 +60,8 @@ describe("ApplyForm (dynamic)", () => {
 
     await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "I care about this cause.");
     await user.click(screen.getByLabelText("Evening"));
-    await user.click(screen.getByLabelText(/I confirm my details are accurate/));
+    await user.click(screen.getByLabelText(/^I confirm my details are accurate\.\s*\*?$/));
+    await user.click(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria."));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
     await waitFor(() => {
@@ -96,7 +97,8 @@ describe("ApplyForm (dynamic)", () => {
 
     await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "I want to help.");
     await user.click(screen.getByLabelText("Morning"));
-    await user.click(screen.getByLabelText(/I confirm my details are accurate/));
+    await user.click(screen.getByLabelText(/^I confirm my details are accurate\.\s*\*?$/));
+    await user.click(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria."));
     await user.click(screen.getByRole("button", { name: "Submit application" }));
 
     expect(await screen.findByText("opportunity_unavailable")).toBeInTheDocument();
