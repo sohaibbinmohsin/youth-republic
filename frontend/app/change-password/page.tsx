@@ -7,13 +7,16 @@ import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -22,8 +25,10 @@ export default function ChangePasswordPage() {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setIsAuthenticated(true);
+        setUserEmail(data.session.user.email ?? null);
       } else {
         setIsAuthenticated(false);
+        setUserEmail(null);
       }
       setCheckingAuth(false);
     });
@@ -32,6 +37,7 @@ export default function ChangePasswordPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session?.user));
+      setUserEmail(session?.user?.email ?? null);
       setCheckingAuth(false);
     });
 
@@ -45,6 +51,11 @@ export default function ChangePasswordPage() {
     setError(null);
     setSuccess(false);
 
+    if (!currentPassword) {
+      setError("Please enter your current password.");
+      return;
+    }
+
     if (newPassword.length < 8) {
       setError("Password must be at least 8 characters long.");
       return;
@@ -55,11 +66,41 @@ export default function ChangePasswordPage() {
       return;
     }
 
+    if (newPassword === currentPassword) {
+      setError("New password must be different from your current password.");
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = getBrowserSupabaseClient();
+      let email = userEmail;
+      if (!email) {
+        const { data: userData } = await supabase.auth.getUser();
+        email = userData?.user?.email ?? null;
+      }
+
+      if (!email) {
+        setError("User session not found. Please sign in again.");
+        setLoading(false);
+        return;
+      }
+
+      // Verify current password matches by re-authenticating against Supabase
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        setError("The current password you entered is incorrect.");
+        setLoading(false);
+        return;
+      }
+
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
+        current_password: currentPassword,
       });
 
       if (updateError) {
@@ -69,6 +110,7 @@ export default function ChangePasswordPage() {
       }
 
       setSuccess(true);
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
@@ -200,7 +242,33 @@ export default function ChangePasswordPage() {
             </div>
           )}
 
-          <form className="form-narrow" onSubmit={handleSubmit}>
+          <form className="form-narrow" onSubmit={handleSubmit} noValidate>
+            <div className="field">
+              <label htmlFor="current-password">Current Password</label>
+              <div className="pwd">
+                <input
+                  id="current-password"
+                  name="currentPassword"
+                  type={showCurrentPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  className="dots-placeholder"
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="pwd__toggle"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  aria-label={showCurrentPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showCurrentPassword}
+                >
+                  {showCurrentPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
             <div className="field">
               <label htmlFor="new-password">New Password</label>
               <div className="pwd">

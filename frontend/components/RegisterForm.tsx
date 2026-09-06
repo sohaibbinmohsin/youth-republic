@@ -262,7 +262,7 @@ export function RegisterForm({
         country: form.country.trim(),
         institution: form.institution.trim(),
         degreeProgram: form.degreeProgram.trim(),
-        idDocType: (form.idDocType as "cnic" | "b_form") || (minor ? "b_form" : "cnic"),
+        idDocType: (form.idDocType as "cnic" | "b_form" | "passport") || (minor ? "b_form" : "cnic"),
         idDocNumber: form.idDocNumber.trim() || undefined,
         idDocAttachmentId: resolvedAttachmentId,
         ...(showGuardianFields ? guardian : {}),
@@ -279,7 +279,12 @@ export function RegisterForm({
         const message = err instanceof Error ? err.message : "unknown_error";
         const errMap: Record<string, string> = {};
         if (message === "id_doc_attachment_required") {
-          errMap.idDocAttachmentId = "Please upload your CNIC / B-Form document scan";
+          errMap.idDocAttachmentId =
+            form.idDocType === "passport"
+              ? "Please upload your Passport scan or photo"
+              : form.idDocType === "b_form"
+              ? "Please upload your B-Form document scan"
+              : "Please upload your CNIC document scan";
           setFieldErrors((prev) => ({
             ...prev,
             ...errMap,
@@ -530,12 +535,12 @@ export function RegisterForm({
           <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
             <div>
               <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 600, color: "var(--ink)" }}>
-                {minor ? "B-Form Details & Document" : "CNIC Details & Document"}
+                {minor ? "B-Form Details & Document" : "Identity Details & Document"}
               </h4>
               <p style={{ margin: "0.2rem 0 0", fontSize: "0.8rem", color: "var(--ink-2)" }}>
                 {minor
                   ? "Minors under 18 provide a B-Form number and document scan for verification."
-                  : "Enter your National ID (CNIC) and attach your card for verification."}
+                  : "Provide your identification details (CNIC, B-Form, or Passport) and attach your document for verification."}
               </p>
             </div>
             {form.idDocAttachmentId ? (
@@ -546,43 +551,67 @@ export function RegisterForm({
           </div>
 
           <div className="grid-2" style={{ marginBottom: "1rem" }}>
+            <div className={`field ${fieldErrors.idDocType ? "has-error" : ""}`} style={{ marginBottom: 0 }}>
+              <label htmlFor="idDocType">Document type</label>
+              <select
+                id="idDocType"
+                value={form.idDocType}
+                onChange={(e) => {
+                  const nextType = e.target.value as "cnic" | "b_form" | "passport";
+                  updateField("idDocType", nextType);
+                  if (nextType === "cnic" || nextType === "b_form") {
+                    updateField("idDocNumber", formatCnic(form.idDocNumber));
+                  }
+                }}
+                className={fieldErrors.idDocType ? "input-error" : ""}
+              >
+                {minor ? (
+                  <option value="b_form">B-Form (Child Registration Certificate)</option>
+                ) : (
+                  <>
+                    <option value="cnic">CNIC (National Identity Card)</option>
+                    <option value="b_form">B-Form (Child Registration Certificate)</option>
+                    <option value="passport">Passport</option>
+                  </>
+                )}
+              </select>
+              {fieldErrors.idDocType && (
+                <p className="field__error" role="alert">{fieldErrors.idDocType}</p>
+              )}
+            </div>
+
             <div className={`field ${fieldErrors.idDocNumber ? "has-error" : ""}`} style={{ marginBottom: 0 }}>
               <label htmlFor="idDocNumber">
-                {minor ? "B-Form number" : "CNIC number"}
+                {form.idDocType === "passport"
+                  ? "Passport number"
+                  : form.idDocType === "b_form"
+                  ? "B-Form number"
+                  : "CNIC number"}
               </label>
               <input
                 id="idDocNumber"
                 type="text"
-                inputMode="numeric"
+                inputMode={form.idDocType === "passport" ? "text" : "numeric"}
                 value={form.idDocNumber}
-                onChange={(e) => updateField("idDocNumber", formatCnic(e.target.value))}
-                placeholder="e.g. 35202-1234567-1"
+                onChange={(e) => {
+                  const val =
+                    form.idDocType === "passport"
+                      ? e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15)
+                      : formatCnic(e.target.value);
+                  updateField("idDocNumber", val);
+                }}
+                placeholder={form.idDocType === "passport" ? "e.g. AB1234567" : "e.g. 35202-1234567-1"}
                 className={fieldErrors.idDocNumber ? "input-error" : ""}
               />
               {fieldErrors.idDocNumber && (
                 <p className="field__error" role="alert">{fieldErrors.idDocNumber}</p>
               )}
             </div>
-
-            <div className={`field ${fieldErrors.idDocType ? "has-error" : ""}`} style={{ marginBottom: 0 }}>
-              <label htmlFor="idDocType">Document type</label>
-              <select
-                id="idDocType"
-                value={form.idDocType}
-                onChange={(e) => updateField("idDocType", e.target.value as "cnic" | "b_form")}
-                className={fieldErrors.idDocType ? "input-error" : ""}
-              >
-                <option value="cnic">CNIC (National Identity Card)</option>
-                <option value="b_form">B-Form (Child Registration Certificate)</option>
-              </select>
-              {fieldErrors.idDocType && (
-                <p className="field__error" role="alert">{fieldErrors.idDocType}</p>
-              )}
-            </div>
           </div>
 
           <CnicUploadField
             accessToken={accessToken}
+            docType={form.idDocType}
             onUploadPromise={(promise) => {
               pendingUploadPromiseRef.current = promise;
             }}

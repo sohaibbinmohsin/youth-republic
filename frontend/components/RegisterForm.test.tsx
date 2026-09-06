@@ -142,4 +142,52 @@ describe("RegisterForm", () => {
       expect(scrollMock).toHaveBeenCalled();
     });
   });
+
+  it("updates labels, placeholders, and payload when Passport is selected", async () => {
+    vi.mocked(edgeFunctions.registerVolunteer).mockResolvedValue({ volunteerId: "v2", volunteerCode: "VOL-2026-000002" });
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" showCnicUpload={true} />);
+
+    expect(screen.getByText("Identity Details & Document")).toBeInTheDocument();
+    expect(screen.getByLabelText("CNIC number")).toBeInTheDocument();
+
+    const docTypeSelect = screen.getByLabelText("Document type");
+    await user.selectOptions(docTypeSelect, "passport");
+
+    const passportInput = screen.getByLabelText("Passport number");
+    expect(passportInput).toBeInTheDocument();
+    expect(passportInput).toHaveAttribute("placeholder", "e.g. AB1234567");
+    expect(screen.getByLabelText("Passport document")).toBeInTheDocument();
+
+    await user.type(passportInput, "ab1234567");
+    expect(passportInput).toHaveValue("AB1234567");
+
+    await fillBaseFields(user);
+    await user.type(screen.getByLabelText("Date of birth"), "1995-05-15");
+    await user.click(screen.getByRole("button", { name: /save & build portfolio|save details|register/i }));
+
+    await waitFor(() => {
+      expect(edgeFunctions.registerVolunteer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idDocType: "passport",
+          idDocNumber: "AB1234567",
+        }),
+        accessToken,
+      );
+    });
+  });
+
+  it("restricts document type to B-Form for minors and displays minor-specific wording", async () => {
+    const user = userEvent.setup();
+    render(<RegisterForm accessToken={accessToken} email="test@example.com" showCnicUpload={true} />);
+
+    await user.type(screen.getByLabelText("Date of birth"), "2015-01-01");
+
+    expect(screen.getByText("B-Form Details & Document")).toBeInTheDocument();
+    expect(screen.getByLabelText("B-Form number")).toBeInTheDocument();
+    const docTypeSelect = screen.getByLabelText("Document type");
+    expect(screen.getByRole("option", { name: /B-Form/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Passport/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /CNIC \(National Identity Card\)/i })).not.toBeInTheDocument();
+  });
 });

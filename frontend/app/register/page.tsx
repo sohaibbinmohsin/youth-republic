@@ -317,7 +317,7 @@ function RegisterContent() {
               <h3>What happens next</h3>
               <ol>
                 <li>
-                  <strong>Step 2: Portfolio Details & ID</strong>: Add your basic info (education, location & CNIC / B-Form) to get your Volunteer ID issued immediately.
+                  <strong>Step 2: Portfolio Details & ID</strong>: Add your basic info (education, location & ID document) to get your Volunteer ID issued immediately.
                 </li>
                 <li>
                   <strong>Browse & Apply</strong>: Explore verified volunteer drives across Pakistan and apply directly from your profile.
@@ -343,16 +343,16 @@ function RegisterContent() {
                   <strong>Instant Volunteer ID</strong>: Your official ID is generated immediately once you save your details.
                 </li>
                 <li>
-                  <strong>Document Review</strong>: Administrators check your CNIC / B-Form against your profile information.
+                  <strong>Document Review</strong>: Administrators check your identity document (CNIC, B-Form, or Passport) against your profile information.
                 </li>
                 <li>
                   <strong>Certified Portfolio</strong>: Once verified, all volunteer hours and achievements become officially authenticated.
                 </li>
               </ol>
 
-              <h3>Why we ask for CNIC / B-Form</h3>
+              <h3>Why we ask for an ID document</h3>
               <p>
-                Confirming your identity ensures your verified volunteer hours mean something to universities and employers. Volunteers under 18 provide a <strong>B-Form</strong>.
+                Confirming your identity ensures your verified volunteer hours mean something to universities and employers. Volunteers under 18 provide a <strong>B-Form</strong>, while adults can provide a <strong>CNIC</strong> or <strong>Passport</strong>.
               </p>
 
               <h3>Need help?</h3>

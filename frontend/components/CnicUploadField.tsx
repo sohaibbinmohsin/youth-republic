@@ -8,15 +8,35 @@ export function CnicUploadField({
   ownerId,
   onUploaded,
   onUploadPromise,
+  docType,
 }: {
   accessToken: string;
   ownerId?: string;
   onUploaded: (attachmentId: string) => void;
   onUploadPromise?: (promise: Promise<string | null> | null) => void;
+  docType?: "cnic" | "b_form" | "passport" | string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+
+  const docLabel =
+    docType === "passport"
+      ? "Passport document"
+      : docType === "b_form"
+      ? "B-Form document"
+      : docType === "cnic"
+      ? "CNIC document"
+      : "Identity document (CNIC / B-Form / Passport)";
+
+  const docHelpText =
+    docType === "passport"
+      ? "Upload a clear scan or photo of your passport to complete verification."
+      : docType === "b_form"
+      ? "Upload your B-Form (Child Registration Certificate) scan or photo for verification."
+      : docType === "cnic"
+      ? "Upload your CNIC document scan or photo to complete national verification."
+      : "Upload your CNIC, B-Form, or Passport scan or photo to complete verification.";
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -69,7 +89,7 @@ export function CnicUploadField({
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <label htmlFor="cnicFile" className="block text-sm font-semibold text-[var(--ink)] mb-0">
-            CNIC / B-Form document
+            {docLabel}
           </label>
           {uploadedFileName ? (
             <span className="pill pill--pos text-[0.7rem] py-0.5 px-2 flex-shrink-0">Uploaded</span>
@@ -78,7 +98,7 @@ export function CnicUploadField({
           )}
         </div>
         <p className="text-xs text-[var(--ink-2)] leading-relaxed mb-0">
-          Upload your CNIC (or B-Form if under 18) document scan or photo to complete national verification.
+          {docHelpText}
         </p>
       </div>
 

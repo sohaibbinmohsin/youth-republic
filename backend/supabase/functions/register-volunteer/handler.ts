@@ -12,7 +12,7 @@ export interface RegisterVolunteerInput {
   country: string;
   institution: string;
   degreeProgram: string;
-  idDocType?: "cnic" | "b_form";
+  idDocType?: "cnic" | "b_form" | "passport";
   idDocNumber?: string;
   idDocAttachmentId?: string;
   guardianName?: string;

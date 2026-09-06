@@ -8,7 +8,7 @@ select has_column('volunteers', 'id_doc_number', 'id_doc_number exists');
 select has_column('volunteers', 'id_doc_type', 'id_doc_type exists');
 
 select throws_ok(
-  $$ update volunteers set id_doc_type = 'passport' $$,
+  $$ update volunteers set id_doc_type = 'alien_id' $$,
   null, null, 'id_doc_type check rejects unknown type');
 
 select * from finish();
