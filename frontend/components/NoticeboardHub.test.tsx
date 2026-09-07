@@ -164,4 +164,30 @@ describe("NoticeboardHub", () => {
     const headings = screen.getAllByRole("heading", { level: 3 });
     expect(headings).toHaveLength(7);
   });
+
+  it("only renders organization filter options for organizations that have listed opportunities", () => {
+    const opps: OpportunityItem[] = [
+      {
+        id: "opp-custom",
+        name: "Community Drive",
+        type: "community",
+        location: "Lahore",
+        organizationId: "org-custom",
+        organizationName: "Rizq Trust",
+        computedStatus: "open",
+        createdAt: "2026-09-06T10:00:00Z",
+      },
+    ];
+
+    render(<NoticeboardHub initialOpportunities={opps} />);
+
+    // Should display Rizq Trust
+    expect(screen.getByRole("checkbox", { name: "Rizq Trust" })).toBeInTheDocument();
+
+    // Should NOT display old hardcoded defaults that have no listed opportunities
+    expect(screen.queryByRole("checkbox", { name: "Rizq" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Green Crescent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Sehat First" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Read Foundation" })).not.toBeInTheDocument();
+  });
 });
