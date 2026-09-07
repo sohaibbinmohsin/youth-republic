@@ -2,8 +2,8 @@ import { isDisplayableLogo, orgInitials } from "@/lib/orgLogo";
 
 /**
  * Organization avatar used across the volunteer surface. Exactly two sizes:
- *  - "sm" (22px): opportunity cards, the compact badge on the detail aside
- *  - "md" (28px): the org line on the detail page, the apply summary, portfolio
+ *  - "sm" (22px): opportunity cards, the org label above the detail-page title
+ *  - "md" (28px): the org card on the detail aside, the apply summary, portfolio
  *
  * Renders the uploaded logo when there is one (transparent logos sit on the
  * surrounding surface; a logo with its own background fills the rounded square),

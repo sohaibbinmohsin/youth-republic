@@ -86,7 +86,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
         {/* Left Column: Detail */}
         <div className="detail">
           <p className="detail__org">
-            <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="md" />
+            <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="sm" />
             <span>{org.name}</span>
           </p>
 
@@ -167,7 +167,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
         <aside className="pane__aside aside-cta">
           {/* Organization Header Badge with Purple Verified Tick */}
           <div className="flex items-center gap-2.5 pb-3 mb-3 border-b border-[#E7E4DC]">
-            <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="sm" className="shadow-xs" />
+            <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="md" className="shadow-xs" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="font-['Oswald'] font-bold text-[15px] leading-tight text-[#24262D] truncate">
