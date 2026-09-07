@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { resolveOrgVolunteerIds } from "../_shared/orgVolunteers.ts";
 
 export interface GetKpiSummaryInput {
   organizationId: string;
@@ -37,12 +38,10 @@ export async function getKpiSummary(
     throw new Error("forbidden");
   }
 
-  const { data: indexRows, error: indexError } = await supabase
-    .from("org_volunteer_index")
-    .select("volunteer_id")
-    .eq("organization_id", input.organizationId);
-  if (indexError) throw indexError;
-  const volunteerIds = (indexRows ?? []).map((r) => r.volunteer_id as string);
+  // Same roster the Volunteers directory shows: index rows plus anyone with a
+  // non-draft application or a participation for this org. Keeps the
+  // dashboard's "Active volunteers" count in step with the directory.
+  const volunteerIds = await resolveOrgVolunteerIds(supabase, input.organizationId);
 
   const { data: volunteerRows, error: volunteerError } = volunteerIds.length === 0
     ? { data: [] as { city: string; province: string; institution: string; status: string }[], error: null }
@@ -52,7 +51,8 @@ export async function getKpiSummary(
   const { data: applicationRows, error: applicationError } = await supabase
     .from("applications")
     .select("status")
-    .eq("organization_id", input.organizationId);
+    .eq("organization_id", input.organizationId)
+    .neq("status", "draft");
   if (applicationError) throw applicationError;
 
   const { data: participationRows, error: participationError } = await supabase
