@@ -105,3 +105,44 @@ Deno.test("updateParticipationStatus rejects when staff lacks participation:upda
     "forbidden",
   );
 });
+
+const scopedClaims = (orgId: string, permission: string, scopes?: Record<string, string[]>): StaffClaims => ({
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  canVerifyIdentity: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{
+    organizationId: orgId, module: "youth-republic", permissions: [permission],
+    ...(scopes ? { chapterScopes: scopes } : {}),
+  }],
+});
+
+Deno.test("updateParticipationStatus: a chapter-scoped participation:update only touches its own chapter", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const lums = crypto.randomUUID();
+  const nust = crypto.randomUUID();
+  const claims = scopedClaims(orgId, "participation:update", { "participation:update": [lums] });
+
+  const mk = async (chapterId: string | null) => {
+    const pid = await makeParticipation(supabase, orgId);
+    const { data } = await supabase.from("participation").select("opportunity_id").eq("id", pid).single();
+    await supabase.from("opportunities").update({ chapter_id: chapterId }).eq("id", data!.opportunity_id);
+    return pid;
+  };
+  const lumsP = await mk(lums);
+  const nustP = await mk(nust);
+  const orgP = await mk(null);
+
+  await updateParticipationStatus(supabase, claims, { participationId: lumsP, status: "participating" });
+
+  await assertRejects(
+    () => updateParticipationStatus(supabase, claims, { participationId: nustP, status: "participating" }),
+    Error, "forbidden",
+  );
+  await assertRejects(
+    () => updateParticipationStatus(supabase, claims, { participationId: orgP, status: "participating" }),
+    Error, "forbidden",
+  );
+});

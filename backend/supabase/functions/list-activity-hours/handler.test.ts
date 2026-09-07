@@ -75,3 +75,44 @@ Deno.test("listActivityHours rejects a caller without hours:read for this org", 
 
   await assertRejects(() => listActivityHours(supabase, noPerm, { organizationId: orgId }), Error, "forbidden");
 });
+
+Deno.test("listActivityHours: a chapter read-scope confines results to those chapters' opportunities", async () => {
+  const supabase = testClient();
+  const { data: org } = await supabase.from("organizations").insert({
+    id: crypto.randomUUID(), name: "LH Scope Org", slug: `lh-scope-${crypto.randomUUID()}`,
+  }).select("id").single();
+  const orgId = org!.id as string;
+  const lums = crypto.randomUUID();
+  const nust = crypto.randomUUID();
+  const vId = await makeVolunteer(supabase);
+  const mk = async (chapterId: string | null) => {
+    const oppId = (await supabase.from("opportunities").insert({
+      organization_id: orgId, name: `Opp ${chapterId ?? "org"}`, type: "environment", chapter_id: chapterId,
+    }).select("id").single()).data!.id as string;
+    const pId = (await supabase.from("participation").insert({
+      volunteer_id: vId, opportunity_id: oppId, organization_id: orgId, status: "participating",
+    }).select("id").single()).data!.id as string;
+    await supabase.from("activity_hours").insert({
+      participation_id: pId, volunteer_id: vId, opportunity_id: oppId, organization_id: orgId,
+      activity_date: "2026-03-01", hours_submitted: 4, verification_status: "pending",
+    });
+    return oppId;
+  };
+  const lumsOpp = await mk(lums);
+  await mk(nust);
+
+  const scopedClaims: StaffClaims = {
+    actorType: "staff", staffId: "s1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
+    moduleAccess: [{
+      organizationId: orgId, module: "youth-republic", permissions: ["hours:read"],
+      chapterScopes: { "hours:read": [lums] },
+    }],
+  };
+  const scoped = await listActivityHours(supabase, scopedClaims, { organizationId: orgId });
+  assertEquals(scoped.activity.length, 1);
+  assertEquals(scoped.activity[0].opportunityName, `Opp ${lums}`);
+  void lumsOpp;
+
+  const all = await listActivityHours(supabase, claims(orgId), { organizationId: orgId });
+  assertEquals(all.activity.length, 2);
+});

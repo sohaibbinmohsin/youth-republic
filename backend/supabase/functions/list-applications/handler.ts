@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { readScopeChapterIds } from "../_shared/opportunityChapter.ts";
 
 export interface ListApplicationsInput {
   organizationId: string;
@@ -70,6 +71,14 @@ export async function listApplications(
       { count: "exact" },
     )
     .eq("organization_id", input.organizationId);
+
+  const chapterIds = readScopeChapterIds(staffClaims, input.organizationId, "applications:read");
+  if (chapterIds) {
+    const { data: opps } = await supabase.from("opportunities").select("id")
+      .eq("organization_id", input.organizationId).in("chapter_id", chapterIds);
+    query = query.in("opportunity_id", (opps ?? []).map((o) => o.id as string));
+  }
+
   if (input.opportunityId) query = query.eq("opportunity_id", input.opportunityId);
   if (input.status) query = query.eq("status", input.status);
 

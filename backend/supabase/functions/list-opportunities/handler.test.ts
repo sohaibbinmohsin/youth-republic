@@ -272,3 +272,27 @@ Deno.test("staff variant rejects a caller without opportunities:read for this or
     "forbidden",
   );
 });
+
+Deno.test("staff listOpportunities: a chapter read-scope confines results to those chapters", async () => {
+  const db = makeDb({
+    organizations: [{ id: "org-1", name: "Org One", slug: "org-one" }],
+    opportunities: [
+      { id: "o-lums", organization_id: "org-1", name: "LUMS Drive", type: "community", chapter_id: "lums", deactivated_at: null, created_at: "2026-01-03" },
+      { id: "o-nust", organization_id: "org-1", name: "NUST Drive", type: "community", chapter_id: "nust", deactivated_at: null, created_at: "2026-01-02" },
+      { id: "o-org", organization_id: "org-1", name: "Org Drive", type: "community", chapter_id: null, deactivated_at: null, created_at: "2026-01-01" },
+    ],
+    participation: [],
+  });
+  const scopedClaims: StaffClaims = {
+    actorType: "staff", staffId: "s1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
+    moduleAccess: [{
+      organizationId: "org-1", module: "youth-republic", permissions: ["opportunities:read"],
+      chapterScopes: { "opportunities:read": ["lums"] },
+    }],
+  };
+  const scoped = await listOpportunities(db, scopedClaims, { organizationId: "org-1" });
+  assertEquals(scoped.opportunities.map((o) => o.id).sort(), ["o-lums"]);
+
+  const unrestricted = await listOpportunities(db, claims("org-1"), { organizationId: "org-1" });
+  assertEquals(unrestricted.opportunities.length, 3);
+});

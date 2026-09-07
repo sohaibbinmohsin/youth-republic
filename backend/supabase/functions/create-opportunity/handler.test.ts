@@ -129,3 +129,55 @@ Deno.test("createOpportunity silently ignores a legacy eligibilityCriteria field
 
   assertEquals(typeof opportunityId, "string");
 });
+
+const scopedClaims = (orgId: string, permission: string, scopes?: Record<string, string[]>): StaffClaims => ({
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  canVerifyIdentity: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{
+    organizationId: orgId,
+    module: "youth-republic",
+    permissions: [permission],
+    ...(scopes ? { chapterScopes: scopes } : {}),
+  }],
+});
+
+Deno.test("createOpportunity: a chapter-scoped writer can only file under a scoped chapter", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const lums = crypto.randomUUID();
+  const nust = crypto.randomUUID();
+  const claims = scopedClaims(orgId, "opportunities:write", { "opportunities:write": [lums] });
+
+  const { opportunityId } = await createOpportunity(supabase, claims, {
+    organizationId: orgId, name: "LUMS Drive", type: "event", chapterId: lums,
+  });
+  const { data } = await supabase.from("opportunities").select("chapter_id").eq("id", opportunityId).single();
+  assertEquals(data!.chapter_id, lums);
+
+  await assertRejects(
+    () => createOpportunity(supabase, claims, { organizationId: orgId, name: "NUST Drive", type: "event", chapterId: nust }),
+    Error, "forbidden",
+  );
+  await assertRejects(
+    () => createOpportunity(supabase, claims, { organizationId: orgId, name: "Org Drive", type: "event", chapterId: null }),
+    Error, "forbidden",
+  );
+});
+
+Deno.test("createOpportunity: an unrestricted writer can file org-wide or under any chapter", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const anyChapter = crypto.randomUUID();
+  const claims = scopedClaims(orgId, "opportunities:write");
+
+  const a = await createOpportunity(supabase, claims, { organizationId: orgId, name: "Org Wide", type: "event", chapterId: null });
+  const { data: rowA } = await supabase.from("opportunities").select("chapter_id").eq("id", a.opportunityId).single();
+  assertEquals(rowA!.chapter_id, null);
+
+  const b = await createOpportunity(supabase, claims, { organizationId: orgId, name: "Any Chapter", type: "event", chapterId: anyChapter });
+  const { data: rowB } = await supabase.from("opportunities").select("chapter_id").eq("id", b.opportunityId).single();
+  assertEquals(rowB!.chapter_id, anyChapter);
+});

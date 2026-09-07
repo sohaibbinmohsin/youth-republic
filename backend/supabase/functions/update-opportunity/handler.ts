@@ -34,14 +34,14 @@ export async function updateOpportunity(
   // client, which bypasses RLS entirely, so RLS cannot backstop this check.
   const { data: opportunity, error: fetchError } = await supabase
     .from("opportunities")
-    .select("id, organization_id, name")
+    .select("id, organization_id, name, chapter_id")
     .eq("id", input.opportunityId)
     .single();
   if (fetchError) throw fetchError;
 
   const isDelete = Boolean(input.hardDelete || input.statusOverride === "deleted");
   if (isDelete) {
-    if (!staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:delete")) {
+    if (!staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:delete", opportunity.chapter_id ?? null)) {
       throw new Error("forbidden");
     }
 
@@ -88,11 +88,11 @@ export async function updateOpportunity(
     || input.capacity !== undefined
     || input.statusOverride !== undefined;
 
-  if (touchesOtherFields && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:update")) {
+  if (touchesOtherFields && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:update", opportunity.chapter_id ?? null)) {
     throw new Error("forbidden");
   }
 
-  if (input.deactivatedAt !== undefined && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:delete")) {
+  if (input.deactivatedAt !== undefined && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:delete", opportunity.chapter_id ?? null)) {
     throw new Error("forbidden");
   }
 

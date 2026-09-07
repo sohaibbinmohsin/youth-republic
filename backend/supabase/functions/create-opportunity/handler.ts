@@ -19,6 +19,7 @@ export interface CreateOpportunityInput {
   whatToBring?: string[];
   applicationForm?: unknown;
   capacity?: number;
+  chapterId?: string | null;
 }
 
 export async function createOpportunity(
@@ -26,13 +27,14 @@ export async function createOpportunity(
   staffClaims: StaffClaims,
   input: CreateOpportunityInput,
 ): Promise<{ opportunityId: string }> {
-  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "opportunities:write")) {
+  if (!staffHasPermission(staffClaims, input.organizationId, "youth-republic", "opportunities:write", input.chapterId ?? null)) {
     throw new Error("forbidden");
   }
 
   const row: Record<string, unknown> = {
     organization_id: input.organizationId,
     name: input.name,
+    chapter_id: input.chapterId ?? null,
     type: input.type,
     description: input.description ?? null,
     location: input.location ?? null,

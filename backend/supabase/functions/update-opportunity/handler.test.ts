@@ -270,3 +270,47 @@ Deno.test("updateOpportunity lets staff with opportunities:delete reactivate an 
   assertEquals(updated!.deactivated_at, null);
   assertEquals(updated!.opportunity_status, "open");
 });
+
+const scopedClaims = (orgId: string, permission: string, scopes?: Record<string, string[]>): StaffClaims => ({
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  canVerifyIdentity: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{
+    organizationId: orgId,
+    module: "youth-republic",
+    permissions: [permission],
+    ...(scopes ? { chapterScopes: scopes } : {}),
+  }],
+});
+
+Deno.test("updateOpportunity: a chapter-scoped updater can only touch its own chapter's opportunity", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const lums = crypto.randomUUID();
+  const nust = crypto.randomUUID();
+
+  const mk = async (chapterId: string | null) =>
+    (await supabase.from("opportunities").insert({
+      organization_id: orgId, name: `Opp ${chapterId ?? "org"}`, type: "event", chapter_id: chapterId,
+    }).select("id").single()).data!.id as string;
+  const lumsOpp = await mk(lums);
+  const nustOpp = await mk(nust);
+  const orgOpp = await mk(null);
+
+  const claims = scopedClaims(orgId, "opportunities:update", { "opportunities:update": [lums] });
+
+  await updateOpportunity(supabase, claims, { opportunityId: lumsOpp, organizationId: orgId, name: "LUMS renamed" });
+  const { data: renamed } = await supabase.from("opportunities").select("name").eq("id", lumsOpp).single();
+  assertEquals(renamed!.name, "LUMS renamed");
+
+  await assertRejects(
+    () => updateOpportunity(supabase, claims, { opportunityId: nustOpp, organizationId: orgId, name: "nope" }),
+    Error, "forbidden",
+  );
+  await assertRejects(
+    () => updateOpportunity(supabase, claims, { opportunityId: orgOpp, organizationId: orgId, name: "nope" }),
+    Error, "forbidden",
+  );
+});

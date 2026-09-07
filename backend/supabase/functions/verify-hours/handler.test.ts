@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { createClient } from "@supabase/supabase-js";
 import { verifyHours } from "./handler.ts";
 import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
@@ -229,4 +229,46 @@ Deno.test("verifyHours completes successfully when the email send throws — the
     .eq("target_id", activityHoursId)
     .eq("action", "hours_verified");
   assertEquals(logRows?.length, 1);
+});
+
+const scopedClaims = (orgId: string, permission: string, scopes?: Record<string, string[]>): StaffClaims => ({
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  canVerifyIdentity: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{
+    organizationId: orgId, module: "youth-republic", permissions: [permission],
+    ...(scopes ? { chapterScopes: scopes } : {}),
+  }],
+});
+
+Deno.test("verifyHours: a chapter-scoped hours:update only verifies its own chapter", async () => {
+  const supabase = testClient();
+  const lums = crypto.randomUUID();
+  const nust = crypto.randomUUID();
+
+  const mk = async (chapterId: string | null) => {
+    const { activityHoursId, orgId } = await makeActivityHours(supabase);
+    const { data } = await supabase.from("activity_hours").select("opportunity_id").eq("id", activityHoursId).single();
+    await supabase.from("opportunities").update({ chapter_id: chapterId }).eq("id", data!.opportunity_id);
+    return { activityHoursId, orgId };
+  };
+  const a = await mk(lums);
+  const b = await mk(nust);
+  const c = await mk(null);
+  const claimsFor = (orgId: string) => scopedClaims(orgId, "hours:update", { "hours:update": [lums] });
+
+  await verifyHours(supabase, claimsFor(a.orgId), { activityHoursId: a.activityHoursId, decision: "verified", hoursVerified: 5 }, new FakeEmailClient());
+  const { data: verified } = await supabase.from("activity_hours").select("verification_status").eq("id", a.activityHoursId).single();
+  assertEquals(verified!.verification_status, "verified");
+
+  await assertRejects(
+    () => verifyHours(supabase, claimsFor(b.orgId), { activityHoursId: b.activityHoursId, decision: "verified", hoursVerified: 5 }, new FakeEmailClient()),
+    Error, "forbidden",
+  );
+  await assertRejects(
+    () => verifyHours(supabase, claimsFor(c.orgId), { activityHoursId: c.activityHoursId, decision: "verified", hoursVerified: 5 }, new FakeEmailClient()),
+    Error, "forbidden",
+  );
 });

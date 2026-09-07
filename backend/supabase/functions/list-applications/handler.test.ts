@@ -107,3 +107,37 @@ Deno.test("listApplications rejects a caller without applications:read for this 
 
   await assertRejects(() => listApplications(supabase, noPerm, { organizationId: orgId }), Error, "forbidden");
 });
+
+Deno.test("listApplications: a chapter read-scope confines results to those chapters' opportunities", async () => {
+  const supabase = testClient();
+  const { data: org } = await supabase.from("organizations").insert({
+    id: crypto.randomUUID(), name: "LA Scope Org", slug: `la-scope-${crypto.randomUUID()}`,
+  }).select("id").single();
+  const orgId = org!.id as string;
+  const lums = crypto.randomUUID();
+  const nust = crypto.randomUUID();
+  const mkOpp = async (chapterId: string | null) =>
+    (await supabase.from("opportunities").insert({
+      organization_id: orgId, name: `Opp ${chapterId ?? "org"}`, type: "environment", chapter_id: chapterId,
+    }).select("id").single()).data!.id as string;
+  const lumsOpp = await mkOpp(lums);
+  const nustOpp = await mkOpp(nust);
+  const vId = await makeVolunteer(supabase);
+  await supabase.from("applications").insert([
+    { volunteer_id: vId, opportunity_id: lumsOpp, organization_id: orgId, status: "submitted" },
+    { volunteer_id: vId, opportunity_id: nustOpp, organization_id: orgId, status: "submitted" },
+  ]);
+
+  const scopedClaims: StaffClaims = {
+    actorType: "staff", staffId: "s1", platformOwner: false, canVerifyIdentity: false, orgRoles: [],
+    moduleAccess: [{
+      organizationId: orgId, module: "youth-republic", permissions: ["applications:read"],
+      chapterScopes: { "applications:read": [lums] },
+    }],
+  };
+  const scoped = await listApplications(supabase, scopedClaims, { organizationId: orgId });
+  assertEquals(scoped.applications.map((a) => a.opportunityId).sort(), [lumsOpp].sort());
+
+  const all = await listApplications(supabase, claims(orgId), { organizationId: orgId });
+  assertEquals(all.applications.length, 2);
+});

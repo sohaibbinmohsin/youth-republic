@@ -144,3 +144,54 @@ Deno.test("staffHasPermission is false for a different organization", () => {
 Deno.test("staffHasPermission bypasses everything for platform_owner", () => {
   assertEquals(staffHasPermission(baseClaims({ platformOwner: true, moduleAccess: [] }), "org-9", "youth-republic", "applications:write"), true);
 });
+
+Deno.test("staffHasPermission 4-arg honours per-key chapter scope", () => {
+  const claims: StaffClaims = baseClaims({
+    moduleAccess: [{
+      organizationId: "org-1", module: "youth-republic",
+      permissions: ["opportunities:read", "opportunities:write"],
+      chapterScopes: { "opportunities:write": ["lums"] },
+    }],
+  });
+  // unrestricted read
+  assertEquals(staffHasPermission(claims, "org-1", "youth-republic", "opportunities:read", null), true);
+  assertEquals(staffHasPermission(claims, "org-1", "youth-republic", "opportunities:read", "nust"), true);
+  // scoped write
+  assertEquals(staffHasPermission(claims, "org-1", "youth-republic", "opportunities:write", "lums"), true);
+  assertEquals(staffHasPermission(claims, "org-1", "youth-republic", "opportunities:write", "nust"), false);
+  assertEquals(staffHasPermission(claims, "org-1", "youth-republic", "opportunities:write", null), false);
+  // ungranted key
+  assertEquals(staffHasPermission(claims, "org-1", "youth-republic", "hours:update", "lums"), false);
+  // 3-arg still works
+  assertEquals(staffHasPermission(claims, "org-1", "youth-republic", "opportunities:write"), true);
+});
+
+Deno.test("verifyStaffToken decodes chapter_scopes into moduleAccess[].chapterScopes", async () => {
+  Deno.env.set("STAFF_JWT_SECRET", secret);
+  const token = await signStaffToken({
+    actor_type: "staff",
+    staff_id: "staff-1",
+    platform_owner: false,
+    org_roles: [{ organization_id: "org-1" }],
+    module_access: [{
+      organization_id: "org-1", module: "youth-republic",
+      permissions: ["opportunities:read", "opportunities:write"],
+      chapter_scopes: { "opportunities:write": ["lums"] },
+    }],
+  });
+  const claims = await verifyStaffToken(`Bearer ${token}`);
+  assertEquals(claims.moduleAccess[0].chapterScopes, { "opportunities:write": ["lums"] });
+});
+
+Deno.test("verifyStaffToken leaves chapterScopes undefined when the claim is absent", async () => {
+  Deno.env.set("STAFF_JWT_SECRET", secret);
+  const token = await signStaffToken({
+    actor_type: "staff",
+    staff_id: "staff-1",
+    platform_owner: false,
+    org_roles: [],
+    module_access: [{ organization_id: "org-1", module: "youth-republic", permissions: ["applications:read"] }],
+  });
+  const claims = await verifyStaffToken(`Bearer ${token}`);
+  assertEquals(claims.moduleAccess[0].chapterScopes, undefined);
+});

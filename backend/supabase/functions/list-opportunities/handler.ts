@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { readScopeChapterIds } from "../_shared/opportunityChapter.ts";
 import { getOpportunityTier, isClosingSoon } from "../_shared/opportunityStatus.ts";
 
 export interface ListOpportunitiesInput {
@@ -76,6 +77,8 @@ interface QueryScope {
   organizationId?: string;
   // Staff callers see deactivated opportunities; public callers never do.
   includeDeactivated: boolean;
+  // Staff chapter read-scope: when set, results are confined to these chapters.
+  chapterIds?: string[] | null;
 }
 
 function toCard(o: Record<string, unknown>, filledCount: number): OpportunityCard {
@@ -137,6 +140,7 @@ async function computeFacets(
   // active type/city/search/status filters.
   let facetQuery = supabase.from("opportunities").select("location, organization_id");
   if (scope.organizationId) facetQuery = facetQuery.eq("organization_id", scope.organizationId);
+  if (scope.chapterIds) facetQuery = facetQuery.in("chapter_id", scope.chapterIds);
   if (!scope.includeDeactivated) facetQuery = facetQuery.is("deactivated_at", null);
   const { data, error } = await facetQuery;
   if (error) throw error;
@@ -171,6 +175,7 @@ async function runOpportunityQuery(
 
   let query = supabase.from("opportunities").select(CARD_SELECT, { count: "exact" });
   if (scope.organizationId) query = query.eq("organization_id", scope.organizationId);
+  if (scope.chapterIds) query = query.in("chapter_id", scope.chapterIds);
   if (!scope.includeDeactivated) query = query.is("deactivated_at", null);
   if (input.type) query = query.eq("type", input.type);
   if (typeof input.online === "boolean") query = query.eq("is_online", input.online);
@@ -264,8 +269,10 @@ export async function listOpportunities(
   if (!staffHasPermission(staffClaims, input.organizationId ?? "", "youth-republic", "opportunities:read")) {
     throw new Error("forbidden");
   }
+  const chapterIds = readScopeChapterIds(staffClaims, input.organizationId ?? "", "opportunities:read");
   return await runOpportunityQuery(supabase, input, {
     organizationId: input.organizationId,
     includeDeactivated: true,
+    chapterIds,
   });
 }
