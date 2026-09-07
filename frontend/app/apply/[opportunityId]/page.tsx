@@ -10,10 +10,10 @@ import {
   fetchOpportunityClient,
   type OpportunityDetailRow,
   TYPE_CONFIG,
-  formatOrgInitials,
   formatOpportunityDates,
 } from "@/lib/opportunityData";
 import { computeOpportunityStatus } from "@/lib/opportunityStatus";
+import { OrgAvatar } from "@/components/OrgAvatar";
 import ApplyLoading from "./loading";
 
 export default function ApplyPage({ params }: { params: Promise<{ opportunityId: string }> }) {
@@ -173,9 +173,9 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
     name: "Youth Republic Partner",
     brand_color: "#8A7A10",
     about: null,
+    logo_url: null,
   };
   const orgColor = org.brand_color ?? "#8A7A10";
-  const orgInitials = formatOrgInitials(org.name);
 
   const typeConf = TYPE_CONFIG[opportunity.type.toLowerCase()] ?? {
     label: opportunity.type
@@ -200,19 +200,14 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
 
   const locationDisplay = opportunity.is_online
     ? "Online"
-    : `${opportunity.location ?? "Islamabad"} · in person`;
+    : (opportunity.location ?? "Islamabad");
 
   const summaryContent = (
     <>
       <h3>You’re applying to</h3>
       <div className="pcard__id" style={{ marginBottom: ".9rem" }}>
-        <span
-          className="orglogo"
-          id="as-logo"
-          style={{ background: orgColor }}
-        >
-          {orgInitials}
-        </span>
+        <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="md" />
+
         <div>
           <div className="pcard__name" id="as-name">
             {opportunity.name}

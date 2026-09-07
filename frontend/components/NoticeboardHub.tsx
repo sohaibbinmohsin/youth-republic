@@ -13,6 +13,8 @@ export interface OpportunityItem {
   description?: string | null;
   organizationId: string;
   organizationName: string;
+  organizationLogoUrl?: string | null;
+  organizationBrandColor?: string | null;
   computedStatus: string;
   applicationDeadline?: string | null;
   createdAt?: string | null;
