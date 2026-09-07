@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { readScopeChapterIds } from "../_shared/opportunityChapter.ts";
 
 export interface ListActivityHoursInput {
   organizationId: string;
@@ -48,6 +49,21 @@ export async function listActivityHours(
       .eq("type", input.activityType);
     if (opportunityError) throw opportunityError;
     opportunityIdFilter = (opportunityRows ?? []).map((o) => o.id as string);
+    if (opportunityIdFilter.length === 0) return { activity: [], total: 0 };
+  }
+
+  const chapterIds = readScopeChapterIds(staffClaims, input.organizationId, "hours:read");
+  if (chapterIds) {
+    const { data: chapterOpps, error: chapterErr } = await supabase
+      .from("opportunities")
+      .select("id")
+      .eq("organization_id", input.organizationId)
+      .in("chapter_id", chapterIds);
+    if (chapterErr) throw chapterErr;
+    const chapterOppIds = (chapterOpps ?? []).map((o) => o.id as string);
+    opportunityIdFilter = opportunityIdFilter
+      ? opportunityIdFilter.filter((id) => chapterOppIds.includes(id))
+      : chapterOppIds;
     if (opportunityIdFilter.length === 0) return { activity: [], total: 0 };
   }
 
