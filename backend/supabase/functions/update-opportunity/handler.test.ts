@@ -104,6 +104,44 @@ Deno.test("updateOpportunity lets staff with opportunities:delete deactivate an 
   assertEquals(updated!.opportunity_status, "closed");
 });
 
+Deno.test("updateOpportunity permanently deletes opportunity and logs when hardDelete is true", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Delete Target", type: "event",
+  }).select("id").single();
+
+  await updateOpportunity(supabase, staffClaims(orgId, "opportunities:delete"), {
+    opportunityId: opportunity!.id, organizationId: orgId, hardDelete: true,
+  });
+
+  const { data: found } = await supabase.from("opportunities").select("id").eq("id", opportunity!.id).maybeSingle();
+  assertEquals(found, null);
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("*")
+    .eq("target_id", opportunity!.id)
+    .eq("action", "opportunity_deleted");
+  assertEquals(logRows?.length, 1);
+});
+
+Deno.test("updateOpportunity rejects staff without opportunities:delete trying hardDelete", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const { data: opportunity } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Delete Target", type: "event",
+  }).select("id").single();
+
+  await assertRejects(
+    () => updateOpportunity(supabase, staffClaims(orgId, "opportunities:update"), {
+      opportunityId: opportunity!.id, organizationId: orgId, hardDelete: true,
+    }),
+    Error,
+    "forbidden",
+  );
+});
+
 Deno.test("updateOpportunity rejects staff with only opportunities:update trying to set deactivatedAt", async () => {
   const supabase = testClient();
   const orgId = crypto.randomUUID();

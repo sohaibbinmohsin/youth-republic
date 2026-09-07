@@ -21,6 +21,7 @@ export interface UpdateOpportunityInput {
   capacity?: number;
   statusOverride?: string;
   deactivatedAt?: string | null;
+  hardDelete?: boolean;
 }
 
 export async function updateOpportunity(
@@ -33,10 +34,36 @@ export async function updateOpportunity(
   // client, which bypasses RLS entirely, so RLS cannot backstop this check.
   const { data: opportunity, error: fetchError } = await supabase
     .from("opportunities")
-    .select("id, organization_id")
+    .select("id, organization_id, name")
     .eq("id", input.opportunityId)
     .single();
   if (fetchError) throw fetchError;
+
+  const isDelete = Boolean(input.hardDelete || input.statusOverride === "deleted");
+  if (isDelete) {
+    if (!staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:delete")) {
+      throw new Error("forbidden");
+    }
+
+    const { error: delError } = await supabase
+      .from("opportunities")
+      .delete()
+      .eq("id", input.opportunityId)
+      .eq("organization_id", opportunity.organization_id);
+    if (delError) throw delError;
+
+    await supabase.from("admin_action_log").insert({
+      staff_id: staffClaims.staffId,
+      actor_type: staffClaims.actorType,
+      action: "opportunity_deleted",
+      target_type: "opportunity",
+      target_id: input.opportunityId,
+      organization_id: opportunity.organization_id,
+      metadata: { name: opportunity.name, hard_delete: true },
+    });
+
+    return { opportunityId: input.opportunityId };
+  }
 
   // Every field except deactivatedAt stays gated on opportunities:update.
   // deactivatedAt (soft-delete/reactivate) gets its own, stricter permission
