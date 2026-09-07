@@ -6,7 +6,7 @@ const DEFAULT_SUPABASE_URL = "https://kbotpktgojpvkotigrjh.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtib3Rwa3Rnb2pwdmtvdGlncmpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0ODk2NzIsImV4cCI6MjEwMzA2NTY3Mn0.RaE7H0eWCNrvAzfiMJdnQ1Nwr1zipUjgqVNdJY-1PZ4";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;

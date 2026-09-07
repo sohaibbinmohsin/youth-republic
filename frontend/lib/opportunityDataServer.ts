@@ -1,7 +1,13 @@
+import { cache } from "react";
 import { getServerSupabaseClient } from "@/lib/supabase/serverClient";
 import { PROTOTYPE_SEED_OPPORTUNITIES, type OpportunityDetailRow } from "./opportunityData";
 
-export async function fetchOpportunityServer(id: string): Promise<OpportunityDetailRow | null> {
+/**
+ * Wrapped in cache() because generateMetadata and the page body both ask for
+ * the same opportunity — without it that's two identical Supabase round-trips
+ * per request. cache() dedupes them within a single render.
+ */
+export const fetchOpportunityServer = cache(async (id: string): Promise<OpportunityDetailRow | null> => {
   if (PROTOTYPE_SEED_OPPORTUNITIES[id]) {
     return PROTOTYPE_SEED_OPPORTUNITIES[id];
   }
@@ -27,4 +33,4 @@ export async function fetchOpportunityServer(id: string): Promise<OpportunityDet
   if (matched) return matched;
 
   return null;
-}
+});
