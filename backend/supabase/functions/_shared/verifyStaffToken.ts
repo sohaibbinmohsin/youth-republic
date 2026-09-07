@@ -4,6 +4,7 @@ export interface ModuleAccessEntry {
   organizationId: string;
   module: string;
   permissions: string[];
+  chapterScopes?: Record<string, string[]>;
 }
 
 export interface StaffClaims {
@@ -61,6 +62,15 @@ export async function verifyStaffToken(authHeader: string | null): Promise<Staff
           organizationId: String(m.organization_id),
           module: String(m.module),
           permissions: Array.isArray(m.permissions) ? m.permissions.map(String) : [],
+          chapterScopes:
+            m.chapter_scopes && typeof m.chapter_scopes === "object"
+              ? Object.fromEntries(
+                Object.entries(m.chapter_scopes as Record<string, unknown>).map(([k, v]) => [
+                  k,
+                  Array.isArray(v) ? v.map(String) : [],
+                ]),
+              )
+              : undefined,
         }))
         : [],
     };
@@ -74,9 +84,28 @@ export function staffHasPermission(
   organizationId: string,
   module: string,
   permission: string,
+): boolean;
+export function staffHasPermission(
+  claims: StaffClaims,
+  organizationId: string,
+  module: string,
+  permission: string,
+  targetChapterId: string | null,
+): boolean;
+export function staffHasPermission(
+  claims: StaffClaims,
+  organizationId: string,
+  module: string,
+  permission: string,
+  targetChapterId?: string | null,
 ): boolean {
   if (claims.platformOwner) return true;
-  return claims.moduleAccess.some(
-    (m) => m.organizationId === organizationId && m.module === module && m.permissions.includes(permission),
+  const entry = claims.moduleAccess.find(
+    (m) => m.organizationId === organizationId && m.module === module,
   );
+  if (!entry || !entry.permissions.includes(permission)) return false;
+  if (targetChapterId === undefined) return true; // 3-arg: any scope
+  const scope = entry.chapterScopes?.[permission];
+  if (!scope) return true; // key unrestricted
+  return targetChapterId !== null && scope.includes(targetChapterId);
 }
