@@ -11,6 +11,7 @@ import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
 import { getAvatarInitials } from "@/lib/coolNames";
 import { PROTOTYPE_SEED_OPPORTUNITIES } from "@/lib/opportunityData";
+import { OrgAvatar } from "@/components/OrgAvatar";
 import PortfolioLoading from "./loading";
 
 interface VolunteerProfile {
@@ -42,6 +43,7 @@ interface ApplicationItem {
   orgName: string;
   orgInitials: string;
   orgColor: string;
+  orgLogoUrl: string | null;
   type: string;
   location: string | null;
   isOnline?: boolean;
@@ -64,6 +66,7 @@ interface ProgrammeItem {
   orgName: string;
   orgInitials: string;
   orgColor: string;
+  orgLogoUrl: string | null;
   type: string;
   status: string;
   role: string;
@@ -150,7 +153,7 @@ export default function PortfolioPage() {
       try {
         const { data: appRows } = await supabase
           .from("applications")
-          .select("id, status, opportunity_id, applied_at, opportunities(id, name, type, location, is_online), organizations(name, brand_color)")
+          .select("id, status, opportunity_id, applied_at, opportunities(id, name, type, location, is_online), organizations(name, brand_color, logo_url)")
           .order("applied_at", { ascending: false });
 
         const dbApps: ApplicationItem[] = (appRows ?? []).map((r: any) => {
@@ -173,6 +176,7 @@ export default function PortfolioPage() {
             orgName: org.name ?? "Youth Republic Partner",
             orgInitials: getOrgInitials(org.name),
             orgColor: org.brand_color ?? getOrgColor(org.name),
+            orgLogoUrl: org.logo_url ?? null,
             type: opp.type ?? "community",
             location: opp.location ?? "Pakistan",
             isOnline: Boolean(opp.is_online),
@@ -203,6 +207,7 @@ export default function PortfolioPage() {
                     orgName: orgName,
                     orgInitials: getOrgInitials(orgName),
                     orgColor: seedOpp?.organizations?.brand_color ?? getOrgColor(orgName),
+                    orgLogoUrl: seedOpp?.organizations?.logo_url ?? null,
                     type: seedOpp?.type ?? "community",
                     location: seedOpp?.location ?? "Pakistan",
                     isOnline: Boolean(seedOpp?.is_online),
@@ -274,7 +279,7 @@ export default function PortfolioPage() {
       try {
         const { data } = await supabase
           .from("participation")
-          .select("id, status, organization_id, opportunities(id, name, type, activity_start_at, activity_end_at), organizations(name, brand_color)")
+          .select("id, status, organization_id, opportunities(id, name, type, activity_start_at, activity_end_at), organizations(name, brand_color, logo_url)")
           .eq("volunteer_id", volunteerRow.id);
         partRows = data ?? [];
       } catch {
@@ -284,7 +289,7 @@ export default function PortfolioPage() {
       try {
         const { data } = await supabase
           .from("activity_hours")
-          .select("id, participation_id, role, activity_date, hours_submitted, hours_verified, verification_status, note, organization_id, opportunities(id, name, type, activity_start_at, activity_end_at), organizations(name, brand_color)")
+          .select("id, participation_id, role, activity_date, hours_submitted, hours_verified, verification_status, note, organization_id, opportunities(id, name, type, activity_start_at, activity_end_at), organizations(name, brand_color, logo_url)")
           .eq("volunteer_id", volunteerRow.id)
           .order("activity_date", { ascending: false });
         hourRows = data ?? [];
@@ -306,6 +311,7 @@ export default function PortfolioPage() {
           orgName: org.name ?? "Youth Republic",
           orgInitials: getOrgInitials(org.name),
           orgColor: org.brand_color ?? getOrgColor(org.name),
+          orgLogoUrl: org.logo_url ?? null,
           type: opp.type ?? "community",
           status: p.status ?? "in_progress",
           role: "Volunteer",
@@ -331,6 +337,7 @@ export default function PortfolioPage() {
             orgName: org.name ?? "Youth Republic",
             orgInitials: getOrgInitials(org.name),
             orgColor: org.brand_color ?? getOrgColor(org.name),
+            orgLogoUrl: org.logo_url ?? null,
             type: opp.type ?? "community",
             status: "in_progress",
             role: h.role ?? "Volunteer",
@@ -554,9 +561,7 @@ export default function PortfolioPage() {
                   <div key={p.participationId} className="pcard">
                     <div className="pcard__top">
                       <div className="pcard__id">
-                        <span className="orglogo" style={{ background: p.orgColor }}>
-                          {p.orgInitials}
-                        </span>
+                        <OrgAvatar name={p.orgName} logoUrl={p.orgLogoUrl} color={p.orgColor} size="md" />
                         <div>
                           <div className="pcard__name">{p.opportunityName}</div>
                           <div className="pcard__org">
@@ -755,9 +760,7 @@ export default function PortfolioPage() {
                 return (
                   <div key={app.id} className="rowcard">
                     <div className="pcard__id">
-                      <span className="orglogo" style={{ background: app.orgColor }}>
-                        {app.orgInitials}
-                      </span>
+                      <OrgAvatar name={app.orgName} logoUrl={app.orgLogoUrl} color={app.orgColor} size="md" />
                       <div>
                         <div className="pcard__name">{app.opportunityName}</div>
                         <div className="pcard__org">

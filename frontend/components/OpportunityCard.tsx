@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
 import { LiveIndicator } from "./LiveIndicator";
+import { OrgAvatar } from "./OrgAvatar";
 
 export interface OpportunitySummary {
   id: string;
@@ -8,6 +9,8 @@ export interface OpportunitySummary {
   type: string;
   location: string | null;
   organizationName: string;
+  organizationLogoUrl?: string | null;
+  organizationBrandColor?: string | null;
   description?: string | null;
   computedStatus?: string;
   isOnline?: boolean;
@@ -51,9 +54,12 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
   return (
     <Link href={`/opportunities/${opportunity.id}`} className="oc">
       <div className="oc__org">
-        <span className="orglogo" style={{ background: orgConf.color }}>
-          {orgConf.monogram}
-        </span>
+        <OrgAvatar
+          name={opportunity.organizationName}
+          logoUrl={opportunity.organizationLogoUrl}
+          color={opportunity.organizationBrandColor ?? orgConf.color}
+          size="sm"
+        />
         <span className="org">{opportunity.organizationName}</span>
       </div>
       <div className="oc__title-row">

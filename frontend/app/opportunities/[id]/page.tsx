@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getServerSupabaseClient } from "@/lib/supabase/serverClient";
 import { computeOpportunityStatus, getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
 import { LiveIndicator } from "@/components/LiveIndicator";
+import { OrgAvatar } from "@/components/OrgAvatar";
 import {
   type OpportunityDetailRow,
   TYPE_CONFIG,
@@ -48,14 +49,8 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const isAcceptingApplications =
     status === "open" || (status === "in_progress" && !isDeadlinePassed);
 
-  const org = opp.organizations ?? { name: "Youth Republic Partner", brand_color: "#8A7A10", about: null };
+  const org = opp.organizations ?? { name: "Youth Republic Partner", brand_color: "#8A7A10", about: null, logo_url: null };
   const orgColor = org.brand_color ?? "#8A7A10";
-  const orgInitials = (org.name ?? "YR")
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 
   const typeConf = TYPE_CONFIG[opp.type.toLowerCase()] ?? {
     label: opp.type ? opp.type.charAt(0).toUpperCase() + opp.type.slice(1) : "Opportunity",
@@ -91,9 +86,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
         {/* Left Column: Detail */}
         <div className="detail">
           <p className="detail__org">
-            <span className="orglogo" style={{ background: orgColor }}>
-              {orgInitials}
-            </span>
+            <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="md" />
             <span>{org.name}</span>
           </p>
 
@@ -174,12 +167,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
         <aside className="pane__aside aside-cta">
           {/* Organization Header Badge with Purple Verified Tick */}
           <div className="flex items-center gap-2.5 pb-3 mb-3 border-b border-[#E7E4DC]">
-            <span
-              className="w-7 h-7 rounded-md flex items-center justify-center font-['Oswald'] font-bold text-xs text-white shrink-0 shadow-xs"
-              style={{ backgroundColor: orgColor }}
-            >
-              {orgInitials}
-            </span>
+            <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="sm" className="shadow-xs" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="font-['Oswald'] font-bold text-[15px] leading-tight text-[#24262D] truncate">
