@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { getServerSupabaseClient } from "@/lib/supabase/serverClient";
+import { getPublicSupabaseClient } from "@/lib/supabase/publicClient";
 import { PROTOTYPE_SEED_OPPORTUNITIES, type OpportunityDetailRow } from "./opportunityData";
 
 /**
@@ -13,7 +13,8 @@ export const fetchOpportunityServer = cache(async (id: string): Promise<Opportun
   }
 
   try {
-    const supabase = await getServerSupabaseClient();
+    // Anon, cookieless — keeps callers statically renderable.
+    const supabase = getPublicSupabaseClient();
     const { data, error } = await supabase
       .from("opportunities")
       .select(

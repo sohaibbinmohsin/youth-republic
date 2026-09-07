@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getServerSupabaseClient } from "@/lib/supabase/serverClient";
 import { computeOpportunityStatus, getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { OrgAvatar } from "@/components/OrgAvatar";
@@ -11,6 +10,7 @@ import {
   formatOrgInitials,
 } from "@/lib/opportunityData";
 import { fetchOpportunityServer as fetchOpportunity } from "@/lib/opportunityDataServer";
+import { ApplyHint } from "@/components/ApplyHint";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -23,16 +23,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
+// No cookies / no auth read here, so the route is static and served from
+// Next's Full Route Cache — repeat visits render with no loader, for every
+// visitor, in dev and prod. It re-renders in the background at most this
+// often, so an edited drive still shows through within ~2 minutes. The one
+// auth-dependent bit (the Apply hint) lives in a client island, <ApplyHint>.
+// Cache the rendered page. `force-static` + revalidate turns this into ISR
+// for arbitrary [id]s: each opportunity is rendered on first request, served
+// from cache (no loader, any visitor, dev and prod) on every request after,
+// and re-rendered in the background at most every 120s so an edited drive
+// still shows through. The one auth-dependent bit is the <ApplyHint> island.
+export const dynamic = "force-static";
+export const revalidate = 120;
+
 export default async function OpportunityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const opp = await fetchOpportunity(id);
   if (!opp) notFound();
-
-  const supabase = await getServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const isSignedIn = Boolean(user);
 
   const status = computeOpportunityStatus({
     statusOverride: opp.status_override,
@@ -265,13 +272,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                 <Link className="btn btn--primary btn--block text-center" href={`/apply/${opp.id}`}>
                   Apply
                 </Link>
-                {(!isSignedIn || status === "in_progress") && (
-                  <p className="hint text-center">
-                    {status === "in_progress"
-                      ? "This drive is underway and accepting applications."
-                      : "You’ll be asked to sign in to apply."}
-                  </p>
-                )}
+                <ApplyHint status={status} />
               </>
             )}
 
