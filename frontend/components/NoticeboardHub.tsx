@@ -30,13 +30,6 @@ interface NoticeboardHubProps {
   } | null;
 }
 
-const ORG_CONFIG: Record<string, { monogram: string; color: string }> = {
-  rizq: { monogram: "RZ", color: "#8A7A10" },
-  "green crescent": { monogram: "GC", color: "#0B7A3B" },
-  "sehat first": { monogram: "SF", color: "#B02A2A" },
-  "read foundation": { monogram: "RF", color: "#6E1560" },
-};
-
 export function NoticeboardHub({ initialOpportunities, isLoading = false }: NoticeboardHubProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -48,9 +41,13 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const availableOrgs = useMemo(() => {
-    const defaults = ["Rizq", "Green Crescent", "Sehat First", "Read Foundation"];
-    const fromOpps = Array.from(new Set((initialOpportunities ?? []).map((o) => o.organizationName).filter(Boolean)));
-    return Array.from(new Set([...defaults, ...fromOpps]));
+    return Array.from(
+      new Set(
+        (initialOpportunities ?? [])
+          .map((o) => o.organizationName?.trim())
+          .filter((name): name is string => Boolean(name))
+      )
+    ).sort((a, b) => a.localeCompare(b));
   }, [initialOpportunities]);
 
   const availableCities = useMemo(() => {
