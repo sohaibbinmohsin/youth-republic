@@ -42,14 +42,13 @@ select is(staff_has_permission('11111111-1111-1111-1111-111111111111'::uuid, 'yo
   false, 'key not granted at all: false');
 
 
--- --- RLS backstop (needs 0027 applied): chapter-scoped read visibility -------
+-- --- RLS backstop (needs 0027 applied): opportunities_staff_insert WITH CHECK -
+-- A read-visibility test is defeated by opportunities_public_select
+-- (deactivated_at is null) which permissively OR-s in for everyone, so instead
+-- prove the chapter-scoped INSERT policy (no competing permissive policy).
 reset role;
 insert into organizations (id, name, slug)
   values ('44444444-4444-4444-4444-444444444444', 'RLS 0027 Org', 'rls-0027-org')
-  on conflict (id) do nothing;
-insert into opportunities (id, organization_id, name, type, chapter_id)
-  values ('55555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444',
-          'RLS 0027 Opp', 'community', '66666666-6666-6666-6666-666666666666')
   on conflict (id) do nothing;
 set role authenticated;
 
@@ -57,23 +56,24 @@ select set_config('request.jwt.claims', json_build_object(
   'module_access', json_build_array(json_build_object(
     'organization_id', '44444444-4444-4444-4444-444444444444',
     'module', 'youth-republic',
-    'permissions', json_build_array('opportunities:read'),
-    'chapter_scopes', json_build_object('opportunities:read', json_build_array('66666666-6666-6666-6666-666666666666'))
+    'permissions', json_build_array('opportunities:write'),
+    'chapter_scopes', json_build_object('opportunities:write', json_build_array('66666666-6666-6666-6666-666666666666'))
   ))
 )::text, true);
-select is((select count(*) from opportunities where id = '55555555-5555-5555-5555-555555555555'),
-  1::bigint, 'RLS: in-scope opportunity is visible to a chapter-scoped reader');
 
-select set_config('request.jwt.claims', json_build_object(
-  'module_access', json_build_array(json_build_object(
-    'organization_id', '44444444-4444-4444-4444-444444444444',
-    'module', 'youth-republic',
-    'permissions', json_build_array('opportunities:read'),
-    'chapter_scopes', json_build_object('opportunities:read', json_build_array('77777777-7777-7777-7777-777777777777'))
-  ))
-)::text, true);
-select is((select count(*) from opportunities where id = '55555555-5555-5555-5555-555555555555'),
-  0::bigint, 'RLS: out-of-scope opportunity is hidden from a chapter-scoped reader');
+select lives_ok(
+  $$ insert into opportunities (organization_id, name, type, chapter_id)
+     values ('44444444-4444-4444-4444-444444444444', 'RLS in-scope', 'environment',
+             '66666666-6666-6666-6666-666666666666') $$,
+  'RLS: a chapter-scoped writer can insert under an in-scope chapter');
+
+select throws_ok(
+  $$ insert into opportunities (organization_id, name, type, chapter_id)
+     values ('44444444-4444-4444-4444-444444444444', 'RLS out-of-scope', 'environment',
+             '77777777-7777-7777-7777-777777777777') $$,
+  '42501',
+  'new row violates row-level security policy for table "opportunities"',
+  'RLS: a chapter-scoped writer cannot insert under an out-of-scope chapter');
 
 reset role;
 
