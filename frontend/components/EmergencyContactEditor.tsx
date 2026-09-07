@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateSensitiveField } from "@/lib/edgeFunctions";
+import { FieldSaveButton } from "@/components/FieldSaveButton";
 
 export function EmergencyContactEditor({
   currentValue,
@@ -51,14 +52,7 @@ export function EmergencyContactEditor({
             onChange={(e) => setPhone(e.target.value)}
           />
         </div>
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+        <FieldSaveButton saving={saving} onClick={handleSave} />
       </div>
       {error && <p className="field-error-text">{error}</p>}
     </div>

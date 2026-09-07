@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateProfileField, type UpdateProfileFieldPayload } from "@/lib/edgeFunctions";
+import { FieldSaveButton } from "@/components/FieldSaveButton";
 
 export function ProfileFieldEditor({
   fieldName,
@@ -39,14 +40,7 @@ export function ProfileFieldEditor({
       <label htmlFor={fieldName}>{fieldLabel}</label>
       <div className="field-row">
         <input id={fieldName} value={value} onChange={(e) => setValue(e.target.value)} />
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+        <FieldSaveButton saving={saving} onClick={handleSave} />
       </div>
       {error && <p className="field-error-text">{error}</p>}
     </div>

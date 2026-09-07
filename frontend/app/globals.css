@@ -1236,6 +1236,24 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
 }
 .field-error-text { color: var(--st-neg-fg); font-size: .8rem; margin-top: .35rem; }
 
+/* Inline save control: text button on mobile, circular check on desktop. */
+.field-save__check { display: none; }
+@media (min-width: 561px) {
+  .field-save.btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 999px;
+    align-self: center;
+  }
+  .field-save__label { display: none; }
+  .field-save__check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 .pcards { display: flex; flex-direction: column; gap: .85rem; }
 .pcard {
   border: 1px solid var(--line);

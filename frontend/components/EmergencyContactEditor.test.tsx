@@ -20,7 +20,7 @@ describe("EmergencyContactEditor", () => {
 
     await user.type(screen.getByLabelText("Emergency contact name"), "Fatima Khan");
     await user.type(screen.getByLabelText("Emergency contact phone"), "0300-9999999");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
       expect(edgeFunctions.updateSensitiveField).toHaveBeenCalledWith(
