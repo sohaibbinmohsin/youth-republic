@@ -70,6 +70,7 @@ interface ProgrammeItem {
   orgLogoUrl: string | null;
   type: string;
   status: string;
+  phase: ProgrammePhase;
   role: string;
   dates: string;
   hoursTotal: number;
@@ -111,6 +112,44 @@ function formatDateDisplay(isoString?: string | null): string {
   } catch {
     return isoString;
   }
+}
+
+type ProgrammePhase = "starting_soon" | "in_progress" | "completed";
+
+const PHASE_META: Record<ProgrammePhase, { label: string; cls: string }> = {
+  starting_soon: { label: "Starting soon", cls: "pill--pend" },
+  in_progress: { label: "In progress", cls: "pill--prog" },
+  completed: { label: "Completed", cls: "pill--done" },
+};
+
+/** Where the volunteer's drive sits: hasn't started / running / finished. */
+function programmePhase(
+  startAt: string | null | undefined,
+  endAt: string | null | undefined,
+  participationStatus: string,
+): ProgrammePhase {
+  if (participationStatus === "completed") return "completed";
+  const now = Date.now();
+  if (endAt && new Date(endAt).getTime() < now) return "completed";
+  if (startAt && new Date(startAt).getTime() > now) return "starting_soon";
+  return "in_progress";
+}
+
+/**
+ * Date range for a programme card. A drive with an end date shows
+ * "{start} – {end}"; an open-ended drive shows "{start} – ongoing", and for
+ * an ongoing drive the start is the day the volunteer was selected (there is
+ * no fixed drive window), not the opportunity's nominal start.
+ */
+function programmeDates(
+  startAt: string | null | undefined,
+  endAt: string | null | undefined,
+  selectedAt: string | null | undefined,
+): string {
+  const start = endAt ? startAt : selectedAt ?? startAt;
+  if (!start) return "Ongoing";
+  const s = formatDateDisplay(start);
+  return endAt ? `${s} – ${formatDateDisplay(endAt)}` : `${s} – ongoing`;
 }
 
 function formatYrCode(rawCode?: string | null, userId?: string | null): string {
@@ -311,7 +350,7 @@ export default function PortfolioPage() {
       try {
         const { data } = await supabase
           .from("participation")
-          .select("id, status, organization_id, opportunities(id, name, type, activity_start_at, activity_end_at), organizations(name, brand_color, logo_url)")
+          .select("id, status, created_at, organization_id, opportunities(id, name, type, activity_start_at, activity_end_at), organizations(name, brand_color, logo_url)")
           .eq("volunteer_id", volunteerRow.id);
         partRows = data ?? [];
       } catch {
@@ -346,8 +385,9 @@ export default function PortfolioPage() {
           orgLogoUrl: org.logo_url ?? null,
           type: opp.type ?? "community",
           status: p.status ?? "in_progress",
+          phase: programmePhase(opp.activity_start_at, opp.activity_end_at, p.status ?? ""),
           role: "Volunteer",
-          dates: opp.activity_start_at ? `${formatDateDisplay(opp.activity_start_at)} - ongoing` : "Ongoing",
+          dates: programmeDates(opp.activity_start_at, opp.activity_end_at, p.created_at),
           hoursTotal: 0,
           hoursVerified: 0,
           allVerified: false,
@@ -372,8 +412,9 @@ export default function PortfolioPage() {
             orgLogoUrl: org.logo_url ?? null,
             type: opp.type ?? "community",
             status: "in_progress",
+            phase: programmePhase(opp.activity_start_at, opp.activity_end_at, ""),
             role: h.role ?? "Volunteer",
-            dates: h.activity_date ? formatDateDisplay(h.activity_date) : "Recent",
+            dates: programmeDates(opp.activity_start_at, opp.activity_end_at, h.activity_date),
             hoursTotal: 0,
             hoursVerified: 0,
             allVerified: false,
@@ -615,8 +656,8 @@ export default function PortfolioPage() {
                           </div>
                         </div>
                       </div>
-                      <span className={`pill ${p.status === "completed" ? "pill--done" : "pill--prog"}`}>
-                        {p.status === "completed" ? "Completed" : "In progress"}
+                      <span className={`pill ${PHASE_META[p.phase].cls}`}>
+                        {PHASE_META[p.phase].label}
                       </span>
                     </div>
 

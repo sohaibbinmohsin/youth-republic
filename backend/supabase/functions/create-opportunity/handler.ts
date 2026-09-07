@@ -12,7 +12,7 @@ export interface CreateOpportunityInput {
   applicationOpenAt?: string;
   applicationDeadline?: string;
   activityStartAt?: string;
-  activityEndAt?: string;
+  activityEndAt?: string | null;
   about?: string;
   duties?: string[];
   eligibility?: string[];
