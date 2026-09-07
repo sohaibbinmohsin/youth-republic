@@ -2,6 +2,12 @@ begin;
 set constraints all deferred;
 select plan(10);
 
+-- fixture orgs (opportunities.organization_id -> organizations FK, migration 0022)
+insert into organizations (id, name, slug) values
+  ('11111111-1111-1111-1111-111111111111', 'pgTAP Org 1', 'pgtap-org-1'),
+  ('22222222-2222-2222-2222-222222222222', 'pgTAP Org 2', 'pgtap-org-2')
+on conflict (id) do nothing;
+
 insert into opportunities (organization_id, name, type)
 values ('22222222-2222-2222-2222-222222222222', 'Public Op', 'event')
 returning id as opp_id \gset
@@ -20,7 +26,7 @@ select is(
 
 select set_config(
   'request.jwt.claims',
-  '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}], "module_access": [{"organization_id": "22222222-2222-2222-2222-222222222222", "module": "vms", "permissions": ["opportunities:read"]}]}',
+  '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}], "module_access": [{"organization_id": "22222222-2222-2222-2222-222222222222", "module": "youth-republic", "permissions": ["opportunities:read"]}]}',
   true
 );
 update opportunities set name = 'read-only hijack' where id = :'opp_id';
@@ -32,7 +38,7 @@ select is(
 
 select set_config(
   'request.jwt.claims',
-  '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}], "module_access": [{"organization_id": "22222222-2222-2222-2222-222222222222", "module": "vms", "permissions": ["opportunities:update"]}]}',
+  '{"org_roles": [{"organization_id": "22222222-2222-2222-2222-222222222222"}], "module_access": [{"organization_id": "22222222-2222-2222-2222-222222222222", "module": "youth-republic", "permissions": ["opportunities:update"]}]}',
   true
 );
 update opportunities set name = 'updated by owning org staff' where id = :'opp_id';

@@ -16,9 +16,18 @@ const staffClaims = (orgId: string, permission: string, staffId = crypto.randomU
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
 });
 
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
+
 Deno.test("updateOpportunity publishes by setting status_override and logs the action", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Draft Opp", type: "event",
   }).select("id").single();
@@ -40,8 +49,8 @@ Deno.test("updateOpportunity publishes by setting status_override and logs the a
 
 Deno.test("updateOpportunity rejects a cross-tenant write even when the caller holds opportunities:update in the org they claim", async () => {
   const supabase = testClient();
-  const orgA = crypto.randomUUID();
-  const orgB = crypto.randomUUID();
+  const orgA = await seedOrg(supabase);
+  const orgB = await seedOrg(supabase);
   const originalName = `Org B Opp ${crypto.randomUUID()}`;
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgB, name: originalName, type: "event",
@@ -69,7 +78,7 @@ Deno.test("updateOpportunity rejects a cross-tenant write even when the caller h
 
 Deno.test("updateOpportunity rejects staff without opportunities:update for the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Draft Opp", type: "event",
   }).select("id").single();
@@ -85,7 +94,7 @@ Deno.test("updateOpportunity rejects staff without opportunities:update for the 
 
 Deno.test("updateOpportunity lets staff with opportunities:delete deactivate an opportunity, and its computed status becomes closed", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Deactivate Target", type: "event",
   }).select("id").single();
@@ -106,7 +115,7 @@ Deno.test("updateOpportunity lets staff with opportunities:delete deactivate an 
 
 Deno.test("updateOpportunity permanently deletes opportunity and logs when hardDelete is true", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Delete Target", type: "event",
   }).select("id").single();
@@ -128,7 +137,7 @@ Deno.test("updateOpportunity permanently deletes opportunity and logs when hardD
 
 Deno.test("updateOpportunity rejects staff without opportunities:delete trying hardDelete", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Delete Target", type: "event",
   }).select("id").single();
@@ -144,7 +153,7 @@ Deno.test("updateOpportunity rejects staff without opportunities:delete trying h
 
 Deno.test("updateOpportunity rejects staff with only opportunities:update trying to set deactivatedAt", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Deactivate Target", type: "event",
   }).select("id").single();
@@ -167,7 +176,7 @@ Deno.test("updateOpportunity rejects staff with only opportunities:update trying
 
 Deno.test("updateOpportunity persists about, duties, eligibility and whatToBring", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Content Target", type: "event",
   }).select("id").single();
@@ -194,7 +203,7 @@ Deno.test("updateOpportunity persists about, duties, eligibility and whatToBring
 
 Deno.test("updateOpportunity validates applicationForm and rejects an invalid one with invalid_form", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Form Target", type: "event",
   }).select("id").single();
@@ -212,7 +221,7 @@ Deno.test("updateOpportunity validates applicationForm and rejects an invalid on
 
 Deno.test("updateOpportunity writes a valid applicationForm definition", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Form Target", type: "event",
   }).select("id").single();
@@ -237,7 +246,7 @@ Deno.test("updateOpportunity writes a valid applicationForm definition", async (
 
 Deno.test("updateOpportunity gates the new content fields on opportunities:update", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Guard Target", type: "event",
   }).select("id").single();
@@ -253,7 +262,7 @@ Deno.test("updateOpportunity gates the new content fields on opportunities:updat
 
 Deno.test("updateOpportunity lets staff with opportunities:delete reactivate an opportunity by setting deactivatedAt to null", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Reactivate Target", type: "event", deactivated_at: new Date().toISOString(),
   }).select("id").single();
@@ -287,7 +296,7 @@ const scopedClaims = (orgId: string, permission: string, scopes?: Record<string,
 
 Deno.test("updateOpportunity: a chapter-scoped updater can only touch its own chapter's opportunity", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const lums = crypto.randomUUID();
   const nust = crypto.randomUUID();
 

@@ -16,9 +16,18 @@ const staffClaims = (orgId: string): StaffClaims => ({
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["applications:read"] }],
 });
 
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
+
 Deno.test("exportApplicationsCsv includes a header row and one row per application", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,
@@ -46,7 +55,7 @@ Deno.test("exportApplicationsCsv includes a header row and one row per applicati
 
 Deno.test("exportApplicationsCsv neutralizes a leading formula character in an exported field", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,
@@ -79,8 +88,8 @@ Deno.test("exportApplicationsCsv neutralizes a leading formula character in an e
 
 Deno.test("exportApplicationsCsv rejects staff without applications:read for the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
 
   await assertRejects(() => exportApplicationsCsv(supabase, staffClaims(otherOrgId), orgId), Error, "forbidden");
 });
@@ -96,7 +105,7 @@ const volunteersReadClaims = (orgId: string): StaffClaims => ({
 
 Deno.test("exportVolunteersCsv includes a header row and one row per volunteer linked to the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,
@@ -119,7 +128,7 @@ Deno.test("exportVolunteersCsv includes a header row and one row per volunteer l
 
 Deno.test("exportVolunteersCsv neutralizes a leading formula character in an exported field", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,
@@ -143,8 +152,8 @@ Deno.test("exportVolunteersCsv neutralizes a leading formula character in an exp
 
 Deno.test("exportVolunteersCsv rejects staff without volunteers:read for the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
 
   await assertRejects(() => exportVolunteersCsv(supabase, volunteersReadClaims(otherOrgId), orgId), Error, "forbidden");
 });
@@ -172,7 +181,7 @@ Deno.test("exportOpportunitiesCsv includes name, type, and computed capacity for
 
 Deno.test("exportOpportunitiesCsv rejects a caller without opportunities:read", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const claims: StaffClaims = { actorType: "staff", staffId: "staff-1", platformOwner: false, canVerifyIdentity: false, orgRoles: [], moduleAccess: [] };
 
   await assertRejects(() => exportOpportunitiesCsv(supabase, claims, orgId), Error, "forbidden");

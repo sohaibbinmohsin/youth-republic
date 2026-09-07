@@ -54,9 +54,18 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["participation:update"] }],
 });
 
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
+
 Deno.test("updateParticipationStatus moves selected to participating", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const participationId = await makeParticipation(supabase, orgId);
 
   await updateParticipationStatus(supabase, staffClaims(orgId), {
@@ -70,7 +79,7 @@ Deno.test("updateParticipationStatus moves selected to participating", async () 
 
 Deno.test("updateParticipationStatus writes an admin_action_log entry attributed to the caller's own staffId", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const participationId = await makeParticipation(supabase, orgId);
   const realStaffId = crypto.randomUUID();
 
@@ -91,8 +100,8 @@ Deno.test("updateParticipationStatus writes an admin_action_log entry attributed
 
 Deno.test("updateParticipationStatus rejects when staff lacks participation:update for the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
   const participationId = await makeParticipation(supabase, orgId);
 
   await assertRejects(
@@ -120,7 +129,7 @@ const scopedClaims = (orgId: string, permission: string, scopes?: Record<string,
 
 Deno.test("updateParticipationStatus: a chapter-scoped participation:update only touches its own chapter", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const lums = crypto.randomUUID();
   const nust = crypto.randomUUID();
   const claims = scopedClaims(orgId, "participation:update", { "participation:update": [lums] });

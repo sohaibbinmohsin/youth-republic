@@ -7,7 +7,7 @@ function testClient() {
 }
 
 async function makeParticipation(supabase: ReturnType<typeof testClient>) {
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,
@@ -62,6 +62,15 @@ async function makeSessionPhoto(
   }).select("id").single();
   if (error) throw error;
   return data!.id as string;
+}
+
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
 }
 
 Deno.test("submitHours creates a pending activity_hours row", async () => {
@@ -188,7 +197,7 @@ Deno.test("submitHours rejects a participationId that belongs to a different vol
 Deno.test("submitHours derives opportunity_id and organization_id from the participation row, not from the input", async () => {
   const supabase = testClient();
   const { participationId, volunteerId, opportunityId, orgId, authUserId } = await makeParticipation(supabase);
-  const bogusOrgId = crypto.randomUUID();
+  const bogusOrgId = await seedOrg(supabase);
   const { data: bogusOpportunity } = await supabase.from("opportunities").insert({
     organization_id: bogusOrgId, name: "Unrelated Opp", type: "event",
   }).select("id").single();

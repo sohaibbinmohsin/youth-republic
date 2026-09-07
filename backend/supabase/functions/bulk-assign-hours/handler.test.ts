@@ -40,9 +40,18 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["hours:write"] }],
 });
 
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
+
 Deno.test("bulkAssignHours creates one activity_hours row per participant", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Bulk Opp", type: "event",
   }).select("id").single();
@@ -58,8 +67,8 @@ Deno.test("bulkAssignHours creates one activity_hours row per participant", asyn
 
 Deno.test("bulkAssignHours silently excludes participation ids belonging to a different org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Bulk Opp Cross-Tenant", type: "event",
   }).select("id").single();
@@ -86,8 +95,8 @@ Deno.test("bulkAssignHours silently excludes participation ids belonging to a di
 
 Deno.test("bulkAssignHours rejects an opportunityId that belongs to a different org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
   const { data: ownOpportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Bulk Opp Own", type: "event",
   }).select("id").single();
@@ -109,8 +118,8 @@ Deno.test("bulkAssignHours rejects an opportunityId that belongs to a different 
 
 Deno.test("bulkAssignHours rejects staff without hours:write in the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Bulk Opp 2", type: "event",
   }).select("id").single();
@@ -129,7 +138,7 @@ Deno.test("bulkAssignHours rejects staff without hours:write in the org", async 
 
 Deno.test("bulkAssignHours attributes admin_action_log to the caller's own staffId, never a client-supplied value", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const realStaffId = crypto.randomUUID();
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Bulk Opp 3", type: "event",
@@ -158,7 +167,7 @@ Deno.test("bulkAssignHours attributes admin_action_log to the caller's own staff
 
 Deno.test("bulkAssignHours logs one bulk_hours_assigned row per created activity_hours row", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: opportunity } = await supabase.from("opportunities").insert({
     organization_id: orgId, name: "Bulk Opp 4", type: "event",
   }).select("id").single();

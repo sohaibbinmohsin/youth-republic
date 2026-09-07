@@ -16,9 +16,18 @@ const staffClaims = (orgId: string, permission: string, staffId = crypto.randomU
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
 });
 
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
+
 Deno.test("createOpportunity creates a row and logs the action under the caller's own staffId", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const realStaffId = crypto.randomUUID();
 
   const result = await createOpportunity(supabase, staffClaims(orgId, "opportunities:write", realStaffId), {
@@ -38,7 +47,7 @@ Deno.test("createOpportunity creates a row and logs the action under the caller'
 
 Deno.test("createOpportunity rejects staff without opportunities:write for the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
 
   await assertRejects(
     () => createOpportunity(supabase, staffClaims(orgId, "opportunities:read"), {
@@ -51,7 +60,7 @@ Deno.test("createOpportunity rejects staff without opportunities:write for the o
 
 Deno.test("createOpportunity persists about, duties, eligibility and whatToBring, and applies the application_form default when omitted", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
 
   const { opportunityId } = await createOpportunity(supabase, staffClaims(orgId, "opportunities:write"), {
     organizationId: orgId,
@@ -78,7 +87,7 @@ Deno.test("createOpportunity persists about, duties, eligibility and whatToBring
 
 Deno.test("createOpportunity rejects an invalid applicationForm with invalid_form", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
 
   await assertRejects(
     () => createOpportunity(supabase, staffClaims(orgId, "opportunities:write"), {
@@ -94,7 +103,7 @@ Deno.test("createOpportunity rejects an invalid applicationForm with invalid_for
 
 Deno.test("createOpportunity stores a valid applicationForm definition", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const form = {
     version: 1,
     fields: [{ id: "why", type: "long_text", label: "Why do you want to join?" }],
@@ -117,7 +126,7 @@ Deno.test("createOpportunity stores a valid applicationForm definition", async (
 
 Deno.test("createOpportunity silently ignores a legacy eligibilityCriteria field in the body", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
 
   const { opportunityId } = await createOpportunity(supabase, staffClaims(orgId, "opportunities:write"), {
     organizationId: orgId,
@@ -146,7 +155,7 @@ const scopedClaims = (orgId: string, permission: string, scopes?: Record<string,
 
 Deno.test("createOpportunity: a chapter-scoped writer can only file under a scoped chapter", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const lums = crypto.randomUUID();
   const nust = crypto.randomUUID();
   const claims = scopedClaims(orgId, "opportunities:write", { "opportunities:write": [lums] });
@@ -169,7 +178,7 @@ Deno.test("createOpportunity: a chapter-scoped writer can only file under a scop
 
 Deno.test("createOpportunity: an unrestricted writer can file org-wide or under any chapter", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const anyChapter = crypto.randomUUID();
   const claims = scopedClaims(orgId, "opportunities:write");
 

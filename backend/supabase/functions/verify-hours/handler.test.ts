@@ -25,7 +25,7 @@ function testClient() {
 }
 
 async function makeActivityHours(supabase: ReturnType<typeof testClient>, volunteerOverrides: Record<string, unknown> = {}) {
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,
@@ -67,6 +67,15 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   orgRoles: [{ organizationId: orgId }],
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["hours:update"] }],
 });
+
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
 
 Deno.test("verifyHours verifying sets hours_verified and status", async () => {
   const supabase = testClient();
