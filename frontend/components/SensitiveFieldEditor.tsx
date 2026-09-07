@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateSensitiveField, type SensitiveFieldName } from "@/lib/edgeFunctions";
+import { FieldSaveButton } from "@/components/FieldSaveButton";
 
 function formatErrorMessage(err: string): string {
   if (err === "id_doc_already_registered") {
@@ -51,14 +52,7 @@ export function SensitiveFieldEditor({
       <label htmlFor={fieldName}>{fieldLabel}</label>
       <div className="field-row">
         <input id={fieldName} value={value} onChange={(e) => setValue(e.target.value)} />
-        <button
-          type="button"
-          className="btn btn--primary btn--sm"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+        <FieldSaveButton saving={saving} onClick={handleSave} />
       </div>
       {error && <p className="field-error-text">{formatErrorMessage(error)}</p>}
     </div>

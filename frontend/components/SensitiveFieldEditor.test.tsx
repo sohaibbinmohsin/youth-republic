@@ -29,7 +29,7 @@ describe("SensitiveFieldEditor", () => {
     const input = screen.getByLabelText("Phone");
     await user.clear(input);
     await user.type(input, "0300-9998888");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
       expect(edgeFunctions.updateSensitiveField).toHaveBeenCalledWith(
@@ -55,7 +55,7 @@ describe("SensitiveFieldEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
       expect(screen.getByText("This identification number is already registered with another account.")).toBeInTheDocument();

@@ -512,7 +512,7 @@ export default function PortfolioPage() {
 
       {/* TAB 1: IMPACT */}
       {activeTab === "impact" && (
-        <div className="pf-panel">
+        <div className="pf-tabpanel">
           {programmes.length > 0 && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
               <button
@@ -708,7 +708,7 @@ export default function PortfolioPage() {
 
       {/* TAB 2: APPLICATIONS */}
       {activeTab === "apps" && (
-        <div className="pf-panel">
+        <div className="pf-tabpanel">
           {applications.length === 0 ? (
             /* Plain screen unboxed empty state matching opportunities style */
             <div
@@ -871,16 +871,7 @@ export default function PortfolioPage() {
               />
 
               <div className="field">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="mb-0">Identification type</label>
-                  <span className="pill pill--pos text-[0.7rem] py-0.5 px-2">
-                    {volunteer.id_doc_type === "passport"
-                      ? "Passport"
-                      : volunteer.id_doc_type === "b_form"
-                      ? "B-Form"
-                      : "CNIC"}
-                  </span>
-                </div>
+                <label>Identification type</label>
                 <input
                   type="text"
                   readOnly
@@ -911,6 +902,9 @@ export default function PortfolioPage() {
                 }
               />
 
+              {/* Identity document upload sits with the ID number it verifies. */}
+              <CnicUploadField accessToken={accessToken} ownerId={volunteer.id} onUploaded={() => loadAll()} />
+
               <ProfileFieldEditor
                 fieldName="city"
                 fieldLabel="City"
@@ -937,10 +931,6 @@ export default function PortfolioPage() {
                 accessToken={accessToken}
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, emergency_contact: newValue } : v))}
               />
-
-              <div style={{ marginTop: "1.25rem" }}>
-                <CnicUploadField accessToken={accessToken} ownerId={volunteer.id} onUploaded={() => loadAll()} />
-              </div>
             </div>
           )}
         </div>

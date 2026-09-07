@@ -20,7 +20,7 @@ describe("ProfileFieldEditor", () => {
 
     await user.clear(screen.getByLabelText("Institution"));
     await user.type(screen.getByLabelText("Institution"), "IBA");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() => {
       expect(edgeFunctions.updateProfileField).toHaveBeenCalledWith({ fieldName: "institution", newValue: "IBA" }, "t");
