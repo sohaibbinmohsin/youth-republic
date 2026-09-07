@@ -223,7 +223,7 @@ describe("PortfolioPage", () => {
 
     expect(await screen.findByText("Beach Cleanup")).toBeInTheDocument();
     expect(screen.getByText("Tree Plantation")).toBeInTheDocument();
-    expect(screen.getAllByText("environment")).toHaveLength(2);
+    expect(screen.getAllByText("Environment")).toHaveLength(2);
     expect(screen.getByText("Volunteer Lead")).toBeInTheDocument();
   });
 

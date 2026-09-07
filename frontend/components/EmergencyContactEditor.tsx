@@ -32,22 +32,35 @@ export function EmergencyContactEditor({
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">Emergency contact</p>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <div>
-          <label htmlFor="emergencyContactName" className="block text-sm">Emergency contact name</label>
-          <input id="emergencyContactName" className="mt-1 rounded border px-3 py-2" value={name} onChange={(e) => setName(e.target.value)} />
+    <div className="field">
+      <label>Emergency contact</label>
+      <div className="field-row">
+        <div className="field-inputs">
+          <input
+            id="emergencyContactName"
+            aria-label="Emergency contact name"
+            placeholder="Contact name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            id="emergencyContactPhone"
+            aria-label="Emergency contact phone"
+            placeholder="Contact phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
         </div>
-        <div>
-          <label htmlFor="emergencyContactPhone" className="block text-sm">Emergency contact phone</label>
-          <input id="emergencyContactPhone" className="mt-1 rounded border px-3 py-2" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </div>
-        <button type="button" onClick={handleSave} disabled={saving} className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50">
-          Save
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save"}
         </button>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="field-error-text">{error}</p>}
     </div>
   );
 }

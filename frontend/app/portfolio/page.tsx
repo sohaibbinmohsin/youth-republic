@@ -77,6 +77,12 @@ interface ProgrammeItem {
   sessions: ActivitySession[];
 }
 
+/** "community" -> "Community" for the category tag. */
+function categoryLabel(type?: string | null): string {
+  if (!type) return "";
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 function getOrgInitials(name?: string | null): string {
   if (!name) return "YR";
   const parts = name.trim().split(/\s+/);
@@ -156,65 +162,90 @@ export default function PortfolioPage() {
           .select("id, status, opportunity_id, applied_at, opportunities(id, name, type, location, is_online), organizations(name, brand_color, logo_url)")
           .order("applied_at", { ascending: false });
 
-        const dbApps: ApplicationItem[] = (appRows ?? []).map((r: any) => {
-          let opp = r.opportunities ?? {};
-          let org = r.organizations ?? {};
-          if (!opp.name && r.opportunity_id) {
-            const seedOpp =
-              PROTOTYPE_SEED_OPPORTUNITIES[r.opportunity_id] ||
-              Object.values(PROTOTYPE_SEED_OPPORTUNITIES).find((o) => o.id === r.opportunity_id);
-            if (seedOpp) {
-              opp = seedOpp;
-              org = seedOpp.organizations ?? org;
+        const dbApps: ApplicationItem[] = (appRows ?? [])
+          .map((r: any): ApplicationItem | null => {
+            let opp = r.opportunities ?? {};
+            let org = r.organizations ?? {};
+            if (!opp.name && r.opportunity_id) {
+              const seedOpp =
+                PROTOTYPE_SEED_OPPORTUNITIES[r.opportunity_id] ||
+                Object.values(PROTOTYPE_SEED_OPPORTUNITIES).find((o) => o.id === r.opportunity_id);
+              if (seedOpp) {
+                opp = seedOpp;
+                org = seedOpp.organizations ?? org;
+              }
             }
-          }
-          return {
-            id: r.id,
-            opportunityId: r.opportunity_id || opp.id,
-            status: r.status ?? "pending_review",
-            opportunityName: opp.name ?? "Volunteer Drive",
-            orgName: org.name ?? "Youth Republic Partner",
-            orgInitials: getOrgInitials(org.name),
-            orgColor: org.brand_color ?? getOrgColor(org.name),
-            orgLogoUrl: org.logo_url ?? null,
-            type: opp.type ?? "community",
-            location: opp.location ?? "Pakistan",
-            isOnline: Boolean(opp.is_online),
-          };
-        });
+            // Drop rows whose opportunity can't be resolved (deleted / stale
+            // prototype data) — they'd otherwise render as a placeholder
+            // "Volunteer Drive" card.
+            if (!opp.name) return null;
+            return {
+              id: r.id,
+              opportunityId: r.opportunity_id || opp.id,
+              status: r.status ?? "pending_review",
+              opportunityName: opp.name,
+              orgName: org.name ?? "Youth Republic Partner",
+              orgInitials: getOrgInitials(org.name),
+              orgColor: org.brand_color ?? getOrgColor(org.name),
+              orgLogoUrl: org.logo_url ?? null,
+              type: opp.type ?? "community",
+              location: opp.location ?? "Pakistan",
+              isOnline: Boolean(opp.is_online),
+            };
+          })
+          .filter((a): a is ApplicationItem => a !== null);
 
-        // Merge any drafts from localStorage not yet present in DB
+        // Merge any drafts from localStorage not yet present in DB. A draft
+        // whose opportunity no longer exists (and isn't prototype seed data)
+        // is dead — drop it and clear the stale key.
         if (typeof window !== "undefined") {
           try {
             const knownOppIds = new Set(dbApps.map((a) => a.opportunityId).filter(Boolean));
+            const staleKeys: string[] = [];
             for (let i = 0; i < localStorage.length; i++) {
               const key = localStorage.key(i);
-              if (key && key.startsWith("yr_apply_draft_")) {
-                const rest = key.replace("yr_apply_draft_", "");
-                const oppId = rest.split("_")[0];
-                if (oppId && !knownOppIds.has(oppId)) {
-                  knownOppIds.add(oppId);
-                  const seedOpp =
-                    PROTOTYPE_SEED_OPPORTUNITIES[oppId] ||
-                    Object.values(PROTOTYPE_SEED_OPPORTUNITIES).find((o) => o.id === oppId);
-                  const oppName = seedOpp?.name ?? "Volunteer Drive";
-                  const orgName = seedOpp?.organizations?.name ?? "Youth Republic Partner";
-                  dbApps.unshift({
-                    id: `local-draft-${oppId}`,
-                    opportunityId: oppId,
-                    status: "draft",
-                    opportunityName: oppName,
-                    orgName: orgName,
-                    orgInitials: getOrgInitials(orgName),
-                    orgColor: seedOpp?.organizations?.brand_color ?? getOrgColor(orgName),
-                    orgLogoUrl: seedOpp?.organizations?.logo_url ?? null,
-                    type: seedOpp?.type ?? "community",
-                    location: seedOpp?.location ?? "Pakistan",
-                    isOnline: Boolean(seedOpp?.is_online),
-                  });
+              if (!key || !key.startsWith("yr_apply_draft_")) continue;
+              const oppId = key.replace("yr_apply_draft_", "").split("_")[0];
+              if (!oppId || knownOppIds.has(oppId)) continue;
+              knownOppIds.add(oppId);
+
+              let seedOpp: any =
+                PROTOTYPE_SEED_OPPORTUNITIES[oppId] ||
+                Object.values(PROTOTYPE_SEED_OPPORTUNITIES).find((o) => o.id === oppId);
+              if (!seedOpp) {
+                const { data: liveOpp } = await supabase
+                  .from("opportunities")
+                  .select("id, name, type, location, is_online, organizations(name, brand_color, logo_url)")
+                  .eq("id", oppId)
+                  .maybeSingle();
+                if (!liveOpp) {
+                  staleKeys.push(key);
+                  continue;
                 }
+                seedOpp = { ...liveOpp, organizations: (liveOpp as any).organizations };
               }
+
+              const oppName = seedOpp?.name;
+              if (!oppName) {
+                staleKeys.push(key);
+                continue;
+              }
+              const orgName = seedOpp?.organizations?.name ?? "Youth Republic Partner";
+              dbApps.unshift({
+                id: `local-draft-${oppId}`,
+                opportunityId: oppId,
+                status: "draft",
+                opportunityName: oppName,
+                orgName: orgName,
+                orgInitials: getOrgInitials(orgName),
+                orgColor: seedOpp?.organizations?.brand_color ?? getOrgColor(orgName),
+                orgLogoUrl: seedOpp?.organizations?.logo_url ?? null,
+                type: seedOpp?.type ?? "community",
+                location: seedOpp?.location ?? "Pakistan",
+                isOnline: Boolean(seedOpp?.is_online),
+              });
             }
+            for (const k of staleKeys) localStorage.removeItem(k);
           } catch {
             // ignore localStorage errors
           }
@@ -461,6 +492,9 @@ export default function PortfolioPage() {
           onClick={() => setActiveTab("apps")}
         >
           Applications
+          {applications.length > 0 && (
+            <span className="pf-tab-count" aria-hidden="true">{applications.length}</span>
+          )}
         </button>
         <button
           type="button"
@@ -566,7 +600,7 @@ export default function PortfolioPage() {
                           <div className="pcard__name">{p.opportunityName}</div>
                           <div className="pcard__org">
                             {showOrgLabel && <span>{p.orgName} · </span>}
-                            <span className={`ttag type-${p.type}`}>{p.type}</span>
+                            <span className={`ttag type-${p.type}`}>{categoryLabel(p.type)}</span>
                           </div>
                         </div>
                       </div>
@@ -764,7 +798,7 @@ export default function PortfolioPage() {
                       <div>
                         <div className="pcard__name">{app.opportunityName}</div>
                         <div className="pcard__org">
-                          {app.orgName} · <span className={`ttag type-${app.type}`}>{app.type}</span>
+                          {app.orgName} · <span className={`ttag type-${app.type}`}>{categoryLabel(app.type)}</span>
                           {app.isOnline ? " · Online" : app.location ? ` · ${app.location}` : ""}
                         </div>
                       </div>
