@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { SubmitHoursForm } from "@/components/SubmitHoursForm";
+import { Select } from "@/components/Select";
 import { RegisterForm } from "@/components/RegisterForm";
 import { SensitiveFieldEditor } from "@/components/SensitiveFieldEditor";
 import { ProfileFieldEditor } from "@/components/ProfileFieldEditor";
@@ -433,8 +434,6 @@ export default function PortfolioPage() {
   const avatarInitials = getAvatarInitials(volunteer.full_name);
   const isVerified = volunteer.status === "active" || (!volunteer.is_unregistered && volunteer.status === "verified");
   const isPending = !isVerified || volunteer.is_unregistered;
-  const uniqueOrgCount = new Set(programmes.map((p) => p.orgName)).size;
-  const showOrgLabel = uniqueOrgCount > 1;
 
   function toggleSessions(partId: string) {
     setExpandedSessions((prev) => ({ ...prev, [partId]: !prev[partId] }));
@@ -514,7 +513,19 @@ export default function PortfolioPage() {
       {activeTab === "impact" && (
         <div className="pf-tabpanel">
           {programmes.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "1rem",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: ".9rem", color: "var(--ink-2)" }}>
+                Every programme you&apos;ve joined, with sessions, hours and status.
+              </p>
               <button
                 type="button"
                 className="btn btn--primary btn--sm"
@@ -599,7 +610,7 @@ export default function PortfolioPage() {
                         <div>
                           <div className="pcard__name">{p.opportunityName}</div>
                           <div className="pcard__org">
-                            {showOrgLabel && <span>{p.orgName} · </span>}
+                            <span>{p.orgName} · </span>
                             <span className={`ttag type-${p.type}`}>{categoryLabel(p.type)}</span>
                           </div>
                         </div>
@@ -643,7 +654,7 @@ export default function PortfolioPage() {
                       </div>
                     </dl>
 
-                    {p.sessions.length > 0 ? (
+                    {p.sessions.length > 0 && (
                       <>
                         <button
                           type="button"
@@ -669,19 +680,6 @@ export default function PortfolioPage() {
                           </ul>
                         )}
                       </>
-                    ) : (
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          className="btn btn--ghost btn--sm"
-                          onClick={() => {
-                            setSelectedParticipationForHours(p.participationId);
-                            setShowLogHoursModal(true);
-                          }}
-                        >
-                          + Log hours for this drive
-                        </button>
-                      </div>
                     )}
                   </div>
                 );
@@ -957,17 +955,17 @@ export default function PortfolioPage() {
               ) : (
                 <div className="space-y-4">
                   <div className="field">
-                    <label>Select drive</label>
-                    <select
+                    <label htmlFor="log-hours-drive">Programme</label>
+                    <Select
+                      id="log-hours-drive"
+                      aria-label="Select drive"
                       value={selectedParticipationForHours ?? programmes[0].participationId}
-                      onChange={(e) => setSelectedParticipationForHours(e.target.value)}
-                    >
-                      {programmes.map((prg) => (
-                        <option key={prg.participationId} value={prg.participationId}>
-                          {prg.opportunityName} ({prg.orgName})
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setSelectedParticipationForHours}
+                      options={programmes.map((prg) => ({
+                        value: prg.participationId,
+                        label: `${prg.opportunityName} (${prg.orgName})`,
+                      }))}
+                    />
                   </div>
 
                   {(() => {

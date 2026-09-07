@@ -580,6 +580,85 @@ select {
 .field input[readonly] { background: var(--bg-2); color: var(--ink-2); }
 .field .hint { font-size: .8rem; color: var(--ink-2); margin-top: .3rem; }
 
+/* Custom dropdown (components/Select.tsx) — replaces the native <select>. */
+.yr-select { position: relative; display: block; }
+.yr-select__trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  font: inherit;
+  text-align: left;
+  padding: .7rem .85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.yr-select__trigger:hover { border-color: var(--ink-2); }
+.yr-select__trigger:focus-visible,
+.yr-select__trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(148, 26, 128, .18);
+}
+.yr-select__trigger:disabled { opacity: .55; cursor: not-allowed; }
+.yr-select__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yr-select__chevron { flex-shrink: 0; color: var(--ink-2); transition: transform .15s ease; }
+.yr-select__trigger[aria-expanded="true"] .yr-select__chevron { transform: rotate(180deg); }
+
+.yr-select__menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 15rem;
+  overflow-y: auto;
+  padding: .3rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  box-shadow: 0 1px 2px rgba(36, 38, 45, .05), 0 16px 36px -12px rgba(36, 38, 45, .28);
+  animation: yr-select-pop .12s ease;
+}
+@keyframes yr-select-pop { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .yr-select__menu { animation: none; } }
+
+.yr-select__option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  font: inherit;
+  text-align: left;
+  padding: .55rem .6rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.yr-select__option.is-active { background: var(--bg-2); }
+.yr-select__option.is-selected { font-weight: 600; }
+.yr-select__option svg { flex-shrink: 0; color: var(--blue); }
+.yr-select__option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Log volunteer hours form */
+.log-hours__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+}
+@media (max-width: 520px) {
+  .log-hours__row { grid-template-columns: 1fr; gap: 0; }
+}
+.log-hours__optional { color: var(--ink-2); font-weight: 400; }
+
 /* Field Error & Validation States */
 .field.has-error input,
 .field.has-error select,
