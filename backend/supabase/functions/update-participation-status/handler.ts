@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { opportunityChapterId } from "../_shared/opportunityChapter.ts";
 
 export interface UpdateParticipationStatusInput {
   participationId: string;
@@ -13,12 +14,13 @@ export async function updateParticipationStatus(
 ): Promise<{ participationId: string }> {
   const { data: participation, error: fetchError } = await supabase
     .from("participation")
-    .select("id, organization_id")
+    .select("id, organization_id, opportunity_id")
     .eq("id", input.participationId)
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, participation.organization_id, "youth-republic", "participation:update")) {
+  const targetChapter = await opportunityChapterId(supabase, participation.opportunity_id);
+  if (!staffHasPermission(staffClaims, participation.organization_id, "youth-republic", "participation:update", targetChapter)) {
     throw new Error("forbidden");
   }
 

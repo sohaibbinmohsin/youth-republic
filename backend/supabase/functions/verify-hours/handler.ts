@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { opportunityChapterId } from "../_shared/opportunityChapter.ts";
 import type { EmailClient } from "../_shared/sendEmail.ts";
 import { escapeHtml } from "../_shared/escapeHtml.ts";
 
@@ -22,12 +23,13 @@ export async function verifyHours(
 ): Promise<VerifyHoursResult> {
   const { data: row, error: fetchError } = await supabase
     .from("activity_hours")
-    .select("id, organization_id, volunteer_id, hours_submitted")
+    .select("id, organization_id, volunteer_id, hours_submitted, opportunity_id")
     .eq("id", input.activityHoursId)
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, row.organization_id, "youth-republic", "hours:update")) {
+  const targetChapter = await opportunityChapterId(supabase, row.opportunity_id);
+  if (!staffHasPermission(staffClaims, row.organization_id, "youth-republic", "hours:update", targetChapter)) {
     throw new Error("forbidden");
   }
 

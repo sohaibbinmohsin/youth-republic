@@ -251,3 +251,44 @@ Deno.test("decideApplication completes successfully when the email send throws â
     .eq("action", "application_decided");
   assertEquals(logRows?.length, 1);
 });
+
+const scopedClaims = (orgId: string, permission: string, scopes?: Record<string, string[]>): StaffClaims => ({
+  actorType: "staff",
+  staffId: crypto.randomUUID(),
+  platformOwner: false,
+  canVerifyIdentity: false,
+  orgRoles: [{ organizationId: orgId }],
+  moduleAccess: [{
+    organizationId: orgId, module: "youth-republic", permissions: [permission],
+    ...(scopes ? { chapterScopes: scopes } : {}),
+  }],
+});
+
+Deno.test("decideApplication: a chapter-scoped applications:update only decides its own chapter", async () => {
+  const supabase = testClient();
+  const orgId = crypto.randomUUID();
+  const lums = crypto.randomUUID();
+  const nust = crypto.randomUUID();
+  const claims = scopedClaims(orgId, "applications:update", { "applications:update": [lums] });
+
+  const mk = async (chapterId: string | null) => {
+    const { applicationId, opportunityId } = await makeApplication(supabase, orgId);
+    await supabase.from("opportunities").update({ chapter_id: chapterId }).eq("id", opportunityId);
+    return applicationId;
+  };
+  const lumsApp = await mk(lums);
+  const nustApp = await mk(nust);
+  const orgApp = await mk(null);
+
+  const r = await decideApplication(supabase, claims, { applicationId: lumsApp, decision: "selected" }, new FakeEmailClient());
+  assertEquals(r.participationId !== null, true);
+
+  await assertRejects(
+    () => decideApplication(supabase, claims, { applicationId: nustApp, decision: "selected" }, new FakeEmailClient()),
+    Error, "forbidden",
+  );
+  await assertRejects(
+    () => decideApplication(supabase, claims, { applicationId: orgApp, decision: "selected" }, new FakeEmailClient()),
+    Error, "forbidden",
+  );
+});

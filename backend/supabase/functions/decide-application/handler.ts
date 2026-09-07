@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { opportunityChapterId } from "../_shared/opportunityChapter.ts";
 import type { EmailClient } from "../_shared/sendEmail.ts";
 import { escapeHtml } from "../_shared/escapeHtml.ts";
 
@@ -26,7 +27,8 @@ export async function decideApplication(
     .single();
   if (fetchError) throw fetchError;
 
-  if (!staffHasPermission(staffClaims, application.organization_id, "youth-republic", "applications:update")) {
+  const targetChapter = await opportunityChapterId(supabase, application.opportunity_id);
+  if (!staffHasPermission(staffClaims, application.organization_id, "youth-republic", "applications:update", targetChapter)) {
     throw new Error("forbidden");
   }
 
