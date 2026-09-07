@@ -20,6 +20,8 @@ export interface CreateOpportunityInput {
   applicationForm?: unknown;
   capacity?: number;
   chapterId?: string | null;
+  /** e.g. "draft" to create the opportunity hidden from the noticeboard. */
+  statusOverride?: string;
 }
 
 export async function createOpportunity(
@@ -48,6 +50,7 @@ export async function createOpportunity(
     eligibility: input.eligibility ?? [],
     what_to_bring: input.whatToBring ?? [],
     capacity: input.capacity ?? null,
+    ...(input.statusOverride ? { status_override: input.statusOverride } : {}),
   };
 
   // Omit application_form entirely when the caller doesn't send one so the

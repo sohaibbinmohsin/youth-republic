@@ -45,6 +45,22 @@ Deno.test("createOpportunity creates a row and logs the action under the caller'
   assertEquals(logRows![0].staff_id, realStaffId);
 });
 
+Deno.test("createOpportunity honours a statusOverride of 'draft'", async () => {
+  const supabase = testClient();
+  const orgId = await seedOrg(supabase);
+
+  const result = await createOpportunity(supabase, staffClaims(orgId, "opportunities:write"), {
+    organizationId: orgId, name: "Draft Drive", type: "event", statusOverride: "draft",
+  });
+
+  const { data: opp } = await supabase
+    .from("opportunities")
+    .select("status_override")
+    .eq("id", result.opportunityId)
+    .single();
+  assertEquals(opp!.status_override, "draft");
+});
+
 Deno.test("createOpportunity rejects staff without opportunities:write for the org", async () => {
   const supabase = testClient();
   const orgId = await seedOrg(supabase);
