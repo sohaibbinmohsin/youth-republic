@@ -21,7 +21,7 @@ returning id as opp_id \gset
 insert into applications (volunteer_id, opportunity_id, organization_id)
 values (:'vol_id', :'opp_id', '11111111-1111-1111-1111-111111111111');
 
-select is((select status from applications where volunteer_id = :'vol_id'), 'submitted', 'defaults to submitted');
+select is((select status from applications where volunteer_id = :'vol_id'), 'pending_review', 'defaults to pending_review');
 
 select throws_ok(
   format($$ insert into applications (volunteer_id, opportunity_id, organization_id) values ('%s', '%s', '11111111-1111-1111-1111-111111111111') $$, :'vol_id', :'opp_id'),

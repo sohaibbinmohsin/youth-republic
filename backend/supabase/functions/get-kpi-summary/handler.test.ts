@@ -55,7 +55,7 @@ Deno.test("getKpiSummary computes every metric scoped to the given org only", as
 
   await supabase.from("applications").insert([
     { volunteer_id: lahoreVolunteer, opportunity_id: opportunityId, organization_id: orgId, status: "selected" },
-    { volunteer_id: karachiVolunteer, opportunity_id: opportunityId, organization_id: orgId, status: "submitted" },
+    { volunteer_id: karachiVolunteer, opportunity_id: opportunityId, organization_id: orgId, status: "pending_review" },
   ]);
 
   const { data: participation } = await supabase.from("participation").insert({

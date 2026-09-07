@@ -70,7 +70,11 @@ export async function listApplications(
       "id, status, applied_at, volunteer_id, opportunity_id, applicant_name, applicant_email, applicant_phone, answers, form_snapshot, volunteers(full_name), opportunities(name)",
       { count: "exact" },
     )
-    .eq("organization_id", input.organizationId);
+    .eq("organization_id", input.organizationId)
+    // Drafts are the volunteer's own unsubmitted work-in-progress — never
+    // shown to the partner. RLS enforces this for user-scoped clients; this
+    // handler runs on the service-role client, so it must filter explicitly.
+    .neq("status", "draft");
 
   const chapterIds = readScopeChapterIds(staffClaims, input.organizationId, "applications:read");
   if (chapterIds) {

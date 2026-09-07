@@ -129,6 +129,38 @@ Deno.test("listVolunteers paginates with limit/offset and reports total across a
   assertEquals(page2.total, 3);
 });
 
+Deno.test("listVolunteers includes an applicant who has no org_volunteer_index row", async () => {
+  const supabase = testClient();
+  const orgId = await makeOrg(supabase);
+  const applicantId = await makeVolunteer(supabase, { full_name: "Index-less Applicant" });
+  const { data: opp } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "LV Applicant Opp", type: "environment",
+  }).select("id").single();
+  await supabase.from("applications").insert({
+    volunteer_id: applicantId, opportunity_id: opp!.id, organization_id: orgId, status: "pending_review",
+  });
+
+  const result = await listVolunteers(supabase, claimsWithPermission(orgId, "volunteers:read"), { organizationId: orgId });
+
+  assertEquals(result.volunteers.map((v) => v.id), [applicantId]);
+});
+
+Deno.test("listVolunteers excludes a volunteer whose only application for the org is a draft", async () => {
+  const supabase = testClient();
+  const orgId = await makeOrg(supabase);
+  const draftOnlyId = await makeVolunteer(supabase, { full_name: "Draft Only" });
+  const { data: opp } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "LV Draft Opp", type: "environment",
+  }).select("id").single();
+  await supabase.from("applications").insert({
+    volunteer_id: draftOnlyId, opportunity_id: opp!.id, organization_id: orgId, status: "draft",
+  });
+
+  const result = await listVolunteers(supabase, claimsWithPermission(orgId, "volunteers:read"), { organizationId: orgId });
+
+  assertEquals(result.volunteers.length, 0);
+});
+
 Deno.test("listVolunteers rejects a caller without volunteers:read for this org", async () => {
   const supabase = testClient();
   const orgId = await makeOrg(supabase);

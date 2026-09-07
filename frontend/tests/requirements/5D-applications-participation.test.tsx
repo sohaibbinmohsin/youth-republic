@@ -102,13 +102,10 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
   });
 });
 
-describe("§5D Application status — Applied → Under Review → Selected / Waitlisted / Rejected", () => {
+describe("§5D Application status — Pending Review → Selected / Waitlisted / Rejected", () => {
   it("[5D] the badge renders a distinct label for each status the volunteer can see", () => {
-    const { rerender } = render(<ApplicationStatusBadge status="submitted" />);
-    expect(screen.getByText("Submitted")).toBeInTheDocument();
-
-    rerender(<ApplicationStatusBadge status="under_review" />);
-    expect(screen.getByText("Under review")).toBeInTheDocument();
+    const { rerender } = render(<ApplicationStatusBadge status="pending_review" />);
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
 
     rerender(<ApplicationStatusBadge status="selected" />);
     expect(screen.getByText("Selected")).toBeInTheDocument();
@@ -117,13 +114,21 @@ describe("§5D Application status — Applied → Under Review → Selected / Wa
     expect(screen.getByText(/not selected|rejected/i)).toBeInTheDocument();
   });
 
+  it("[5D] maps the legacy 'submitted' / 'under_review' values onto the single pending-review label", () => {
+    const { rerender } = render(<ApplicationStatusBadge status="submitted" />);
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
+
+    rerender(<ApplicationStatusBadge status="under_review" />);
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
+  });
+
   it("[5D] the badge renders a 'Waitlisted' label", () => {
     render(<ApplicationStatusBadge status="waitlisted" />);
     expect(screen.getByText(/waitlist/i)).toBeInTheDocument();
   });
 
   it("[5D] documents the full application status machine the system must support", () => {
-    expect([...APPLICATION_STATUSES]).toEqual(["Applied", "Under Review", "Selected", "Waitlisted", "Rejected"]);
+    expect([...APPLICATION_STATUSES]).toEqual(["Pending Review", "Selected", "Waitlisted", "Rejected"]);
   });
 });
 
@@ -155,6 +160,6 @@ describe("§5D Admin review workflow", () => {
   // GAP — the entire Youth Republic admin UI is unbuilt in tmp-partner-admin. These belong to
   // tmp-partner-admin/tests/requirements/admin-youth-republic-portal.test.tsx once it exists.
   it.todo("[5D→admin] admin lists applications and filters by Opportunity and Application Status");
-  it.todo("[5D→admin] admin decides an application (selected / waitlisted / rejected / under_review) via decideApplication");
+  it.todo("[5D→admin] admin decides an application (selected / waitlisted / rejected / pending_review) via decideApplication");
   it.todo("[5D→admin] admin promotes a waitlisted application to selected when a spot opens");
 });

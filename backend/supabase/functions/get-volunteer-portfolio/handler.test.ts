@@ -65,7 +65,7 @@ function seedDb() {
     }],
     applications: [
       {
-        id: "a1", volunteer_id: "v1", status: "submitted",
+        id: "a1", volunteer_id: "v1", status: "pending_review",
         opportunities: { name: "Tree Plantation", type: "environment", location: "Lahore" },
         organizations: { name: "Green Org", logo_url: "https://cdn/green.png", brand_color: "#1F7A1F" },
       },
@@ -164,7 +164,7 @@ Deno.test("getVolunteerPortfolio totals.verifiedHours sums verified hours_verifi
 Deno.test("getVolunteerPortfolio totals count completed programmes and active applications", async () => {
   const p = await getVolunteerPortfolio(seedDb(), "v1");
   assertEquals(p.totals.completedProgrammes, 2); // p1, p2
-  assertEquals(p.totals.activeApplications, 2); // a1 submitted, a3 selected
+  assertEquals(p.totals.activeApplications, 2); // a1 pending_review, a3 selected
 });
 
 Deno.test("getVolunteerPortfolio flags a session whose verified hours differ from submitted", async () => {

@@ -155,6 +155,30 @@ Deno.test("decideApplication accepts waitlisted as a decision without creating p
   assertEquals(application!.status, "waitlisted");
 });
 
+Deno.test("decideApplication reconsiders a decided application: back to pending_review, decision metadata cleared, no participation", async () => {
+  const supabase = testClient();
+  const orgId = await seedOrg(supabase);
+  const { applicationId } = await makeApplication(supabase, orgId);
+
+  await decideApplication(supabase, staffClaims(orgId), { applicationId, decision: "rejected" }, new FakeEmailClient());
+  const reconsidered = await decideApplication(
+    supabase,
+    staffClaims(orgId),
+    { applicationId, decision: "pending_review" },
+    new FakeEmailClient(),
+  );
+
+  assertEquals(reconsidered.participationId, null);
+  const { data: application } = await supabase
+    .from("applications")
+    .select("status, decided_at, decided_by")
+    .eq("id", applicationId)
+    .single();
+  assertEquals(application!.status, "pending_review");
+  assertEquals(application!.decided_at, null);
+  assertEquals(application!.decided_by, null);
+});
+
 Deno.test("decideApplication rejects when staff lacks applications:update for the application's org", async () => {
   const supabase = testClient();
   const orgId = await seedOrg(supabase);

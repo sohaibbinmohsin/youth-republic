@@ -6,7 +6,9 @@ import { escapeHtml } from "../_shared/escapeHtml.ts";
 
 export interface DecideApplicationInput {
   applicationId: string;
-  decision: "selected" | "waitlisted" | "rejected" | "under_review";
+  // "pending_review" is the "reconsider" path — moves a decided application
+  // back into the triage queue without creating participation.
+  decision: "selected" | "waitlisted" | "rejected" | "pending_review";
 }
 
 export interface DecideApplicationResult {
@@ -44,9 +46,14 @@ export async function decideApplication(
     }
   }
 
+  const isReconsider = input.decision === "pending_review";
   const { error: updateError } = await supabase
     .from("applications")
-    .update({ status: input.decision, decided_at: new Date().toISOString(), decided_by: staffClaims.staffId })
+    .update(
+      isReconsider
+        ? { status: input.decision, decided_at: null, decided_by: null }
+        : { status: input.decision, decided_at: new Date().toISOString(), decided_by: staffClaims.staffId },
+    )
     .eq("id", input.applicationId);
   if (updateError) throw updateError;
 
@@ -104,8 +111,14 @@ export async function decideApplication(
     .single();
 
   if (volunteer) {
+    const statusPhrase: Record<DecideApplicationInput["decision"], string> = {
+      selected: "selected",
+      waitlisted: "waitlisted",
+      rejected: "not selected",
+      pending_review: "back under review",
+    };
     const subject = "Your application status has been updated";
-    const html = `<p>Hi ${escapeHtml(volunteer.full_name)},</p><p>Your application status is now: <strong>${input.decision}</strong>.</p>`;
+    const html = `<p>Hi ${escapeHtml(volunteer.full_name)},</p><p>Your application is now: <strong>${statusPhrase[input.decision]}</strong>.</p>`;
     try {
       await emailClient.send(volunteer.email, subject, html);
     } catch {

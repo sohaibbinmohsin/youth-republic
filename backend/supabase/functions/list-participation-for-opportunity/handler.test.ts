@@ -42,7 +42,7 @@ Deno.test("listParticipationForOpportunity returns applicants (from applications
   const selectedId = await makeVolunteer(supabase, "Selected Volunteer");
 
   await supabase.from("applications").insert([
-    { volunteer_id: applicantOnlyId, opportunity_id: opportunityId, organization_id: orgId, status: "submitted" },
+    { volunteer_id: applicantOnlyId, opportunity_id: opportunityId, organization_id: orgId, status: "pending_review" },
     { volunteer_id: selectedId, opportunity_id: opportunityId, organization_id: orgId, status: "selected" },
   ]);
   await supabase.from("participation").insert({

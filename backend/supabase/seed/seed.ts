@@ -353,7 +353,7 @@ const APPLICATIONS: { oppKey: string; status: string; why: string; availability:
   },
   {
     oppKey: "medical",
-    status: "under_review",
+    status: "pending_review",
     why:
       "I am a pre-med student and helping at a community clinic would let me support patients directly while learning how triage works.",
     availability: "Both camp days, full shifts",

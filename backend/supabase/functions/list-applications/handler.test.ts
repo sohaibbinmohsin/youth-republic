@@ -42,7 +42,7 @@ Deno.test("listApplications filters by opportunity and status together", async (
   const volunteerId = await makeVolunteer(supabase);
 
   await supabase.from("applications").insert([
-    { volunteer_id: volunteerId, opportunity_id: opp1!.id, organization_id: orgId, status: "submitted" },
+    { volunteer_id: volunteerId, opportunity_id: opp1!.id, organization_id: orgId, status: "pending_review" },
     { volunteer_id: volunteerId, opportunity_id: opp2!.id, organization_id: orgId, status: "selected" },
   ]);
 
@@ -80,7 +80,7 @@ Deno.test("listApplications projects applicant contact fields, answers, formSnap
   };
 
   await supabase.from("applications").insert({
-    volunteer_id: volunteerId, opportunity_id: opp!.id, organization_id: orgId, status: "submitted",
+    volunteer_id: volunteerId, opportunity_id: opp!.id, organization_id: orgId, status: "pending_review",
     applicant_name: "Ayesha Khan", applicant_email: "ayesha@example.com", applicant_phone: "0300-1234567",
     answers, form_snapshot: formSnapshot,
   });
@@ -124,8 +124,8 @@ Deno.test("listApplications: a chapter read-scope confines results to those chap
   const nustOpp = await mkOpp(nust);
   const vId = await makeVolunteer(supabase);
   await supabase.from("applications").insert([
-    { volunteer_id: vId, opportunity_id: lumsOpp, organization_id: orgId, status: "submitted" },
-    { volunteer_id: vId, opportunity_id: nustOpp, organization_id: orgId, status: "submitted" },
+    { volunteer_id: vId, opportunity_id: lumsOpp, organization_id: orgId, status: "pending_review" },
+    { volunteer_id: vId, opportunity_id: nustOpp, organization_id: orgId, status: "pending_review" },
   ]);
 
   const scopedClaims: StaffClaims = {
@@ -140,4 +140,27 @@ Deno.test("listApplications: a chapter read-scope confines results to those chap
 
   const all = await listApplications(supabase, claims(orgId), { organizationId: orgId });
   assertEquals(all.applications.length, 2);
+});
+
+Deno.test("listApplications never returns draft applications to the partner", async () => {
+  const supabase = testClient();
+  const { data: org } = await supabase.from("organizations").insert({
+    id: crypto.randomUUID(), name: "LA Draft Org", slug: `la-draft-${crypto.randomUUID()}`,
+  }).select("id").single();
+  const orgId = org!.id as string;
+  const { data: opp } = await supabase.from("opportunities").insert({
+    organization_id: orgId, name: "Draft Opp", type: "environment",
+  }).select("id").single();
+  const vId = await makeVolunteer(supabase);
+
+  await supabase.from("applications").insert([
+    { volunteer_id: vId, opportunity_id: opp!.id, organization_id: orgId, status: "draft" },
+    { volunteer_id: vId, opportunity_id: opp!.id, organization_id: orgId, status: "pending_review" },
+  ]);
+
+  const result = await listApplications(supabase, claims(orgId), { organizationId: orgId });
+
+  assertEquals(result.applications.length, 1);
+  assertEquals(result.applications[0].status, "pending_review");
+  assertEquals(result.total, 1);
 });

@@ -89,7 +89,7 @@ export const OPPORTUNITY_STATUSES = [
 ] as const;
 
 /** §5D application + participation status machines. */
-export const APPLICATION_STATUSES = ["Applied", "Under Review", "Selected", "Waitlisted", "Rejected"] as const;
+export const APPLICATION_STATUSES = ["Pending Review", "Selected", "Waitlisted", "Rejected"] as const;
 export const PARTICIPATION_STATUSES = ["Selected", "Participating", "Completed", "No-show", "Withdrawn"] as const;
 
 /** §6 hours verification machine. */

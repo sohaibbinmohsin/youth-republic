@@ -111,7 +111,7 @@ describe("PortfolioPage", () => {
         volunteer: { id: "vol-1", full_name: "Aisha Khan", city: "Lahore", institution: "LUMS", created_at: "2026-01-15T00:00:00Z" },
         totalVerifiedHours: 0,
         applications: [
-          { id: "app-1", status: "under_review", opportunities: { name: "Beach Cleanup", type: "environment", location: "Islamabad" } },
+          { id: "app-1", status: "pending_review", opportunities: { name: "Beach Cleanup", type: "environment", location: "Islamabad" } },
           { id: "app-2", status: "rejected", opportunities: { name: "Tree Plantation", type: "environment", location: "Murree" } },
         ],
       }) as never,
@@ -125,7 +125,7 @@ describe("PortfolioPage", () => {
 
     expect(await screen.findByText("Beach Cleanup")).toBeInTheDocument();
     expect(screen.getByText("Tree Plantation")).toBeInTheDocument();
-    expect(screen.getByText("Under review")).toBeInTheDocument();
+    expect(screen.getByText("Pending review")).toBeInTheDocument();
     expect(screen.getByText("Not selected")).toBeInTheDocument();
   });
 

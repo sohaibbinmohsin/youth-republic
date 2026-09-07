@@ -154,10 +154,10 @@ Deno.test("rejects referenced attachments that are not this user's ready applica
   );
 });
 
-Deno.test("rejects if already submitted application exists", async () => {
+Deno.test("rejects if a non-draft application already exists", async () => {
   await assertRejects(
     () =>
-      applyToOpportunity(sb({ existingApp: { id: "app-1", status: "submitted" } }), {
+      applyToOpportunity(sb({ existingApp: { id: "app-1", status: "pending_review" } }), {
         volunteerId: "v1",
         authUserId: "u1",
         opportunityId: "opp1",
@@ -168,7 +168,7 @@ Deno.test("rejects if already submitted application exists", async () => {
   );
 });
 
-Deno.test("updates existing draft application to submitted", async () => {
+Deno.test("updates existing draft application to pending_review", async () => {
   const capture: { updatedApp?: Record<string, unknown> } = {};
   const r = await applyToOpportunity(
     sb({ existingApp: { id: "app-draft-1", status: "draft" }, capture }),
@@ -180,7 +180,7 @@ Deno.test("updates existing draft application to submitted", async () => {
     },
   );
   assertEquals(r.applicationId, "app-updated");
-  assertEquals(capture.updatedApp?.status, "submitted");
+  assertEquals(capture.updatedApp?.status, "pending_review");
   assertEquals(capture.updatedApp?.applicant_name, "Ayesha");
 });
 

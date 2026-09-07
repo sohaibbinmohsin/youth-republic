@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { resolveOrgVolunteerIds } from "../_shared/orgVolunteers.ts";
 
 export interface ListVolunteersInput {
   organizationId: string;
@@ -38,12 +39,7 @@ export async function listVolunteers(
     throw new Error("forbidden");
   }
 
-  const { data: indexRows, error: indexError } = await supabase
-    .from("org_volunteer_index")
-    .select("volunteer_id")
-    .eq("organization_id", input.organizationId);
-  if (indexError) throw indexError;
-  const volunteerIds = (indexRows ?? []).map((r) => r.volunteer_id as string);
+  const volunteerIds = await resolveOrgVolunteerIds(supabase, input.organizationId);
   if (volunteerIds.length === 0) return { volunteers: [], total: 0 };
 
   const limit = Math.min(input.limit ?? 25, 100);

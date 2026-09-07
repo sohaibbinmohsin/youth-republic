@@ -171,7 +171,7 @@ export default function PortfolioPage() {
           return {
             id: r.id,
             opportunityId: r.opportunity_id || opp.id,
-            status: r.status ?? "submitted",
+            status: r.status ?? "pending_review",
             opportunityName: opp.name ?? "Volunteer Drive",
             orgName: org.name ?? "Youth Republic Partner",
             orgInitials: getOrgInitials(org.name),
@@ -742,15 +742,15 @@ export default function PortfolioPage() {
                     ? "pill--neu"
                     : app.status === "selected" || app.status === "approved"
                     ? "pill--pos"
-                    : app.status === "under_review" || app.status === "submitted" || app.status === "waitlisted"
+                    : app.status === "pending_review" || app.status === "under_review" || app.status === "submitted" || app.status === "waitlisted"
                     ? "pill--pend"
                     : "pill--neg";
 
                 const displayStatus =
                   app.status === "draft"
                     ? "Draft"
-                    : app.status === "under_review"
-                    ? "Under review"
+                    : app.status === "pending_review" || app.status === "under_review" || app.status === "submitted"
+                    ? "Pending review"
                     : app.status === "selected"
                     ? "Selected"
                     : app.status === "rejected"
