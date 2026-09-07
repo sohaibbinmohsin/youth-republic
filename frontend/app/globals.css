@@ -1171,6 +1171,32 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
 .pf-tabs button:hover {
   color: var(--ink);
 }
+.pf-tab-count {
+  margin-left: .4rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 .35rem;
+  border-radius: 999px;
+  background: var(--st-neu-bg);
+  color: var(--st-neu-fg);
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.2rem;
+  text-align: center;
+  display: inline-block;
+}
+.pf-tabs button[aria-current="page"] .pf-tab-count {
+  background: var(--blue);
+  color: #fff;
+}
+
+.pf-panel {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 1.35rem 1.4rem;
+}
+@media (max-width: 560px) { .pf-panel { padding: 1rem; } }
 
 .pf-panel-head {
   display: flex;
@@ -1182,6 +1208,33 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
 }
 .pf-panel-head .hint { margin: 0; font-size: .85rem; color: var(--ink-2); }
 @media (max-width: 560px) { .pf-panel-head .btn { width: 100%; } }
+
+/* An editable profile row: label on top, input + Save button on one line. */
+.field-row {
+  display: flex;
+  align-items: stretch;
+  gap: .5rem;
+}
+.field-row > input,
+.field-row > .field-inputs {
+  flex: 1;
+  min-width: 0;
+}
+.field-row > .field-inputs {
+  display: flex;
+  gap: .5rem;
+}
+.field-row .btn {
+  flex: none;
+  white-space: nowrap;
+  align-self: stretch;
+}
+@media (max-width: 560px) {
+  .field-row { flex-direction: column; }
+  .field-row .btn { width: 100%; }
+  .field-row > .field-inputs { flex-direction: column; }
+}
+.field-error-text { color: var(--st-neg-fg); font-size: .8rem; margin-top: .35rem; }
 
 .pcards { display: flex; flex-direction: column; gap: .85rem; }
 .pcard {

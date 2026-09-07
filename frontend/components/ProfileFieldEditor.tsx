@@ -35,15 +35,20 @@ export function ProfileFieldEditor({
   }
 
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-      <div className="flex-1">
-        <label htmlFor={fieldName} className="block text-sm">{fieldLabel}</label>
-        <input id={fieldName} className="mt-1 w-full rounded border px-3 py-2" value={value} onChange={(e) => setValue(e.target.value)} />
+    <div className="field">
+      <label htmlFor={fieldName}>{fieldLabel}</label>
+      <div className="field-row">
+        <input id={fieldName} value={value} onChange={(e) => setValue(e.target.value)} />
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
       </div>
-      <button type="button" onClick={handleSave} disabled={saving} className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50">
-        Save
-      </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="field-error-text">{error}</p>}
     </div>
   );
 }

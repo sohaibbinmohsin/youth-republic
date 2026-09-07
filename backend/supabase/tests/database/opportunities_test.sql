@@ -1,5 +1,5 @@
 begin;
-select plan(6);
+select plan(7);
 
 -- fixture orgs (opportunities.organization_id -> organizations FK, migration 0022)
 insert into organizations (id, name, slug) values
@@ -24,6 +24,9 @@ select is((select opportunity_status(o) from opportunities o where id = :'opp_id
 
 update opportunities set status_override = 'closed' where id = :'opp_id';
 select is((select opportunity_status(o) from opportunities o where id = :'opp_id'), 'closed', 'manual override wins');
+
+update opportunities set status_override = 'draft' where id = :'opp_id';
+select is((select opportunity_status(o) from opportunities o where id = :'opp_id'), 'draft', 'draft is an accepted status_override');
 
 select * from finish();
 rollback;

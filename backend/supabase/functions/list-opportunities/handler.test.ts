@@ -238,6 +238,40 @@ Deno.test("listOpportunitiesPublic excludes deactivated opportunities", async ()
   assertEquals(result.opportunities.some((o) => o.name === "Archived Drive"), false);
 });
 
+Deno.test("draft opportunities are hidden from the public listing but shown to staff", async () => {
+  const rows: Row[] = [
+    {
+      id: "d1", name: "Live Drive", type: "environment", description: "live",
+      location: "Karachi", is_online: false, status_override: null,
+      application_open_at: null, application_deadline: null,
+      activity_start_at: null, activity_end_at: null,
+      created_at: "2026-01-02T00:00:00Z", deactivated_at: null,
+      organization_id: "org-1", organizations: greenOrg(), chapter_id: null,
+    },
+    {
+      id: "d2", name: "Unfinished Draft", type: "community", description: "wip",
+      location: "Multan", is_online: false, status_override: "draft",
+      application_open_at: null, application_deadline: null,
+      activity_start_at: null, activity_end_at: null,
+      created_at: "2026-01-03T00:00:00Z", deactivated_at: null,
+      organization_id: "org-1", organizations: greenOrg(), chapter_id: null,
+    },
+  ];
+  const dbFor = () => makeDb({
+    opportunities: rows,
+    organizations: [{ id: "org-1", name: "Green Org" }],
+    participation: [],
+  });
+
+  const pub = await listOpportunitiesPublic(dbFor(), {});
+  assertEquals(pub.opportunities.map((o) => o.id), ["d1"]);
+  assertEquals(pub.facets.cities, ["Karachi"]); // Multan (draft-only city) is excluded
+
+  const staff = await listOpportunities(dbFor(), claims("org-1"), { organizationId: "org-1" });
+  assertEquals(staff.opportunities.map((o) => o.id).sort(), ["d1", "d2"]);
+  assertEquals(staff.opportunities.find((o) => o.id === "d2")?.computedStatus, "draft");
+});
+
 Deno.test("facets.cities is the distinct city set of the unfiltered org scope (not the filtered page)", async () => {
   const result = await listOpportunitiesPublic(seedDb(), { city: "Karachi" });
 

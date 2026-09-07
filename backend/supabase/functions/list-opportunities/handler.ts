@@ -79,6 +79,8 @@ interface QueryScope {
   includeDeactivated: boolean;
   // Staff chapter read-scope: when set, results are confined to these chapters.
   chapterIds?: string[] | null;
+  // Public callers never see draft opportunities.
+  excludeDrafts?: boolean;
 }
 
 function toCard(o: Record<string, unknown>, filledCount: number): OpportunityCard {
@@ -138,13 +140,14 @@ async function computeFacets(
   // org-scoped-but-otherwise-unfiltered set (NOT the filtered/paginated page),
   // so facets.cities is the full distinct city set in scope regardless of the
   // active type/city/search/status filters.
-  let facetQuery = supabase.from("opportunities").select("location, organization_id");
+  let facetQuery = supabase.from("opportunities").select("location, organization_id, status_override");
   if (scope.organizationId) facetQuery = facetQuery.eq("organization_id", scope.organizationId);
   if (scope.chapterIds) facetQuery = facetQuery.in("chapter_id", scope.chapterIds);
   if (!scope.includeDeactivated) facetQuery = facetQuery.is("deactivated_at", null);
   const { data, error } = await facetQuery;
   if (error) throw error;
-  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  let rows = (data ?? []) as unknown as Record<string, unknown>[];
+  if (scope.excludeDrafts) rows = rows.filter((r) => (r.status_override ?? null) !== "draft");
 
   const cities = [...new Set(
     rows.map((r) => r.location).filter((c): c is string => typeof c === "string" && c.length > 0),
@@ -191,7 +194,10 @@ async function runOpportunityQuery(
   const { data, error, count } = await query.range(offset, offset + limit - 1);
   if (error) throw error;
 
-  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  let rows = (data ?? []) as unknown as Record<string, unknown>[];
+  if (scope.excludeDrafts) {
+    rows = rows.filter((r) => (r.status_override ?? null) !== "draft");
+  }
   const filled = await filledCountsByOpportunity(supabase, rows.map((r) => r.id as string));
   let opportunities = rows.map((r) => toCard(r, filled.get(r.id as string) ?? 0));
   const facets = await computeFacets(supabase, scope);
@@ -256,6 +262,7 @@ export function listOpportunitiesPublic(
   return runOpportunityQuery(supabase, input, {
     organizationId: input.organizationId,
     includeDeactivated: false,
+    excludeDrafts: true,
   });
 }
 
