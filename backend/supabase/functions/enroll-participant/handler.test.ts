@@ -16,9 +16,18 @@ const staffClaims = (orgId: string, permission: string, staffId = crypto.randomU
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: [permission] }],
 });
 
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
+
 Deno.test("enrollParticipant creates a participation row with no application_id and logs the action under the caller's own staffId", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const realStaffId = crypto.randomUUID();
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
@@ -53,8 +62,8 @@ Deno.test("enrollParticipant creates a participation row with no application_id 
 
 Deno.test("enrollParticipant rejects an opportunityId that belongs to a different org than the caller's", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,
@@ -96,7 +105,7 @@ Deno.test("enrollParticipant rejects an opportunityId that belongs to a differen
 
 Deno.test("enrollParticipant rejects staff without participation:write for the org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
     email: `auth-${crypto.randomUUID()}@example.com`,
     email_confirm: true,

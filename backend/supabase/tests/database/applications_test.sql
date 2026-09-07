@@ -2,6 +2,12 @@ begin;
 set constraints all deferred;
 select plan(5);
 
+-- fixture orgs (opportunities.organization_id -> organizations FK, migration 0022)
+insert into organizations (id, name, slug) values
+  ('11111111-1111-1111-1111-111111111111', 'pgTAP Org 1', 'pgtap-org-1'),
+  ('22222222-2222-2222-2222-222222222222', 'pgTAP Org 2', 'pgtap-org-2')
+on conflict (id) do nothing;
+
 select has_table('public', 'applications', 'applications exists');
 
 insert into volunteers (auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program)
@@ -15,7 +21,7 @@ returning id as opp_id \gset
 insert into applications (volunteer_id, opportunity_id, organization_id)
 values (:'vol_id', :'opp_id', '11111111-1111-1111-1111-111111111111');
 
-select is((select status from applications where volunteer_id = :'vol_id'), 'submitted', 'defaults to submitted');
+select is((select status from applications where volunteer_id = :'vol_id'), 'pending_review', 'defaults to pending_review');
 
 select throws_ok(
   format($$ insert into applications (volunteer_id, opportunity_id, organization_id) values ('%s', '%s', '11111111-1111-1111-1111-111111111111') $$, :'vol_id', :'opp_id'),

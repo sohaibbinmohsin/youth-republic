@@ -85,7 +85,7 @@ export async function applyToOpportunity(
     const { data: updatedApp, error: uErr } = await supabase.from("applications").update({
       volunteer_id: volunteer.id,
       auth_user_id: input.authUserId,
-      status: "submitted",
+      status: "pending_review",
       applied_at: new Date().toISOString(),
       answers: input.answers,
       form_snapshot: form,
@@ -103,7 +103,7 @@ export async function applyToOpportunity(
       auth_user_id: input.authUserId,
       opportunity_id: opp.id,
       organization_id: opp.organization_id,
-      status: "submitted",
+      status: "pending_review",
       answers: input.answers,
       form_snapshot: form,
       applicant_name: volunteer.full_name,

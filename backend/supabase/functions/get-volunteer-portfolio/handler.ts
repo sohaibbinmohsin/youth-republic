@@ -57,7 +57,7 @@ export interface Portfolio {
   programmes: PortfolioProgramme[];
 }
 
-const ACTIVE_APPLICATION_STATUSES = ["submitted", "under_review", "waitlisted", "selected"];
+const ACTIVE_APPLICATION_STATUSES = ["pending_review", "waitlisted", "selected"];
 
 function num(v: unknown): number {
   const n = typeof v === "number" ? v : Number(v);

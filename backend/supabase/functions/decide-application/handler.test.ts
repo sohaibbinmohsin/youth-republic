@@ -78,9 +78,18 @@ const staffClaims = (orgId: string, staffId = crypto.randomUUID()): StaffClaims 
   moduleAccess: [{ organizationId: orgId, module: "youth-republic", permissions: ["applications:update"] }],
 });
 
+async function seedOrg(supabase: ReturnType<typeof testClient>): Promise<string> {
+  const id = crypto.randomUUID();
+  const { error } = await supabase.from("organizations").insert({
+    id, name: "Fixture Org", slug: `fixture-${id}`,
+  });
+  if (error) throw error;
+  return id;
+}
+
 Deno.test("decideApplication selecting an applicant auto-creates participation", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId);
 
   const result = await decideApplication(supabase, staffClaims(orgId), {
@@ -96,7 +105,7 @@ Deno.test("decideApplication selecting an applicant auto-creates participation",
 
 Deno.test("decideApplication re-selecting an already-selected application does not create a duplicate participation row", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId);
 
   const first = await decideApplication(supabase, staffClaims(orgId), {
@@ -117,7 +126,7 @@ Deno.test("decideApplication re-selecting an already-selected application does n
 
 Deno.test("decideApplication rejects selecting an applicant with no emergency_contact on file", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId, { emergency_contact: null });
 
   await assertRejects(
@@ -133,7 +142,7 @@ Deno.test("decideApplication rejects selecting an applicant with no emergency_co
 
 Deno.test("decideApplication accepts waitlisted as a decision without creating participation", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId);
 
   const result = await decideApplication(supabase, staffClaims(orgId), {
@@ -146,10 +155,34 @@ Deno.test("decideApplication accepts waitlisted as a decision without creating p
   assertEquals(application!.status, "waitlisted");
 });
 
+Deno.test("decideApplication reconsiders a decided application: back to pending_review, decision metadata cleared, no participation", async () => {
+  const supabase = testClient();
+  const orgId = await seedOrg(supabase);
+  const { applicationId } = await makeApplication(supabase, orgId);
+
+  await decideApplication(supabase, staffClaims(orgId), { applicationId, decision: "rejected" }, new FakeEmailClient());
+  const reconsidered = await decideApplication(
+    supabase,
+    staffClaims(orgId),
+    { applicationId, decision: "pending_review" },
+    new FakeEmailClient(),
+  );
+
+  assertEquals(reconsidered.participationId, null);
+  const { data: application } = await supabase
+    .from("applications")
+    .select("status, decided_at, decided_by")
+    .eq("id", applicationId)
+    .single();
+  assertEquals(application!.status, "pending_review");
+  assertEquals(application!.decided_at, null);
+  assertEquals(application!.decided_by, null);
+});
+
 Deno.test("decideApplication rejects when staff lacks applications:update for the application's org", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
-  const otherOrgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
+  const otherOrgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId);
 
   await assertRejects(
@@ -165,7 +198,7 @@ Deno.test("decideApplication rejects when staff lacks applications:update for th
 
 Deno.test("decideApplication writes an admin_action_log entry and applications.decided_by using the caller's own staffId from the token, never a client-supplied value", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId);
   const realStaffId = crypto.randomUUID();
 
@@ -194,7 +227,7 @@ Deno.test("decideApplication writes an admin_action_log entry and applications.d
 
 Deno.test("decideApplication sends a status-change email to the volunteer", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId, volunteerId } = await makeApplication(supabase, orgId);
   const { data: volunteer } = await supabase.from("volunteers").select("email").eq("id", volunteerId).single();
   const emailClient = new FakeEmailClient();
@@ -209,7 +242,7 @@ Deno.test("decideApplication sends a status-change email to the volunteer", asyn
 
 Deno.test("decideApplication escapes a volunteer's full_name before interpolating it into the email HTML", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId, {
     full_name: '<img src=x onerror=alert(1)>Evil<script>alert(2)</script>',
   });
@@ -228,7 +261,7 @@ Deno.test("decideApplication escapes a volunteer's full_name before interpolatin
 
 Deno.test("decideApplication completes successfully when the email send throws — the committed state change is still reported as success", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId);
   const emailClient = new ThrowingEmailClient();
 
@@ -266,7 +299,7 @@ const scopedClaims = (orgId: string, permission: string, scopes?: Record<string,
 
 Deno.test("decideApplication: a chapter-scoped applications:update only decides its own chapter", async () => {
   const supabase = testClient();
-  const orgId = crypto.randomUUID();
+  const orgId = await seedOrg(supabase);
   const lums = crypto.randomUUID();
   const nust = crypto.randomUUID();
   const claims = scopedClaims(orgId, "applications:update", { "applications:update": [lums] });

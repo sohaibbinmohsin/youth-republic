@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { staffHasPermission, type StaffClaims } from "../_shared/verifyStaffToken.ts";
+import { resolveOrgVolunteerIds } from "../_shared/orgVolunteers.ts";
 
 function csvEscape(value: string): string {
   // Quoting (below) is a CSV-syntax concern -- it does not stop Excel/
@@ -24,7 +25,8 @@ export async function exportApplicationsCsv(
   const { data: rows, error } = await supabase
     .from("applications")
     .select("status, applied_at, volunteers(volunteer_code, full_name, email), opportunities(name)")
-    .eq("organization_id", organizationId);
+    .eq("organization_id", organizationId)
+    .neq("status", "draft");
   if (error) throw error;
 
   const header = "volunteer_code,full_name,email,opportunity_name,status,applied_at";
@@ -53,27 +55,28 @@ export async function exportVolunteersCsv(
     throw new Error("forbidden");
   }
 
-  const { data: rows, error } = await supabase
-    .from("org_volunteer_index")
-    .select("volunteers(volunteer_code, full_name, email, phone, city, province, institution, status)")
-    .eq("organization_id", organizationId);
-  if (error) throw error;
+  const volunteerIds = await resolveOrgVolunteerIds(supabase, organizationId);
 
   const header = "volunteer_code,full_name,email,phone,city,province,institution,status";
-  const lines = (rows ?? []).map((r: Record<string, unknown>) => {
-    const v = r.volunteers as {
-      volunteer_code: string; full_name: string; email: string; phone: string;
-      city: string; province: string; institution: string; status: string;
-    };
+  if (volunteerIds.length === 0) return header + "\n";
+
+  const { data: rows, error } = await supabase
+    .from("volunteers")
+    .select("volunteer_code, full_name, email, phone, city, province, institution, status")
+    .in("id", volunteerIds)
+    .order("full_name", { ascending: true });
+  if (error) throw error;
+
+  const lines = (rows ?? []).map((v: Record<string, unknown>) => {
     return [
-      csvEscape(v.volunteer_code),
-      csvEscape(v.full_name),
-      csvEscape(v.email),
-      csvEscape(v.phone),
-      csvEscape(v.city),
-      csvEscape(v.province),
-      csvEscape(v.institution),
-      csvEscape(v.status),
+      csvEscape(String(v.volunteer_code ?? "")),
+      csvEscape(String(v.full_name ?? "")),
+      csvEscape(String(v.email ?? "")),
+      csvEscape(String(v.phone ?? "")),
+      csvEscape(String(v.city ?? "")),
+      csvEscape(String(v.province ?? "")),
+      csvEscape(String(v.institution ?? "")),
+      csvEscape(String(v.status ?? "")),
     ].join(",");
   });
 

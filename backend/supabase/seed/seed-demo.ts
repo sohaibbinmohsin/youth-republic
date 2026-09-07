@@ -21,7 +21,7 @@ const ORG_IDS = {
 } as const;
 type OrgKey = keyof typeof ORG_IDS;
 
-const APP_STATUSES = ["submitted", "under_review", "selected", "waitlisted", "rejected"] as const;
+const APP_STATUSES = ["pending_review", "selected", "waitlisted", "rejected"] as const;
 
 // deterministic PRNG so re-runs pick the same shape
 let _s = 20260901;
@@ -260,7 +260,7 @@ async function seedDemoApplicationsAndHours(
       const v = chosen[i];
       // spread statuses; first entries lean "further along"
       const status = i === 0 ? "selected" : i === 1 ? "selected" : pick(APP_STATUSES);
-      const decided = status === "submitted" ? null : daysFromNow(-2 - Math.floor(rnd() * 10));
+      const decided = status === "pending_review" ? null : daysFromNow(-2 - Math.floor(rnd() * 10));
 
       const { error: aErr } = await c.yr.from("applications").insert({
         volunteer_id: v.id,
