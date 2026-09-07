@@ -18,8 +18,7 @@ export function SubmitHoursForm({
 }) {
   const [activityDate, setActivityDate] = useState("");
   const [hoursSubmitted, setHoursSubmitted] = useState("");
-  const [role, setRole] = useState("");
-  const [location, setLocation] = useState("");
+  const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,8 +34,7 @@ export function SubmitHoursForm({
           organizationId,
           activityDate,
           hoursSubmitted: Number(hoursSubmitted),
-          role: role || undefined,
-          location: location || undefined,
+          note: note.trim() || undefined,
         },
         accessToken,
       );
@@ -49,27 +47,46 @@ export function SubmitHoursForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-      <div>
-        <label htmlFor="activityDate" className="block text-sm">Date</label>
-        <input id="activityDate" type="date" className="mt-1 rounded border px-3 py-2" value={activityDate} onChange={(e) => setActivityDate(e.target.value)} />
+    <form onSubmit={handleSubmit}>
+      <div className="log-hours__row">
+        <div className="field">
+          <label htmlFor="activityDate">Date</label>
+          <input
+            id="activityDate"
+            type="date"
+            value={activityDate}
+            onChange={(e) => setActivityDate(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="hoursSubmitted">Hours</label>
+          <input
+            id="hoursSubmitted"
+            type="number"
+            step="0.5"
+            min="0"
+            placeholder="e.g. 3"
+            value={hoursSubmitted}
+            onChange={(e) => setHoursSubmitted(e.target.value)}
+          />
+        </div>
       </div>
-      <div>
-        <label htmlFor="hoursSubmitted" className="block text-sm">Hours</label>
-        <input id="hoursSubmitted" type="number" step="0.5" className="mt-1 rounded border px-3 py-2" value={hoursSubmitted} onChange={(e) => setHoursSubmitted(e.target.value)} />
+
+      <div className="field">
+        <label htmlFor="hoursNote">What you did <span className="log-hours__optional">(optional)</span></label>
+        <textarea
+          id="hoursNote"
+          rows={3}
+          placeholder="A short note about the work you did on this shift."
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
       </div>
-      <div>
-        <label htmlFor="hoursRole" className="block text-sm">Role</label>
-        <input id="hoursRole" className="mt-1 rounded border px-3 py-2" value={role} onChange={(e) => setRole(e.target.value)} />
-      </div>
-      <div>
-        <label htmlFor="hoursLocation" className="block text-sm">Location</label>
-        <input id="hoursLocation" className="mt-1 rounded border px-3 py-2" value={location} onChange={(e) => setLocation(e.target.value)} />
-      </div>
-      <button type="submit" disabled={submitting} className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50">
-        Submit hours
+
+      <button type="submit" disabled={submitting} className="btn btn--primary">
+        {submitting ? "Submitting…" : "Submit hours"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600" style={{ marginTop: ".5rem" }}>{error}</p>}
     </form>
   );
 }

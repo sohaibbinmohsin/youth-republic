@@ -44,17 +44,17 @@ describe("§9 Clean internal APIs — every write goes through a named function 
 });
 
 describe("§9 Basic role-based access — a volunteer only reaches their own data", () => {
-  it("[9] middleware redirects an unauthenticated visitor away from every private area to /login", async () => {
+  it("[9] proxy redirects an unauthenticated visitor away from every private area to /login", async () => {
     vi.resetModules();
     vi.doMock("@supabase/ssr", () => ({
       createServerClient: () => ({
         auth: { getUser: async () => ({ data: { user: null } }) },
       }),
     }));
-    const { middleware } = await import("@/middleware");
+    const { proxy } = await import("@/proxy");
 
     for (const path of ["/profile", "/applications", "/portfolio", "/apply/opp-1"]) {
-      const res = await middleware(makeRequest(path));
+      const res = await proxy(makeRequest(path));
       expect(res.status, `${path} should redirect`).toBe(307);
       expect(res.headers.get("location")).toContain("/login");
       expect(res.headers.get("location")).toContain(`redirectTo=${encodeURIComponent(path)}`);
@@ -62,17 +62,17 @@ describe("§9 Basic role-based access — a volunteer only reaches their own dat
     vi.doUnmock("@supabase/ssr");
   });
 
-  it("[9] middleware lets an unauthenticated visitor reach the public pages", async () => {
+  it("[9] proxy lets an unauthenticated visitor reach the public pages", async () => {
     vi.resetModules();
     vi.doMock("@supabase/ssr", () => ({
       createServerClient: () => ({
         auth: { getUser: async () => ({ data: { user: null } }) },
       }),
     }));
-    const { middleware } = await import("@/middleware");
+    const { proxy } = await import("@/proxy");
 
     for (const path of ["/", "/opportunities", "/opportunities/opp-1", "/login", "/register"]) {
-      const res = await middleware(makeRequest(path));
+      const res = await proxy(makeRequest(path));
       expect(res.status, `${path} should pass through`).not.toBe(307);
     }
     vi.doUnmock("@supabase/ssr");
