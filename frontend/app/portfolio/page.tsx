@@ -163,17 +163,22 @@ function programmePhase(
 }
 
 /**
- * Date range for a programme card. A drive with an end date shows
- * "{start} – {end}"; an open-ended drive shows "{start} – ongoing", and for
- * an ongoing drive the start is the day the volunteer was selected (there is
- * no fixed drive window), not the opportunity's nominal start.
+ * Date range for a programme card.
+ *  - has an end date        -> "{start} — {end}" (the drive's own span)
+ *  - not started yet        -> "{scheduled start} — ongoing"
+ *  - under way, no end date -> "{date the volunteer was selected} — ongoing"
  */
 function programmeDates(
   startAt: string | null | undefined,
   endAt: string | null | undefined,
   selectedAt: string | null | undefined,
+  phase: ProgrammePhase,
 ): string {
-  const startIso = endAt ? startAt : selectedAt ?? startAt;
+  // The volunteer's window only replaces the drive's nominal start once the
+  // drive is actually under way with no fixed end. A drive that hasn't
+  // started shows its scheduled start date (matching the admin side); one
+  // with an end date always shows the drive's own span.
+  const startIso = phase === "starting_soon" || endAt ? startAt : selectedAt ?? startAt;
   if (!startIso) return "Ongoing";
   const s = new Date(startIso);
   if (!endAt) return `${formatDay(startIso)} — ongoing`;
@@ -461,7 +466,12 @@ export default function PortfolioPage() {
           endAt: opp.activity_end_at ?? null,
           loggable: canLogHours(opp.activity_start_at, opp.activity_end_at),
           role: "Volunteer",
-          dates: programmeDates(opp.activity_start_at, opp.activity_end_at, p.created_at),
+          dates: programmeDates(
+            opp.activity_start_at,
+            opp.activity_end_at,
+            p.created_at,
+            programmePhase(opp.activity_start_at, opp.activity_end_at, p.status ?? ""),
+          ),
           hoursTotal: 0,
           hoursVerified: 0,
           allVerified: false,
@@ -491,7 +501,12 @@ export default function PortfolioPage() {
             endAt: opp.activity_end_at ?? null,
             loggable: canLogHours(opp.activity_start_at, opp.activity_end_at),
             role: h.role ?? "Volunteer",
-            dates: programmeDates(opp.activity_start_at, opp.activity_end_at, h.activity_date),
+            dates: programmeDates(
+              opp.activity_start_at,
+              opp.activity_end_at,
+              h.activity_date,
+              programmePhase(opp.activity_start_at, opp.activity_end_at, ""),
+            ),
             hoursTotal: 0,
             hoursVerified: 0,
             allVerified: false,

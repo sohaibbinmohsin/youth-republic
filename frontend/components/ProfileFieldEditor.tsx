@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateProfileField, type UpdateProfileFieldPayload } from "@/lib/edgeFunctions";
 import { FieldSaveButton } from "@/components/FieldSaveButton";
+import { FieldRevertButton } from "@/components/FieldRevertButton";
 
 export function ProfileFieldEditor({
   fieldName,
@@ -38,12 +39,19 @@ export function ProfileFieldEditor({
     }
   }
 
+  const dirty = value !== currentValue;
+
   return (
     <div className="field">
       <label htmlFor={fieldName}>{fieldLabel}</label>
       <div className="field-row">
         <input id={fieldName} value={value} onChange={(e) => setValue(e.target.value)} />
-        <FieldSaveButton saving={saving} saved={saved} onClick={handleSave} />
+        {(dirty || saving || saved) && (
+          <div className="field-actions">
+            <FieldRevertButton onClick={() => { setValue(currentValue); setError(null); }} disabled={saving} />
+            <FieldSaveButton saving={saving} saved={saved} onClick={handleSave} />
+          </div>
+        )}
       </div>
       {error && <p className="field-error-text">{error}</p>}
     </div>

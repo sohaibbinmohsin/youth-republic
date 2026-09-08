@@ -114,10 +114,12 @@ export function SubmitHoursForm({
         />
       </div>
 
-      <button type="submit" disabled={submitting} className="btn btn--primary">
-        {submitting ? "Submitting…" : "Submit hours"}
-      </button>
-      {error && <p className="text-sm text-red-600" style={{ marginTop: ".5rem" }}>{error}</p>}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button type="submit" disabled={submitting} className="btn btn--primary">
+          {submitting ? "Submitting…" : "Submit hours"}
+        </button>
+      </div>
+      {error && <p className="text-sm text-red-600 text-right" style={{ marginTop: ".5rem" }}>{error}</p>}
     </form>
   );
 }
