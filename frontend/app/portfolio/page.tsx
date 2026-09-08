@@ -8,6 +8,8 @@ import { Select } from "@/components/Select";
 import { RegisterForm } from "@/components/RegisterForm";
 import { SensitiveFieldEditor } from "@/components/SensitiveFieldEditor";
 import { ProfileFieldEditor } from "@/components/ProfileFieldEditor";
+import { CITIES, INSTITUTIONS } from "@/lib/formDatasets";
+import { isValidCnic } from "@/lib/cnicUtils";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
 import { getAvatarInitials } from "@/lib/coolNames";
@@ -163,22 +165,18 @@ function programmePhase(
 }
 
 /**
- * Date range for a programme card.
- *  - has an end date        -> "{start} — {end}" (the drive's own span)
- *  - not started yet        -> "{scheduled start} — ongoing"
- *  - under way, no end date -> "{date the volunteer was selected} — ongoing"
+ * Date range for a programme card — always the drive's own dates, matching
+ * the admin side. Only if the drive has no start date at all (a truly
+ * rolling programme) do we fall back to the date the volunteer was selected.
+ *  - start + end -> "{start} — {end}"
+ *  - start only  -> "{start} — ongoing"
  */
 function programmeDates(
   startAt: string | null | undefined,
   endAt: string | null | undefined,
   selectedAt: string | null | undefined,
-  phase: ProgrammePhase,
 ): string {
-  // The volunteer's window only replaces the drive's nominal start once the
-  // drive is actually under way with no fixed end. A drive that hasn't
-  // started shows its scheduled start date (matching the admin side); one
-  // with an end date always shows the drive's own span.
-  const startIso = phase === "starting_soon" || endAt ? startAt : selectedAt ?? startAt;
+  const startIso = startAt ?? selectedAt;
   if (!startIso) return "Ongoing";
   const s = new Date(startIso);
   if (!endAt) return `${formatDay(startIso)} — ongoing`;
@@ -195,6 +193,35 @@ function programmeDates(
   }
   return `${formatDay(startIso)} — ${formatDay(endAt)}`;
 }
+
+type SessionBucketKey = "verified" | "pending" | "rejected";
+const SESSION_BUCKET_LABEL: Record<SessionBucketKey, string> = {
+  verified: "Verified",
+  pending: "Pending verification",
+  rejected: "Not accredited",
+};
+
+/** Split a programme's sessions into verified / pending / rejected buckets,
+ *  each carrying its own accumulated hours total. */
+function groupSessions(sessions: ActivitySession[]) {
+  const buckets: Record<SessionBucketKey, { hours: number; items: ActivitySession[] }> = {
+    verified: { hours: 0, items: [] },
+    pending: { hours: 0, items: [] },
+    rejected: { hours: 0, items: [] },
+  };
+  for (const s of sessions) {
+    const key: SessionBucketKey = s.verified || s.status === "verified"
+      ? "verified"
+      : s.status === "rejected"
+      ? "rejected"
+      : "pending";
+    buckets[key].hours += Number(s.hours) || 0;
+    buckets[key].items.push(s);
+  }
+  return buckets;
+}
+
+const oneDecimal = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
 function formatYrCode(rawCode?: string | null, userId?: string | null): string {
   if (rawCode && rawCode.startsWith("YR-")) return rawCode;
@@ -466,12 +493,7 @@ export default function PortfolioPage() {
           endAt: opp.activity_end_at ?? null,
           loggable: canLogHours(opp.activity_start_at, opp.activity_end_at),
           role: "Volunteer",
-          dates: programmeDates(
-            opp.activity_start_at,
-            opp.activity_end_at,
-            p.created_at,
-            programmePhase(opp.activity_start_at, opp.activity_end_at, p.status ?? ""),
-          ),
+          dates: programmeDates(opp.activity_start_at, opp.activity_end_at, p.created_at),
           hoursTotal: 0,
           hoursVerified: 0,
           allVerified: false,
@@ -501,12 +523,7 @@ export default function PortfolioPage() {
             endAt: opp.activity_end_at ?? null,
             loggable: canLogHours(opp.activity_start_at, opp.activity_end_at),
             role: h.role ?? "Volunteer",
-            dates: programmeDates(
-              opp.activity_start_at,
-              opp.activity_end_at,
-              h.activity_date,
-              programmePhase(opp.activity_start_at, opp.activity_end_at, ""),
-            ),
+            dates: programmeDates(opp.activity_start_at, opp.activity_end_at, h.activity_date),
             hoursTotal: 0,
             hoursVerified: 0,
             allVerified: false,
@@ -747,6 +764,9 @@ export default function PortfolioPage() {
             <div className="pcards">
               {programmes.map((p) => {
                 const isExpanded = expandedSessions[p.participationId] ?? false;
+                const buckets = groupSessions(p.sessions);
+                const shownBuckets = (["verified", "pending", "rejected"] as SessionBucketKey[])
+                  .filter((k) => buckets[k].items.length > 0);
                 return (
                   <div key={p.participationId} className="pcard">
                     <div className="pcard__top">
@@ -777,24 +797,33 @@ export default function PortfolioPage() {
                       <div>
                         <dt>Hours</dt>
                         <dd>
-                          <span className="hrs-cell">
-                            <strong>{p.hoursVerified > 0 ? `${p.hoursVerified}.0 h` : `${p.hoursTotal}.0 h`}</strong>
-                            {p.allVerified ? (
-                              <span className="hrs-verified" title="Hours verified">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="9"></circle>
-                                  <path d="m8.5 12 2.5 2.5 4.5-5.5"></path>
-                                </svg>
-                              </span>
-                            ) : (
-                              <span className="hrs-pending" title="Hours pending verification">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="9"></circle>
-                                  <path d="M12 7v5l3 2"></path>
-                                </svg>
-                              </span>
-                            )}
-                          </span>
+                          {shownBuckets.length === 0 ? (
+                            <span className="hrs-cell"><strong>0.0 h</strong></span>
+                          ) : (
+                            <span className="hrs-stack">
+                              {shownBuckets.map((k) => (
+                                <span key={k} className={`hrs-cell hrs-cell--${k}`}>
+                                  <strong>{oneDecimal(buckets[k].hours)} h</strong>
+                                  <span className="hrs-cell__tag">{SESSION_BUCKET_LABEL[k].toLowerCase()}</span>
+                                  {k === "verified" ? (
+                                    <span className="hrs-verified" title="Hours verified">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="9"></circle>
+                                        <path d="m8.5 12 2.5 2.5 4.5-5.5"></path>
+                                      </svg>
+                                    </span>
+                                  ) : k === "pending" ? (
+                                    <span className="hrs-pending" title="Hours pending verification">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="9"></circle>
+                                        <path d="M12 7v5l3 2"></path>
+                                      </svg>
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ))}
+                            </span>
+                          )}
                         </dd>
                       </div>
                     </dl>
@@ -813,16 +842,26 @@ export default function PortfolioPage() {
                           </svg>
                         </button>
                         {isExpanded && (
-                          <ul className="sessions">
-                            {p.sessions.map((s) => (
-                              <li key={s.id}>
-                                <div className="session__date">
-                                  {formatDay(s.date)} · {s.hours}.0 h
+                          <div className="sessions-grouped">
+                            {shownBuckets.map((k) => (
+                              <div key={k} className="session-group">
+                                <div className="session-group__head">
+                                  <span>{SESSION_BUCKET_LABEL[k]}</span>
+                                  <span className="session-group__sum">{oneDecimal(buckets[k].hours)} h</span>
                                 </div>
-                                {s.note && <div className="session__note">{s.note}</div>}
-                              </li>
+                                <ul className="sessions">
+                                  {buckets[k].items.map((s) => (
+                                    <li key={s.id}>
+                                      <div className="session__date">
+                                        {formatDay(s.date)} · {oneDecimal(Number(s.hours) || 0)} h
+                                      </div>
+                                      {s.note && <div className="session__note">{s.note}</div>}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
                             ))}
-                          </ul>
+                          </div>
                         )}
                       </>
                     )}
@@ -1012,6 +1051,7 @@ export default function PortfolioPage() {
                 fieldLabel="Phone number"
                 currentValue={volunteer.phone}
                 accessToken={accessToken}
+                required
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, phone: String(newValue) } : v))}
               />
 
@@ -1042,6 +1082,12 @@ export default function PortfolioPage() {
                 }
                 currentValue={volunteer.id_doc_number ?? ""}
                 accessToken={accessToken}
+                required
+                validate={(v) =>
+                  volunteer.id_doc_type === "passport" || isValidCnic(v)
+                    ? null
+                    : "Must be a 13-digit number (XXXXX-XXXXXXX-X)."
+                }
                 onUpdated={(newValue) =>
                   setVolunteer((v) => (v ? { ...v, id_doc_number: String(newValue) } : v))
                 }
@@ -1055,6 +1101,9 @@ export default function PortfolioPage() {
                 fieldLabel="City"
                 currentValue={volunteer.city}
                 accessToken={accessToken}
+                dataset={CITIES}
+                required
+                placeholder="e.g. Lahore"
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, city: String(newValue) } : v))}
               />
 
@@ -1063,6 +1112,9 @@ export default function PortfolioPage() {
                 fieldLabel="Institution / University"
                 currentValue={volunteer.institution}
                 accessToken={accessToken}
+                dataset={INSTITUTIONS}
+                required
+                placeholder="e.g. Punjab University"
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, institution: String(newValue) } : v))}
               />
 
@@ -1125,10 +1177,12 @@ export default function PortfolioPage() {
                     if (!sel || !sel.opportunityId) return null;
                     return (
                       <SubmitHoursForm
+                        key={sel.participationId}
                         participationId={sel.participationId}
                         opportunityId={sel.opportunityId}
                         organizationId={sel.organizationId}
                         accessToken={accessToken}
+                        driveStartAt={sel.startAt}
                         onSubmitted={() => {
                           setShowLogHoursModal(false);
                           loadAll();

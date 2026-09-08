@@ -68,6 +68,17 @@ export async function submitHours(
     throw new Error("drive_logging_closed");
   }
 
+  // The activity date itself can't be in the future or before the drive
+  // started. Compare on the date part only (the client sends "YYYY-MM-DD").
+  const activityDay = input.activityDate.slice(0, 10);
+  const todayDay = new Date(now).toISOString().slice(0, 10);
+  if (activityDay > todayDay) {
+    throw new Error("invalid_input");
+  }
+  if (opp?.activity_start_at && activityDay < opp.activity_start_at.slice(0, 10)) {
+    throw new Error("invalid_input");
+  }
+
   // Session photos: each referenced attachment must be a ready session_photo
   // this volunteer uploaded, and not already linked to another activity_hours
   // row. Ownership is checked against the session-derived authUserId.

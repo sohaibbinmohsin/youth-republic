@@ -1303,7 +1303,8 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
   gap: .5rem;
 }
 .field-row > input,
-.field-row > .field-inputs {
+.field-row > .field-inputs,
+.field-row > .autocomplete-wrap {
   flex: 1;
   min-width: 0;
 }
@@ -1406,9 +1407,28 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
 .session__note { font-size: .88rem; color: var(--ink-2); margin-top: .2rem; }
 
 .hrs-cell { display: inline-flex; align-items: center; gap: .35rem; }
+.hrs-stack { display: flex; flex-direction: column; gap: .15rem; align-items: flex-start; }
+.hrs-cell__tag { font-size: .72rem; color: var(--ink-2); }
+.hrs-cell--verified strong { color: var(--st-pos-fg); }
 .hrs-pending, .hrs-verified { border: 0; background: transparent; padding: 0; margin: 0; line-height: 0; display: inline-flex; }
 .hrs-pending { color: var(--st-pend-fg); }
 .hrs-verified { color: var(--st-pos-fg); }
+
+/* Expanded sessions, split by verification state with a running total. */
+.sessions-grouped { border-top: 1px solid var(--line); }
+.session-group + .session-group { border-top: 1px solid var(--line); }
+.session-group__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: .7rem 0 .3rem;
+  font: 600 .72rem/1 "Oswald", sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.session-group__sum { color: var(--ink); }
+.session-group .sessions { border-top: 0; }
 
 .pill--done { background: var(--st-pos-bg); color: var(--st-pos-fg); }
 

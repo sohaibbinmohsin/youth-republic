@@ -296,3 +296,31 @@ Deno.test("submitHours rejects a missing date or non-positive hours", async () =
     "invalid_input",
   );
 });
+
+Deno.test("submitHours rejects a future activity date or one before the drive started", async () => {
+  const supabase = testClient();
+  const { participationId, volunteerId, opportunityId, orgId, authUserId } = await makeParticipation(supabase);
+  await supabase.from("opportunities").update({
+    activity_start_at: "2026-06-01T00:00:00Z",
+  }).eq("id", opportunityId);
+
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  await assertRejects(
+    () =>
+      submitHours(supabase, {
+        authUserId, participationId, volunteerId, opportunityId, organizationId: orgId,
+        activityDate: tomorrow, hoursSubmitted: 2,
+      }),
+    Error,
+    "invalid_input",
+  );
+  await assertRejects(
+    () =>
+      submitHours(supabase, {
+        authUserId, participationId, volunteerId, opportunityId, organizationId: orgId,
+        activityDate: "2026-05-15", hoursSubmitted: 2,
+      }),
+    Error,
+    "invalid_input",
+  );
+});
