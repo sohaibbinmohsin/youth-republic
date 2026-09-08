@@ -32,6 +32,7 @@ export function SensitiveFieldEditor({
 }) {
   const [value, setValue] = useState(currentValue);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
@@ -40,6 +41,8 @@ export function SensitiveFieldEditor({
     try {
       await updateSensitiveField({ fieldName, newValue: value }, accessToken);
       onUpdated(value);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1600);
     } catch (err) {
       setError(err instanceof Error ? err.message : "unknown_error");
     } finally {
@@ -52,7 +55,7 @@ export function SensitiveFieldEditor({
       <label htmlFor={fieldName}>{fieldLabel}</label>
       <div className="field-row">
         <input id={fieldName} value={value} onChange={(e) => setValue(e.target.value)} />
-        <FieldSaveButton saving={saving} onClick={handleSave} />
+        <FieldSaveButton saving={saving} saved={saved} onClick={handleSave} />
       </div>
       {error && <p className="field-error-text">{formatErrorMessage(error)}</p>}
     </div>

@@ -16,6 +16,7 @@ export function EmergencyContactEditor({
   const [name, setName] = useState(currentValue?.name ?? "");
   const [phone, setPhone] = useState(currentValue?.phone ?? "");
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
@@ -25,6 +26,8 @@ export function EmergencyContactEditor({
       const newValue = { name, phone };
       await updateSensitiveField({ fieldName: "emergency_contact", newValue }, accessToken);
       onUpdated(newValue);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1600);
     } catch (err) {
       setError(err instanceof Error ? err.message : "unknown_error");
     } finally {
@@ -52,7 +55,7 @@ export function EmergencyContactEditor({
             onChange={(e) => setPhone(e.target.value)}
           />
         </div>
-        <FieldSaveButton saving={saving} onClick={handleSave} />
+        <FieldSaveButton saving={saving} saved={saved} onClick={handleSave} />
       </div>
       {error && <p className="field-error-text">{error}</p>}
     </div>

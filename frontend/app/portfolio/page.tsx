@@ -71,6 +71,9 @@ interface ProgrammeItem {
   type: string;
   status: string;
   phase: ProgrammePhase;
+  startAt: string | null;
+  endAt: string | null;
+  loggable: boolean;
   role: string;
   dates: string;
   hoursTotal: number;
@@ -114,6 +117,30 @@ function formatDateDisplay(isoString?: string | null): string {
   }
 }
 
+/** "6 Dec 2023" — a specific day, the way the admin picked it. */
+function formatDay(isoString?: string | null): string {
+  if (!isoString) return "";
+  try {
+    return new Date(isoString).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return isoString;
+  }
+}
+
+/**
+ * Whether the volunteer can log hours for a drive right now: it has started
+ * and either has no end date (ongoing) or ended no more than 10 days ago.
+ * Mirrors the server check in submit-hours/handler.ts.
+ */
+const LOG_HOURS_GRACE_MS = 10 * 24 * 60 * 60 * 1000;
+function canLogHours(startAt?: string | null, endAt?: string | null): boolean {
+  const now = Date.now();
+  const started = !startAt || new Date(startAt).getTime() <= now;
+  if (!started) return false;
+  if (!endAt) return true;
+  return now <= new Date(endAt).getTime() + LOG_HOURS_GRACE_MS;
+}
+
 type ProgrammePhase = "starting_soon" | "in_progress" | "completed";
 
 const PHASE_META: Record<ProgrammePhase, { label: string; cls: string }> = {
@@ -146,16 +173,56 @@ function programmeDates(
   endAt: string | null | undefined,
   selectedAt: string | null | undefined,
 ): string {
-  const start = endAt ? startAt : selectedAt ?? startAt;
-  if (!start) return "Ongoing";
-  const s = formatDateDisplay(start);
-  return endAt ? `${s} – ${formatDateDisplay(endAt)}` : `${s} – ongoing`;
+  const startIso = endAt ? startAt : selectedAt ?? startAt;
+  if (!startIso) return "Ongoing";
+  const s = new Date(startIso);
+  if (!endAt) return `${formatDay(startIso)} — ongoing`;
+  const e = new Date(endAt);
+  const sameYear = s.getFullYear() === e.getFullYear();
+  const sameMonth = sameYear && s.getMonth() === e.getMonth();
+  if (sameMonth) {
+    // "1 — 12 Mar 2024"
+    return `${s.getDate()} — ${e.getDate()} ${e.toLocaleDateString("en-GB", { month: "short", year: "numeric" })}`;
+  }
+  if (sameYear) {
+    // "28 Feb — 3 Mar 2024"
+    return `${s.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — ${formatDay(endAt)}`;
+  }
+  return `${formatDay(startIso)} — ${formatDay(endAt)}`;
 }
 
 function formatYrCode(rawCode?: string | null, userId?: string | null): string {
   if (rawCode && rawCode.startsWith("YR-")) return rawCode;
   const cleanId = (userId || "YR").replace(/[^A-Za-z0-9]/g, "").slice(0, 5).toUpperCase();
   return `YR-${cleanId || "VOL01"}`;
+}
+
+/** Shimmer rows shown in a tab body while loadAll() is still running. */
+function TabSectionSkeleton({ rows = 2 }: { rows?: number }) {
+  return (
+    <div className="pcards animate-pulse" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="pcard"
+          style={{ background: "var(--bg)", border: "1px solid var(--line)", padding: "1.25rem", borderRadius: "var(--radius-card)" }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: ".6rem" }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: "var(--line)" }} />
+              <div style={{ width: 170, height: 18, borderRadius: 4, background: "var(--line)" }} />
+            </div>
+            <div style={{ width: 82, height: 22, borderRadius: 999, background: "var(--line)" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+            <div style={{ width: "70%", height: 14, borderRadius: 4, background: "var(--line)" }} />
+            <div style={{ width: "60%", height: 14, borderRadius: 4, background: "var(--line)" }} />
+            <div style={{ width: "50%", height: 14, borderRadius: 4, background: "var(--line)" }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function PortfolioPage() {
@@ -168,6 +235,10 @@ export default function PortfolioPage() {
   const [programmes, setProgrammes] = useState<ProgrammeItem[]>([]);
   const [completedList, setCompletedList] = useState<Array<{ id: string; name: string }>>([]);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
+  // Header + stats paint as soon as the profile resolves; the tab bodies
+  // (programmes, applications) load a step later. Show a shimmer in the tab
+  // until the whole loadAll() pass finishes rather than a bare empty state.
+  const [sectionsLoading, setSectionsLoading] = useState(true);
   const [showLogHoursModal, setShowLogHoursModal] = useState(false);
   const [selectedParticipationForHours, setSelectedParticipationForHours] = useState<string | null>(null);
 
@@ -386,6 +457,9 @@ export default function PortfolioPage() {
           type: opp.type ?? "community",
           status: p.status ?? "in_progress",
           phase: programmePhase(opp.activity_start_at, opp.activity_end_at, p.status ?? ""),
+          startAt: opp.activity_start_at ?? null,
+          endAt: opp.activity_end_at ?? null,
+          loggable: canLogHours(opp.activity_start_at, opp.activity_end_at),
           role: "Volunteer",
           dates: programmeDates(opp.activity_start_at, opp.activity_end_at, p.created_at),
           hoursTotal: 0,
@@ -413,6 +487,9 @@ export default function PortfolioPage() {
             type: opp.type ?? "community",
             status: "in_progress",
             phase: programmePhase(opp.activity_start_at, opp.activity_end_at, ""),
+            startAt: opp.activity_start_at ?? null,
+            endAt: opp.activity_end_at ?? null,
+            loggable: canLogHours(opp.activity_start_at, opp.activity_end_at),
             role: h.role ?? "Volunteer",
             dates: programmeDates(opp.activity_start_at, opp.activity_end_at, h.activity_date),
             hoursTotal: 0,
@@ -465,7 +542,7 @@ export default function PortfolioPage() {
   }
 
   useEffect(() => {
-    loadAll();
+    loadAll().finally(() => setSectionsLoading(false));
   }, []);
 
   if (totalVerifiedHours === null || volunteer === null || !accessToken) {
@@ -475,6 +552,10 @@ export default function PortfolioPage() {
   const avatarInitials = getAvatarInitials(volunteer.full_name);
   const isVerified = volunteer.status === "active" || (!volunteer.is_unregistered && volunteer.status === "verified");
   const isPending = !isVerified || volunteer.is_unregistered;
+
+  // Only drives that are under way (or ended within the last 10 days) and
+  // resolve to a real opportunity can take a new hours entry.
+  const loggableProgrammes = programmes.filter((p) => p.loggable && p.opportunityId);
 
   function toggleSessions(partId: string) {
     setExpandedSessions((prev) => ({ ...prev, [partId]: !prev[partId] }));
@@ -570,8 +651,14 @@ export default function PortfolioPage() {
               <button
                 type="button"
                 className="btn btn--primary btn--sm"
+                disabled={loggableProgrammes.length === 0}
+                title={
+                  loggableProgrammes.length === 0
+                    ? "You can log hours once a drive is under way, up to 10 days after it ends."
+                    : undefined
+                }
                 onClick={() => {
-                  setSelectedParticipationForHours(programmes[0].participationId);
+                  setSelectedParticipationForHours(loggableProgrammes[0].participationId);
                   setShowLogHoursModal(true);
                 }}
               >
@@ -580,7 +667,9 @@ export default function PortfolioPage() {
             </div>
           )}
 
-          {programmes.length === 0 ? (
+          {sectionsLoading ? (
+            <TabSectionSkeleton rows={2} />
+          ) : programmes.length === 0 ? (
             /* Plain screen unboxed empty state matching opportunities style */
             <div
               style={{
@@ -713,7 +802,7 @@ export default function PortfolioPage() {
                             {p.sessions.map((s) => (
                               <li key={s.id}>
                                 <div className="session__date">
-                                  {s.date} · {s.hours}.0 h
+                                  {formatDay(s.date)} · {s.hours}.0 h
                                 </div>
                                 {s.note && <div className="session__note">{s.note}</div>}
                               </li>
@@ -748,7 +837,9 @@ export default function PortfolioPage() {
       {/* TAB 2: APPLICATIONS */}
       {activeTab === "apps" && (
         <div className="pf-tabpanel">
-          {applications.length === 0 ? (
+          {sectionsLoading ? (
+            <TabSectionSkeleton rows={3} />
+          ) : applications.length === 0 ? (
             /* Plain screen unboxed empty state matching opportunities style */
             <div
               style={{
@@ -991,8 +1082,11 @@ export default function PortfolioPage() {
               </button>
             </div>
             <div className="modal__body">
-              {programmes.length === 0 ? (
-                <p className="text-sm text-[var(--ink-2)]">No active drives available to submit hours for.</p>
+              {loggableProgrammes.length === 0 ? (
+                <p className="text-sm text-[var(--ink-2)]">
+                  None of your drives are open for logging hours right now. You can log hours once a drive
+                  is under way, and for up to 10 days after it ends.
+                </p>
               ) : (
                 <div className="space-y-4">
                   <div className="field">
@@ -1000,9 +1094,9 @@ export default function PortfolioPage() {
                     <Select
                       id="log-hours-drive"
                       aria-label="Select drive"
-                      value={selectedParticipationForHours ?? programmes[0].participationId}
+                      value={selectedParticipationForHours ?? loggableProgrammes[0].participationId}
                       onChange={setSelectedParticipationForHours}
-                      options={programmes.map((prg) => ({
+                      options={loggableProgrammes.map((prg) => ({
                         value: prg.participationId,
                         label: `${prg.opportunityName} (${prg.orgName})`,
                       }))}
@@ -1010,7 +1104,9 @@ export default function PortfolioPage() {
                   </div>
 
                   {(() => {
-                    const sel = programmes.find((prg) => prg.participationId === (selectedParticipationForHours ?? programmes[0].participationId));
+                    const sel = loggableProgrammes.find(
+                      (prg) => prg.participationId === (selectedParticipationForHours ?? loggableProgrammes[0].participationId),
+                    ) ?? loggableProgrammes[0];
                     if (!sel || !sel.opportunityId) return null;
                     return (
                       <SubmitHoursForm

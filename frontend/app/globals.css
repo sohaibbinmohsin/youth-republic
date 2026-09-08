@@ -1316,17 +1316,30 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
 .field-error-text { color: var(--st-neg-fg); font-size: .8rem; margin-top: .35rem; }
 
 /* Inline save control: text button on mobile, circular check on desktop. */
-.field-save__check { display: none; }
+.field-save__icon { display: none; }
+.field-save.btn { min-width: 5.5rem; justify-content: center; transition: background-color .15s ease; }
+.field-save.is-saved.btn { background: var(--st-pos-fg, #1a7f37); }
+.field-save__spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  display: inline-block;
+  animation: fieldSaveSpin .6s linear infinite;
+}
+@keyframes fieldSaveSpin { to { transform: rotate(360deg); } }
 @media (min-width: 561px) {
   .field-save.btn {
     width: 40px;
     height: 40px;
+    min-width: 0;
     padding: 0;
     border-radius: 999px;
     align-self: center;
   }
   .field-save__label { display: none; }
-  .field-save__check {
+  .field-save__icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;

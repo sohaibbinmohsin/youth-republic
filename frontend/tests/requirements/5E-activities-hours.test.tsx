@@ -87,7 +87,7 @@ describe("§5E Volunteer submits activity hours from their portfolio", () => {
     await user.type(screen.getByLabelText("Hours"), "3");
     await user.click(screen.getByRole("button", { name: "Submit hours" }));
 
-    expect(await screen.findByText("participation_not_active")).toBeInTheDocument();
+    expect(await screen.findByText(/place on this drive isn.t active/i)).toBeInTheDocument();
   });
 
   it("[5E] the submit form optionally captures Role (free text) and Location — see components/SubmitHoursForm.test.tsx", () => {

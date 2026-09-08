@@ -220,3 +220,79 @@ Deno.test("submitHours derives opportunity_id and organization_id from the parti
   assertEquals(row!.opportunity_id, opportunityId);
   assertEquals(row!.organization_id, orgId);
 });
+
+Deno.test("submitHours rejects hours for a drive that hasn't started yet", async () => {
+  const supabase = testClient();
+  const { participationId, volunteerId, opportunityId, orgId, authUserId } = await makeParticipation(supabase);
+  const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from("opportunities").update({ activity_start_at: future }).eq("id", opportunityId);
+
+  await assertRejects(
+    () =>
+      submitHours(supabase, {
+        authUserId, participationId, volunteerId, opportunityId, organizationId: orgId,
+        activityDate: "2026-08-01", hoursSubmitted: 3,
+      }),
+    Error,
+    "drive_not_started",
+  );
+});
+
+Deno.test("submitHours rejects hours more than 10 days after a drive ended", async () => {
+  const supabase = testClient();
+  const { participationId, volunteerId, opportunityId, orgId, authUserId } = await makeParticipation(supabase);
+  const longAgo = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from("opportunities").update({
+    activity_start_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    activity_end_at: longAgo,
+  }).eq("id", opportunityId);
+
+  await assertRejects(
+    () =>
+      submitHours(supabase, {
+        authUserId, participationId, volunteerId, opportunityId, organizationId: orgId,
+        activityDate: "2026-08-01", hoursSubmitted: 3,
+      }),
+    Error,
+    "drive_logging_closed",
+  );
+});
+
+Deno.test("submitHours allows hours within 10 days after a drive ended", async () => {
+  const supabase = testClient();
+  const { participationId, volunteerId, opportunityId, orgId, authUserId } = await makeParticipation(supabase);
+  await supabase.from("opportunities").update({
+    activity_start_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+    activity_end_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  }).eq("id", opportunityId);
+
+  const result = await submitHours(supabase, {
+    authUserId, participationId, volunteerId, opportunityId, organizationId: orgId,
+    activityDate: "2026-08-01", hoursSubmitted: 3,
+  });
+  assertEquals(typeof result.activityHoursId, "string");
+});
+
+Deno.test("submitHours rejects a missing date or non-positive hours", async () => {
+  const supabase = testClient();
+  const { participationId, volunteerId, opportunityId, orgId, authUserId } = await makeParticipation(supabase);
+
+  await assertRejects(
+    () =>
+      submitHours(supabase, {
+        authUserId, participationId, volunteerId, opportunityId, organizationId: orgId,
+        activityDate: "", hoursSubmitted: 3,
+      }),
+    Error,
+    "invalid_input",
+  );
+  await assertRejects(
+    () =>
+      submitHours(supabase, {
+        authUserId, participationId, volunteerId, opportunityId, organizationId: orgId,
+        activityDate: "2026-08-01", hoursSubmitted: 0,
+      }),
+    Error,
+    "invalid_input",
+  );
+});
