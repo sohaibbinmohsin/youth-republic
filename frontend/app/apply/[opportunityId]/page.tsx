@@ -481,11 +481,11 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
               </p>
             </div>
             <div className="modal__foot modal__foot--wrap">
-              <Link className="btn btn--primary text-center" href="/portfolio">
-                Go to my portfolio
-              </Link>
-              <Link className="btn btn--ghost text-center" href="/">
+              <Link className="btn btn--primary text-center" href="/">
                 Browse opportunities
+              </Link>
+              <Link className="btn btn--ghost text-center" href="/portfolio">
+                Go to my portfolio
               </Link>
             </div>
           </div>

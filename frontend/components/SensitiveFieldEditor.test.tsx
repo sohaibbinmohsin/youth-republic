@@ -55,7 +55,10 @@ describe("SensitiveFieldEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /save/i }));
+    const input = screen.getByLabelText("CNIC number");
+    await user.clear(input);
+    await user.type(input, "35202-2222222-2");
+    await user.click(screen.getByRole("button", { name: /^save/i }));
 
     await waitFor(() => {
       expect(screen.getByText("This identification number is already registered with another account.")).toBeInTheDocument();

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateSensitiveField } from "@/lib/edgeFunctions";
 import { FieldSaveButton } from "@/components/FieldSaveButton";
+import { FieldRevertButton } from "@/components/FieldRevertButton";
 
 export function EmergencyContactEditor({
   currentValue,
@@ -35,6 +36,15 @@ export function EmergencyContactEditor({
     }
   }
 
+  const origName = currentValue?.name ?? "";
+  const origPhone = currentValue?.phone ?? "";
+  const dirty = name !== origName || phone !== origPhone;
+  function handleRevert() {
+    setName(origName);
+    setPhone(origPhone);
+    setError(null);
+  }
+
   return (
     <div className="field">
       <label>Emergency contact</label>
@@ -55,7 +65,12 @@ export function EmergencyContactEditor({
             onChange={(e) => setPhone(e.target.value)}
           />
         </div>
-        <FieldSaveButton saving={saving} saved={saved} onClick={handleSave} />
+        {(dirty || saving || saved) && (
+          <div className="field-actions">
+            <FieldRevertButton onClick={handleRevert} disabled={saving} />
+            <FieldSaveButton saving={saving} saved={saved} onClick={handleSave} />
+          </div>
+        )}
       </div>
       {error && <p className="field-error-text">{error}</p>}
     </div>
