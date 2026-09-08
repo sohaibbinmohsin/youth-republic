@@ -12,10 +12,12 @@ function mockSupabase(opps: any[] = []) {
     },
     from(table: string) {
       if (table === "opportunities") {
+        const result = Promise.resolve({ data: opps, error: null });
         return {
           select: () => ({
             is: () => ({
-              order: () => Promise.resolve({ data: opps, error: null }),
+              or: () => ({ order: () => result }),
+              order: () => result,
             }),
           }),
         };
