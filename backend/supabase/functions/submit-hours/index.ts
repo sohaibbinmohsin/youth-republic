@@ -26,6 +26,8 @@ export async function handler(req: Request): Promise<Response> {
       ? 404
       : message === "bad_attachment"
       ? 422
+      : message === "drive_not_started" || message === "drive_logging_closed"
+      ? 409
       : 400;
     return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });
   }

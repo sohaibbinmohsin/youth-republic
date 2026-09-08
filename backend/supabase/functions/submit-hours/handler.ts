@@ -28,13 +28,44 @@ export async function submitHours(
   // body is untrusted, and the service-role client bypasses RLS entirely.
   const { data: participation, error: participationError } = await supabase
     .from("participation")
-    .select("id, volunteer_id, opportunity_id, organization_id")
+    .select(
+      "id, volunteer_id, opportunity_id, organization_id, opportunities(activity_start_at, activity_end_at, deactivated_at)",
+    )
     .eq("id", input.participationId)
     .single();
   if (participationError) throw participationError;
 
   if (participation.volunteer_id !== input.volunteerId) {
     throw new Error("forbidden");
+  }
+
+  // Basic shape checks — the client validates too, but never trust it.
+  if (!input.activityDate || Number.isNaN(Date.parse(input.activityDate))) {
+    throw new Error("invalid_input");
+  }
+  if (typeof input.hoursSubmitted !== "number" || !(input.hoursSubmitted > 0)) {
+    throw new Error("invalid_input");
+  }
+
+  // Hours can only be logged once a drive is under way, and for up to 10 days
+  // after it ends. Mirrors canLogHours() in the volunteer portfolio.
+  type OppWindow = {
+    activity_start_at: string | null;
+    activity_end_at: string | null;
+    deactivated_at: string | null;
+  };
+  const embed = (participation as unknown as { opportunities?: OppWindow | OppWindow[] | null }).opportunities;
+  const opp: OppWindow | null = Array.isArray(embed) ? embed[0] ?? null : embed ?? null;
+  const now = Date.now();
+  const GRACE_MS = 10 * 24 * 60 * 60 * 1000;
+  if (opp?.deactivated_at) {
+    throw new Error("drive_logging_closed");
+  }
+  if (opp?.activity_start_at && new Date(opp.activity_start_at).getTime() > now) {
+    throw new Error("drive_not_started");
+  }
+  if (opp?.activity_end_at && now > new Date(opp.activity_end_at).getTime() + GRACE_MS) {
+    throw new Error("drive_logging_closed");
   }
 
   // Session photos: each referenced attachment must be a ready session_photo
