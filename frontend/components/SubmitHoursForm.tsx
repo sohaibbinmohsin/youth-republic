@@ -12,19 +12,32 @@ const ERROR_TEXT: Record<string, string> = {
   unauthorized: "Your session has expired. Please sign in again.",
 };
 
+/** ISO datetime -> "YYYY-MM-DD" for a <input type="date"> min/max. */
+function toDateInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+}
+
 export function SubmitHoursForm({
   participationId,
   opportunityId,
   organizationId,
   accessToken,
+  driveStartAt,
   onSubmitted,
 }: {
   participationId: string;
   opportunityId: string;
   organizationId: string;
   accessToken: string;
+  /** The drive's start date — hours can't be logged before it. */
+  driveStartAt?: string | null;
   onSubmitted: () => void;
 }) {
+  const today = toDateInput(new Date().toISOString());
+  const minDate = toDateInput(driveStartAt);
+
   const [activityDate, setActivityDate] = useState("");
   const [hoursSubmitted, setHoursSubmitted] = useState("");
   const [note, setNote] = useState("");
@@ -37,7 +50,13 @@ export function SubmitHoursForm({
     setError(null);
 
     const next: { date?: string; hours?: string } = {};
-    if (!activityDate) next.date = "Pick the date you volunteered.";
+    if (!activityDate) {
+      next.date = "Pick the date you volunteered.";
+    } else if (minDate && activityDate < minDate) {
+      next.date = `The drive started on ${new Date(minDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} — pick that day or later.`;
+    } else if (today && activityDate > today) {
+      next.date = "You can't log hours for a future date.";
+    }
     const hoursNum = Number(hoursSubmitted);
     if (!hoursSubmitted.trim() || !Number.isFinite(hoursNum) || hoursNum <= 0) {
       next.hours = "Enter how many hours you volunteered (more than 0).";
@@ -75,6 +94,8 @@ export function SubmitHoursForm({
           <input
             id="activityDate"
             type="date"
+            min={minDate || undefined}
+            max={today || undefined}
             aria-invalid={Boolean(fieldErrors.date)}
             value={activityDate}
             onChange={(e) => {

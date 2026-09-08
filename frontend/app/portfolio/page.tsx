@@ -194,6 +194,35 @@ function programmeDates(
   return `${formatDay(startIso)} — ${formatDay(endAt)}`;
 }
 
+type SessionBucketKey = "verified" | "pending" | "rejected";
+const SESSION_BUCKET_LABEL: Record<SessionBucketKey, string> = {
+  verified: "Verified",
+  pending: "Pending verification",
+  rejected: "Not accredited",
+};
+
+/** Split a programme's sessions into verified / pending / rejected buckets,
+ *  each carrying its own accumulated hours total. */
+function groupSessions(sessions: ActivitySession[]) {
+  const buckets: Record<SessionBucketKey, { hours: number; items: ActivitySession[] }> = {
+    verified: { hours: 0, items: [] },
+    pending: { hours: 0, items: [] },
+    rejected: { hours: 0, items: [] },
+  };
+  for (const s of sessions) {
+    const key: SessionBucketKey = s.verified || s.status === "verified"
+      ? "verified"
+      : s.status === "rejected"
+      ? "rejected"
+      : "pending";
+    buckets[key].hours += Number(s.hours) || 0;
+    buckets[key].items.push(s);
+  }
+  return buckets;
+}
+
+const oneDecimal = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
+
 function formatYrCode(rawCode?: string | null, userId?: string | null): string {
   if (rawCode && rawCode.startsWith("YR-")) return rawCode;
   const cleanId = (userId || "YR").replace(/[^A-Za-z0-9]/g, "").slice(0, 5).toUpperCase();
@@ -735,6 +764,9 @@ export default function PortfolioPage() {
             <div className="pcards">
               {programmes.map((p) => {
                 const isExpanded = expandedSessions[p.participationId] ?? false;
+                const buckets = groupSessions(p.sessions);
+                const shownBuckets = (["verified", "pending", "rejected"] as SessionBucketKey[])
+                  .filter((k) => buckets[k].items.length > 0);
                 return (
                   <div key={p.participationId} className="pcard">
                     <div className="pcard__top">
@@ -765,24 +797,33 @@ export default function PortfolioPage() {
                       <div>
                         <dt>Hours</dt>
                         <dd>
-                          <span className="hrs-cell">
-                            <strong>{p.hoursVerified > 0 ? `${p.hoursVerified}.0 h` : `${p.hoursTotal}.0 h`}</strong>
-                            {p.allVerified ? (
-                              <span className="hrs-verified" title="Hours verified">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="9"></circle>
-                                  <path d="m8.5 12 2.5 2.5 4.5-5.5"></path>
-                                </svg>
-                              </span>
-                            ) : (
-                              <span className="hrs-pending" title="Hours pending verification">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <circle cx="12" cy="12" r="9"></circle>
-                                  <path d="M12 7v5l3 2"></path>
-                                </svg>
-                              </span>
-                            )}
-                          </span>
+                          {shownBuckets.length === 0 ? (
+                            <span className="hrs-cell"><strong>0.0 h</strong></span>
+                          ) : (
+                            <span className="hrs-stack">
+                              {shownBuckets.map((k) => (
+                                <span key={k} className={`hrs-cell hrs-cell--${k}`}>
+                                  <strong>{oneDecimal(buckets[k].hours)} h</strong>
+                                  <span className="hrs-cell__tag">{SESSION_BUCKET_LABEL[k].toLowerCase()}</span>
+                                  {k === "verified" ? (
+                                    <span className="hrs-verified" title="Hours verified">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="9"></circle>
+                                        <path d="m8.5 12 2.5 2.5 4.5-5.5"></path>
+                                      </svg>
+                                    </span>
+                                  ) : k === "pending" ? (
+                                    <span className="hrs-pending" title="Hours pending verification">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="9"></circle>
+                                        <path d="M12 7v5l3 2"></path>
+                                      </svg>
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ))}
+                            </span>
+                          )}
                         </dd>
                       </div>
                     </dl>
@@ -801,16 +842,26 @@ export default function PortfolioPage() {
                           </svg>
                         </button>
                         {isExpanded && (
-                          <ul className="sessions">
-                            {p.sessions.map((s) => (
-                              <li key={s.id}>
-                                <div className="session__date">
-                                  {formatDay(s.date)} · {s.hours}.0 h
+                          <div className="sessions-grouped">
+                            {shownBuckets.map((k) => (
+                              <div key={k} className="session-group">
+                                <div className="session-group__head">
+                                  <span>{SESSION_BUCKET_LABEL[k]}</span>
+                                  <span className="session-group__sum">{oneDecimal(buckets[k].hours)} h</span>
                                 </div>
-                                {s.note && <div className="session__note">{s.note}</div>}
-                              </li>
+                                <ul className="sessions">
+                                  {buckets[k].items.map((s) => (
+                                    <li key={s.id}>
+                                      <div className="session__date">
+                                        {formatDay(s.date)} · {oneDecimal(Number(s.hours) || 0)} h
+                                      </div>
+                                      {s.note && <div className="session__note">{s.note}</div>}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
                             ))}
-                          </ul>
+                          </div>
                         )}
                       </>
                     )}
@@ -1126,10 +1177,12 @@ export default function PortfolioPage() {
                     if (!sel || !sel.opportunityId) return null;
                     return (
                       <SubmitHoursForm
+                        key={sel.participationId}
                         participationId={sel.participationId}
                         opportunityId={sel.opportunityId}
                         organizationId={sel.organizationId}
                         accessToken={accessToken}
+                        driveStartAt={sel.startAt}
                         onSubmitted={() => {
                           setShowLogHoursModal(false);
                           loadAll();

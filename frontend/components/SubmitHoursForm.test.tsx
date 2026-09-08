@@ -47,6 +47,29 @@ describe("SubmitHoursForm", () => {
     );
   });
 
+  it("rejects a date before the drive start or in the future", async () => {
+    const user = userEvent.setup();
+    render(
+      <SubmitHoursForm
+        participationId="p1" opportunityId="opp1" organizationId="org1" accessToken="t"
+        driveStartAt="2026-06-01T00:00:00Z"
+        onSubmitted={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Date"), "2026-05-20");
+    await user.type(screen.getByLabelText("Hours"), "2");
+    await user.click(screen.getByRole("button", { name: "Submit hours" }));
+    expect(screen.getByText(/drive started on 1 Jun 2026/i)).toBeInTheDocument();
+    expect(edgeFunctions.submitHours).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByLabelText("Date"));
+    await user.type(screen.getByLabelText("Date"), "2999-01-01");
+    await user.click(screen.getByRole("button", { name: "Submit hours" }));
+    expect(screen.getByText(/can.t log hours for a future date/i)).toBeInTheDocument();
+    expect(edgeFunctions.submitHours).not.toHaveBeenCalled();
+  });
+
   it("submits the date and hours worked", async () => {
     vi.mocked(edgeFunctions.submitHours).mockResolvedValue({ activityHoursId: "ah1" });
     const onSubmitted = vi.fn();
