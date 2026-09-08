@@ -1303,7 +1303,8 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
   gap: .5rem;
 }
 .field-row > input,
-.field-row > .field-inputs {
+.field-row > .field-inputs,
+.field-row > .autocomplete-wrap {
   flex: 1;
   min-width: 0;
 }

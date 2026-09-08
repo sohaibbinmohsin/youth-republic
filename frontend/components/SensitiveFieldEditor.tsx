@@ -24,12 +24,18 @@ export function SensitiveFieldEditor({
   currentValue,
   accessToken,
   onUpdated,
+  required = false,
+  validate,
 }: {
   fieldName: SensitiveFieldName;
   fieldLabel: string;
   currentValue: string;
   accessToken: string;
   onUpdated: (newValue: string) => void;
+  /** Block an empty save. */
+  required?: boolean;
+  /** Return an error string to block the save, or null to allow it. */
+  validate?: (value: string) => string | null;
 }) {
   const [value, setValue] = useState(currentValue);
   const [saving, setSaving] = useState(false);
@@ -37,6 +43,15 @@ export function SensitiveFieldEditor({
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
+    if (required && !value.trim()) {
+      setError(`${fieldLabel} is required.`);
+      return;
+    }
+    const validationError = validate?.(value) ?? null;
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setError(null);
     setSaving(true);
     try {
@@ -54,7 +69,7 @@ export function SensitiveFieldEditor({
   const dirty = value !== currentValue;
 
   return (
-    <div className="field">
+    <div className={`field${error ? " has-error" : ""}`}>
       <label htmlFor={fieldName}>{fieldLabel}</label>
       <div className="field-row">
         <input id={fieldName} value={value} onChange={(e) => setValue(e.target.value)} />

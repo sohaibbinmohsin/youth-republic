@@ -28,3 +28,30 @@ describe("ProfileFieldEditor", () => {
     });
   });
 });
+
+describe("ProfileFieldEditor — dataset + required", () => {
+  beforeEach(() => vi.mocked(edgeFunctions.updateProfileField).mockReset());
+
+  it("renders a typeahead when given a dataset and blocks an empty required save", async () => {
+    const onUpdated = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ProfileFieldEditor
+        fieldName="city"
+        fieldLabel="City"
+        currentValue="Lahore"
+        accessToken="t"
+        dataset={[{ id: "khi", label: "Karachi" }, { id: "isb", label: "Islamabad" }]}
+        required
+        onUpdated={onUpdated}
+      />,
+    );
+
+    const input = screen.getByLabelText("City");
+    await user.clear(input);
+    await user.click(screen.getByRole("button", { name: /^save/i }));
+
+    expect(screen.getByText("City is required.")).toBeInTheDocument();
+    expect(edgeFunctions.updateProfileField).not.toHaveBeenCalled();
+  });
+})

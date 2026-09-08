@@ -8,6 +8,8 @@ import { Select } from "@/components/Select";
 import { RegisterForm } from "@/components/RegisterForm";
 import { SensitiveFieldEditor } from "@/components/SensitiveFieldEditor";
 import { ProfileFieldEditor } from "@/components/ProfileFieldEditor";
+import { CITIES, INSTITUTIONS } from "@/lib/formDatasets";
+import { isValidCnic } from "@/lib/cnicUtils";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
 import { getAvatarInitials } from "@/lib/coolNames";
@@ -998,6 +1000,7 @@ export default function PortfolioPage() {
                 fieldLabel="Phone number"
                 currentValue={volunteer.phone}
                 accessToken={accessToken}
+                required
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, phone: String(newValue) } : v))}
               />
 
@@ -1028,6 +1031,12 @@ export default function PortfolioPage() {
                 }
                 currentValue={volunteer.id_doc_number ?? ""}
                 accessToken={accessToken}
+                required
+                validate={(v) =>
+                  volunteer.id_doc_type === "passport" || isValidCnic(v)
+                    ? null
+                    : "Must be a 13-digit number (XXXXX-XXXXXXX-X)."
+                }
                 onUpdated={(newValue) =>
                   setVolunteer((v) => (v ? { ...v, id_doc_number: String(newValue) } : v))
                 }
@@ -1041,6 +1050,9 @@ export default function PortfolioPage() {
                 fieldLabel="City"
                 currentValue={volunteer.city}
                 accessToken={accessToken}
+                dataset={CITIES}
+                required
+                placeholder="e.g. Lahore"
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, city: String(newValue) } : v))}
               />
 
@@ -1049,6 +1061,9 @@ export default function PortfolioPage() {
                 fieldLabel="Institution / University"
                 currentValue={volunteer.institution}
                 accessToken={accessToken}
+                dataset={INSTITUTIONS}
+                required
+                placeholder="e.g. Punjab University"
                 onUpdated={(newValue) => setVolunteer((v) => (v ? { ...v, institution: String(newValue) } : v))}
               />
 
