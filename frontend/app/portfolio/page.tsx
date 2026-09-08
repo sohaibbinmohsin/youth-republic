@@ -842,26 +842,42 @@ export default function PortfolioPage() {
                           </svg>
                         </button>
                         {isExpanded && (
-                          <div className="sessions-grouped">
-                            {shownBuckets.map((k) => (
-                              <div key={k} className="session-group">
-                                <div className="session-group__head">
-                                  <span>{SESSION_BUCKET_LABEL[k]}</span>
-                                  <span className="session-group__sum">{oneDecimal(buckets[k].hours)} h</span>
-                                </div>
-                                <ul className="sessions">
-                                  {buckets[k].items.map((s) => (
-                                    <li key={s.id}>
-                                      <div className="session__date">
-                                        {formatDay(s.date)} · {oneDecimal(Number(s.hours) || 0)} h
-                                      </div>
-                                      {s.note && <div className="session__note">{s.note}</div>}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ))}
-                          </div>
+                          <ul className="sessions">
+                            {p.sessions.map((s) => {
+                              const isVerified = s.verified || s.status === "verified";
+                              const isRejected = s.status === "rejected";
+                              return (
+                                <li key={s.id}>
+                                  <div className="session__date">
+                                    {formatDay(s.date)} · {oneDecimal(Number(s.hours) || 0)} h
+                                    {isVerified ? (
+                                      <span className="hrs-verified" title="Verified">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <circle cx="12" cy="12" r="9" />
+                                          <path d="m8.5 12 2.5 2.5 4.5-5.5" />
+                                        </svg>
+                                      </span>
+                                    ) : isRejected ? (
+                                      <span className="hrs-rejected" title="Not accredited">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <circle cx="12" cy="12" r="9" />
+                                          <path d="m15 9-6 6M9 9l6 6" />
+                                        </svg>
+                                      </span>
+                                    ) : (
+                                      <span className="hrs-pending" title="Pending verification">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <circle cx="12" cy="12" r="9" />
+                                          <path d="M12 7v5l3 2" />
+                                        </svg>
+                                      </span>
+                                    )}
+                                  </div>
+                                  {s.note && <div className="session__note">{s.note}</div>}
+                                </li>
+                              );
+                            })}
+                          </ul>
                         )}
                       </>
                     )}
