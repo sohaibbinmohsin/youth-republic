@@ -18,6 +18,8 @@ export default function Home() {
           .from("opportunities")
           .select("id, name, type, location, is_online, description, organization_id, status_override, application_open_at, application_deadline, activity_start_at, activity_end_at, deactivated_at, created_at, organizations(id, name, logo_url, brand_color)")
           .is("deactivated_at", null)
+          // Drafts are admin-only until published.
+          .or("status_override.is.null,status_override.neq.draft")
           .order("created_at", { ascending: false });
 
         if (opps) {

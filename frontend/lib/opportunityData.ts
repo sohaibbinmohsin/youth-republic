@@ -286,6 +286,10 @@ export async function fetchOpportunityClient(id: string): Promise<OpportunityDet
       .single();
 
     if (data && !error) {
+      // Drafts are admin-only — invisible to volunteers even by direct link.
+      if ((data as { status_override?: string | null }).status_override === "draft") {
+        return null;
+      }
       return data as unknown as OpportunityDetailRow;
     }
   } catch {
