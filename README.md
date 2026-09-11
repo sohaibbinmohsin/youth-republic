@@ -33,29 +33,29 @@ Youth Republic is built on a modern decoupled architecture: a high-performance *
 It interoperates cleanly with **ZahraOS** (the enterprise administrative command center) through an asymmetric trust boundary: ZahraOS mints signed JWTs with fine-grained capability claims, and Youth Republic verifies and enforces tenant-scoped Row Level Security.
 
 ```mermaid
-graph TD
-    subgraph Client Layer
-        V[Volunteer Portal<br/>Next.js 16 / React 19 / Tailwind]
-        A[ZahraOS Admin Portal<br/>Enterprise Operations Hub]
+flowchart TD
+    subgraph ClientLayer["Client Layer"]
+        V["Volunteer Portal<br/>Next.js 16 / React 19 / Tailwind"]
+        A["ZahraOS Admin Portal<br/>Enterprise Operations Hub"]
     end
 
-    subgraph Edge & API Gateway
-        GW[Supabase Edge Gateway]
-        EF[30+ Deno Edge Functions<br/>Typed Contract & Validation Engine]
-        AUTH[Supabase Auth & Staff JWT Verification]
+    subgraph EdgeGateway["Edge & API Gateway"]
+        GW["Supabase Edge Gateway"]
+        EF["30+ Deno Edge Functions<br/>Typed Contract & Validation Engine"]
+        AUTH["Supabase Auth & Staff JWT Verification"]
     end
 
-    subgraph Data & Storage Layer
-        DB[(PostgreSQL Database<br/>Multi-Tenant RLS & pgTAP Tests)]
-        S3[Encrypted Storage Buckets<br/>identity-docs · application-files · session-photos]
+    subgraph DataLayer["Data & Storage Layer"]
+        DB[("PostgreSQL Database<br/>Multi-Tenant RLS & pgTAP Tests")]
+        S3["Encrypted Storage Buckets<br/>identity-docs · application-files · session-photos"]
     end
 
-    V -->|HTTPS / Supabase Client| GW
-    A -->|Staff Bearer JWT| GW
+    V -->|"HTTPS / Supabase Client"| GW
+    A -->|"Staff Bearer JWT"| GW
     GW --> AUTH
     AUTH --> EF
-    EF -->|Service Role / User Context| DB
-    EF -->|Signed Pre-Auth URLs| S3
+    EF -->|"Service Role / User Context"| DB
+    EF -->|"Signed Pre-Auth URLs"| S3
 ```
 
 ---
