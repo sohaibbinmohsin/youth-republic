@@ -31,8 +31,7 @@ describe("OpportunityCard", () => {
     expect(screen.getByText("Open")).toBeInTheDocument();
   });
 
-  it("renders live dot button next to title when in_progress and toggles info popover on click", async () => {
-    const { fireEvent } = await import("@testing-library/react");
+  it("renders Live pill next to title when in_progress", () => {
     render(
       <OpportunityCard
         opportunity={{
@@ -48,16 +47,10 @@ describe("OpportunityCard", () => {
     expect(screen.getByText("Rawalpindi")).toBeInTheDocument();
     expect(screen.getByText("Closed")).toBeInTheDocument();
 
-    const liveBtn = screen.getByRole("button", { name: /Ongoing program information/i });
-    expect(liveBtn).toBeInTheDocument();
-
-    // Clicking live button opens simple purplish popover
-    fireEvent.click(liveBtn);
-    expect(screen.getByText("This volunteer drive is currently active and in progress.")).toBeInTheDocument();
-
-    // Clicking live button again toggles it off
-    fireEvent.click(liveBtn);
-    expect(screen.queryByText("This volunteer drive is currently active and in progress.")).not.toBeInTheDocument();
+    const livePill = screen.getByText("Live");
+    expect(livePill).toBeInTheDocument();
+    expect(livePill).toHaveClass("live-pill");
+    expect(livePill).toHaveAttribute("title", "Drive in progress");
   });
 
   it("renders 'Open' pill when in_progress and application deadline has not passed", () => {

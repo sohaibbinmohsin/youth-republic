@@ -263,6 +263,56 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
           </div>
 
           <div className="rail__body">
+            <h4>Status</h4>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("open")}
+                onChange={() => toggleStatus("open")}
+              />
+              Open
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("closing_soon")}
+                onChange={() => toggleStatus("closing_soon")}
+              />
+              Closing soon
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("coming_soon")}
+                onChange={() => toggleStatus("coming_soon")}
+              />
+              Coming soon
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("in_progress")}
+                onChange={() => toggleStatus("in_progress")}
+              />
+              In progress
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("closed")}
+                onChange={() => toggleStatus("closed")}
+              />
+              Closed
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedStatuses.includes("completed")}
+                onChange={() => toggleStatus("completed")}
+              />
+              Completed
+            </label>
+
             <h4>Type</h4>
             <label className="env">
               <input
@@ -320,56 +370,6 @@ export function NoticeboardHub({ initialOpportunities, isLoading = false }: Noti
                 {city}
               </label>
             ))}
-
-            <h4>Status</h4>
-            <label>
-              <input
-                type="checkbox"
-                checked={selectedStatuses.includes("open")}
-                onChange={() => toggleStatus("open")}
-              />
-              Open
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={selectedStatuses.includes("closing_soon")}
-                onChange={() => toggleStatus("closing_soon")}
-              />
-              Closing soon
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={selectedStatuses.includes("coming_soon")}
-                onChange={() => toggleStatus("coming_soon")}
-              />
-              Coming soon
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={selectedStatuses.includes("in_progress")}
-                onChange={() => toggleStatus("in_progress")}
-              />
-              In progress
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={selectedStatuses.includes("closed")}
-                onChange={() => toggleStatus("closed")}
-              />
-              Closed
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={selectedStatuses.includes("completed")}
-                onChange={() => toggleStatus("completed")}
-              />
-              Completed
-            </label>
 
             <h4>Format</h4>
             <label>

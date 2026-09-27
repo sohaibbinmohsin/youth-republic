@@ -362,88 +362,24 @@ select {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: .35rem;
-}
-.live-indicator-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.live-indicator-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 0;
-  padding: 4px;
-  cursor: pointer;
-  border-radius: 999px;
-  flex-shrink: 0;
-  vertical-align: middle;
-  transition: transform .15s ease;
-}
-.live-indicator-btn:hover {
-  transform: scale(1.15);
-}
-.live-dot-pulse {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #941A80;
-  position: relative;
-  display: inline-block;
-}
-.live-dot-pulse::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 999px;
-  background: #941A80;
-  opacity: 0.45;
-  animation: liveDotRipples 1.6s ease-out infinite;
-}
-@keyframes liveDotRipples {
-  0% { transform: scale(0.8); opacity: 0.8; }
-  100% { transform: scale(2.3); opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .live-dot-pulse::after { animation: none; }
 }
 
-/* Opaque purplish box with dashed border appearing on top right of dot */
-.live-popover-box {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
-  z-index: 50;
-  width: 135px;
-  max-width: 135px;
-  background: #FAF5FC;
-  border: 1px dashed #941A80;
-  border-radius: 8px;
-  padding: .45rem .6rem;
-  font-size: .72rem;
-  line-height: 1.35;
-  color: #6E1560;
-  font-weight: 500;
-  box-shadow: 0 4px 16px rgba(36, 38, 45, 0.15);
-  pointer-events: auto;
-  white-space: normal;
-  word-break: normal;
-  animation: popoverFadeIn .15s ease-out;
-}
-@media (max-width: 500px) {
-  .live-popover-box {
-    width: 115px;
-    max-width: 115px;
-    font-size: .70rem;
-    padding: .4rem .5rem;
-    line-height: 1.3;
-  }
-}
-@keyframes popoverFadeIn {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Live "in progress" indicator pill — brand primary color background with contrast text */
+.live-pill {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.45rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--blue-strong);
+  color: var(--on-blue);
+  font-family: var(--font-body, "Jost", system-ui, -apple-system, sans-serif);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 /* ---------- 2-COLUMN DETAIL PANE ---------- */

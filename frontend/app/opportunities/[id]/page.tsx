@@ -102,7 +102,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               <>
                 {prefix}
                 <span className="title-with-live">
-                  {lastWord}
+                  {lastWord}{" "}
                   <LiveIndicator />
                 </span>
               </>
