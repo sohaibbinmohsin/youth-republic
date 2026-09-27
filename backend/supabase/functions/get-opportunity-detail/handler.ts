@@ -9,6 +9,7 @@ export interface GetOpportunityDetailInput {
 export interface OpportunityDetail {
   id: string;
   name: string;
+  chapterId?: string | null;
   description: string | null;
   about: string | null;
   duties: string[];
@@ -16,6 +17,8 @@ export interface OpportunityDetail {
   whatToBring: string[];
   type: string;
   location: string | null;
+  city: string | null;
+  venue: string | null;
   isOnline: boolean;
   applicationOpenAt: string | null;
   applicationDeadline: string | null;
@@ -23,6 +26,7 @@ export interface OpportunityDetail {
   activityEndAt: string | null;
   capacity: number | null;
   computedStatus: string;
+  impactStats?: Record<string, unknown> | null;
   orgId: string;
   orgName: string;
   orgAbout: string | null;
@@ -37,9 +41,9 @@ export async function getOpportunityDetail(
   const { data, error } = await supabase
     .from("opportunities")
     .select(
-      "id, name, description, about, duties, eligibility, what_to_bring, type, location, is_online, " +
+      "id, name, description, about, duties, eligibility, what_to_bring, type, location, city, venue, is_online, " +
         "application_open_at, application_deadline, activity_start_at, activity_end_at, capacity, " +
-        "status_override, deactivated_at, organization_id, application_form, " +
+        "status_override, deactivated_at, organization_id, chapter_id, impact_stats, application_form, " +
         "organizations(name, about, logo_url)",
     )
     .eq("id", input.opportunityId)
@@ -56,6 +60,7 @@ export async function getOpportunityDetail(
   return {
     id: row.id as string,
     name: row.name as string,
+    chapterId: (row.chapter_id ?? null) as string | null,
     description: (row.description ?? null) as string | null,
     about: (row.about ?? null) as string | null,
     duties: (row.duties ?? []) as string[],
@@ -63,6 +68,8 @@ export async function getOpportunityDetail(
     whatToBring: (row.what_to_bring ?? []) as string[],
     type: row.type as string,
     location: (row.location ?? null) as string | null,
+    city: (row.city ?? row.location ?? null) as string | null,
+    venue: (row.venue ?? null) as string | null,
     isOnline: Boolean(row.is_online),
     applicationOpenAt: (row.application_open_at ?? null) as string | null,
     applicationDeadline: (row.application_deadline ?? null) as string | null,
@@ -77,6 +84,7 @@ export async function getOpportunityDetail(
       activityEndAt: (row.activity_end_at ?? null) as string | null,
       deactivatedAt: (row.deactivated_at ?? null) as string | null,
     }),
+    impactStats: (row.impact_stats ?? null) as Record<string, unknown> | null,
     orgId: row.organization_id as string,
     orgName: (org.name ?? "") as string,
     orgAbout: (org.about ?? null) as string | null,

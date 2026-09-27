@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   // Pin the workspace root so Turbopack doesn't walk up to the stray
   // package-lock.json in ~/Developer/rizq, outside this repo.
   turbopack: { root: path.resolve(__dirname) },
+  allowedDevOrigins: ["browser3001.sohaibbinmohsin.com"],
   experimental: {
     // Keep visited routes in the client Router Cache. Next defaults dynamic
     // routes to 0s, so re-opening an opportunity you'd already viewed (or

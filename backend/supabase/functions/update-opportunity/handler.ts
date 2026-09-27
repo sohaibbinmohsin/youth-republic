@@ -6,8 +6,12 @@ export interface UpdateOpportunityInput {
   opportunityId: string;
   organizationId: string;
   name?: string;
+  chapterId?: string | null;
   description?: string;
-  location?: string;
+  location?: string | null;
+  city?: string | null;
+  venue?: string | null;
+  impactStats?: Record<string, unknown>;
   isOnline?: boolean;
   applicationOpenAt?: string;
   applicationDeadline?: string;
@@ -18,7 +22,7 @@ export interface UpdateOpportunityInput {
   eligibility?: string[];
   whatToBring?: string[];
   applicationForm?: unknown;
-  capacity?: number;
+  capacity?: number | null;
   statusOverride?: string;
   deactivatedAt?: string | null;
   hardDelete?: boolean;
@@ -34,7 +38,7 @@ export async function updateOpportunity(
   // client, which bypasses RLS entirely, so RLS cannot backstop this check.
   const { data: opportunity, error: fetchError } = await supabase
     .from("opportunities")
-    .select("id, organization_id, name, chapter_id")
+    .select("id, organization_id, name, chapter_id, is_online, city, venue, location")
     .eq("id", input.opportunityId)
     .single();
   if (fetchError) throw fetchError;
@@ -73,8 +77,12 @@ export async function updateOpportunity(
   // of action (it's what the now-removed opportunities_staff_delete RLS
   // policy was gated on).
   const touchesOtherFields = input.name !== undefined
+    || input.chapterId !== undefined
     || input.description !== undefined
     || input.location !== undefined
+    || input.city !== undefined
+    || input.venue !== undefined
+    || input.impactStats !== undefined
     || input.isOnline !== undefined
     || input.applicationOpenAt !== undefined
     || input.applicationDeadline !== undefined
@@ -92,15 +100,43 @@ export async function updateOpportunity(
     throw new Error("forbidden");
   }
 
+  // If chapterId is modified, ensure the caller also has opportunities:write
+  // in the target chapter (or org-wide if clearing chapterId).
+  if (input.chapterId !== undefined && input.chapterId !== opportunity.chapter_id) {
+    if (!staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:write", input.chapterId ?? null)) {
+      throw new Error("forbidden");
+    }
+  }
+
   if (input.deactivatedAt !== undefined && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:delete", opportunity.chapter_id ?? null)) {
     throw new Error("forbidden");
   }
 
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name;
+  if (input.chapterId !== undefined) patch.chapter_id = input.chapterId;
   if (input.description !== undefined) patch.description = input.description;
-  if (input.location !== undefined) patch.location = input.location;
+
+  const willBeOnline = input.isOnline !== undefined ? Boolean(input.isOnline) : Boolean(opportunity.is_online);
   if (input.isOnline !== undefined) patch.is_online = input.isOnline;
+
+  if (willBeOnline) {
+    patch.city = null;
+    patch.venue = null;
+    patch.location = null;
+  } else {
+    const finalCity = input.city !== undefined ? (input.city?.trim() || null) : (opportunity.city ?? opportunity.location ?? null);
+    const finalVenue = input.venue !== undefined ? (input.venue?.trim() || null) : (opportunity.venue ?? null);
+    if (input.city !== undefined) patch.city = finalCity;
+    if (input.venue !== undefined) patch.venue = finalVenue;
+    if (input.city !== undefined || input.venue !== undefined) {
+      patch.location = finalCity ? (finalVenue ? `${finalCity} · ${finalVenue}` : finalCity) : null;
+    } else if (input.location !== undefined) {
+      patch.location = input.location;
+    }
+  }
+
+  if (input.impactStats !== undefined) patch.impact_stats = input.impactStats;
   if (input.applicationOpenAt !== undefined) patch.application_open_at = input.applicationOpenAt;
   if (input.applicationDeadline !== undefined) patch.application_deadline = input.applicationDeadline;
   if (input.activityStartAt !== undefined) patch.activity_start_at = input.activityStartAt;

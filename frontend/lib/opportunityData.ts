@@ -20,6 +20,8 @@ export interface OpportunityDetailRow {
   eligibility: string[] | null;
   what_to_bring: string[] | null;
   location: string | null;
+  city?: string | null;
+  venue?: string | null;
   is_online: boolean;
   application_open_at: string | null;
   application_deadline: string | null;
@@ -280,7 +282,7 @@ export async function fetchOpportunityClient(id: string): Promise<OpportunityDet
     const { data, error } = await supabase
       .from("opportunities")
       .select(
-        "id, name, type, description, about, duties, eligibility, what_to_bring, location, is_online, application_open_at, application_deadline, activity_start_at, activity_end_at, capacity, status_override, deactivated_at, organization_id, application_form, organizations(id, name, about, logo_url, brand_color)"
+        "id, name, type, description, about, duties, eligibility, what_to_bring, location, city, venue, is_online, application_open_at, application_deadline, activity_start_at, activity_end_at, capacity, status_override, deactivated_at, organization_id, application_form, organizations(id, name, about, logo_url, brand_color)"
       )
       .eq("id", id)
       .single();

@@ -18,15 +18,19 @@ export interface ListOpportunitiesInput {
 export interface OpportunityCard {
   id: string;
   name: string;
+  chapterId?: string | null;
   orgName: string;
   orgLogoUrl: string | null;
   type: string;
   city: string | null;
+  venue?: string | null;
+  location?: string | null;
   online: boolean;
   computedStatus: string;
   description: string | null;
   capacity: number | null;
   filledCount: number;
+  impactStats?: Record<string, unknown> | null;
   applicationDeadline: string | null;
   activityStartAt: string | null;
   activityEndAt: string | null;
@@ -68,7 +72,7 @@ export function computeOpportunityStatus(o: OpportunityStatusInputs): string {
 }
 
 const CARD_SELECT =
-  "id, name, type, description, location, is_online, status_override, capacity, " +
+  "id, name, type, description, location, city, venue, is_online, status_override, capacity, chapter_id, impact_stats, " +
   "application_open_at, application_deadline, activity_start_at, activity_end_at, " +
   "deactivated_at, created_at, organization_id, organizations(name, logo_url)";
 
@@ -88,14 +92,18 @@ function toCard(o: Record<string, unknown>, filledCount: number): OpportunityCar
   return {
     id: o.id as string,
     name: o.name as string,
+    chapterId: (o.chapter_id ?? null) as string | null,
     orgName: (org.name ?? "") as string,
     orgLogoUrl: (org.logo_url ?? null) as string | null,
     type: o.type as string,
-    city: (o.location ?? null) as string | null,
+    city: (o.city ?? o.location ?? null) as string | null,
+    venue: (o.venue ?? null) as string | null,
+    location: (o.location ?? null) as string | null,
     online: Boolean(o.is_online),
     description: (o.description ?? null) as string | null,
     capacity: (o.capacity ?? null) as number | null,
     filledCount,
+    impactStats: (o.impact_stats ?? null) as Record<string, unknown> | null,
     applicationDeadline: (o.application_deadline ?? null) as string | null,
     activityStartAt: (o.activity_start_at ?? null) as string | null,
     activityEndAt: (o.activity_end_at ?? null) as string | null,
