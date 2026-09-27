@@ -113,7 +113,7 @@ describe("NoticeboardHub", () => {
     expect(titles[2]).toBe("Blood Drive Closing in 2 Days");
     expect(titles[3]).toBe("Health Camp Older (Open)");
     expect(titles[4]).toBe("Winter Blanket Drive (Coming Soon)");
-    expect(titles[5]).toBe("Flood Relief Kitchen (In Progress - Closed)");
+    expect(titles[5]).toBe("Flood Relief Kitchen (In Progress - Closed) Live");
     expect(titles[6]).toBe("Completed Beach Cleanup");
   });
 
@@ -189,5 +189,23 @@ describe("NoticeboardHub", () => {
     expect(screen.queryByRole("checkbox", { name: "Green Crescent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Sehat First" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Read Foundation" })).not.toBeInTheDocument();
+  });
+
+  it("orders filter headings with Status first, then Type, Organization, City, and Format", () => {
+    render(<NoticeboardHub initialOpportunities={sampleOpportunities} />);
+
+    const filterHeadings = screen.getAllByRole("heading", { level: 4 });
+    const headingTexts = filterHeadings.map((h) => h.textContent?.trim());
+
+    expect(headingTexts).toEqual(["Status", "Type", "Organization", "City", "Format"]);
+  });
+
+  it("renders Live pill for in-progress drives", () => {
+    render(<NoticeboardHub initialOpportunities={sampleOpportunities} />);
+
+    const livePills = screen.getAllByText("Live");
+    expect(livePills.length).toBeGreaterThan(0);
+    expect(livePills[0]).toHaveClass("live-pill");
+    expect(livePills[0]).toHaveAttribute("title", "Drive in progress");
   });
 });

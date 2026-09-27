@@ -68,7 +68,7 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
             <>
               {prefix}
               <span className="title-with-live">
-                {lastWord}
+                {lastWord}{" "}
                 <LiveIndicator />
               </span>
             </>
