@@ -211,14 +211,20 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             {!opp.is_online && (
               <>
                 <dt>City</dt>
-                <dd>{opp.location ?? "Lahore"}</dd>
+                <dd>{opp.city || opp.location?.split(" · ")[0] || "Lahore"}</dd>
+                {Boolean(opp.venue?.trim() || (opp.location?.includes(" · ") && opp.location.split(" · ").slice(1).join(" · ").trim())) && (
+                  <>
+                    <dt>Venue</dt>
+                    <dd>{opp.venue?.trim() || opp.location?.split(" · ").slice(1).join(" · ").trim()}</dd>
+                  </>
+                )}
               </>
             )}
 
             <dt>Format</dt>
             <dd>{opp.is_online ? "Online" : "In person"}</dd>
 
-            {opp.application_open_at && (
+            {status === "coming_soon" && opp.application_open_at && (
               <>
                 <dt>Applications open</dt>
                 <dd>
@@ -257,7 +263,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               </>
             )}
 
-            {opp.capacity !== null && (
+            {opp.capacity !== null && opp.capacity !== undefined && (
               <>
                 <dt>Capacity</dt>
                 <dd>{opp.capacity} volunteers</dd>

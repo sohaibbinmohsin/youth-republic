@@ -8,6 +8,8 @@ export interface CreateOpportunityInput {
   type: string;
   description?: string;
   location?: string;
+  city?: string | null;
+  venue?: string | null;
   isOnline?: boolean;
   applicationOpenAt?: string;
   applicationDeadline?: string;
@@ -18,7 +20,7 @@ export interface CreateOpportunityInput {
   eligibility?: string[];
   whatToBring?: string[];
   applicationForm?: unknown;
-  capacity?: number;
+  capacity?: number | null;
   chapterId?: string | null;
   /** e.g. "draft" to create the opportunity hidden from the noticeboard. */
   statusOverride?: string;
@@ -33,14 +35,23 @@ export async function createOpportunity(
     throw new Error("forbidden");
   }
 
+  const isOnline = Boolean(input.isOnline);
+  const city = isOnline ? null : (input.city?.trim() || (input.location?.trim() ?? null));
+  const venue = isOnline ? null : (input.venue?.trim() ?? null);
+  const location = isOnline
+    ? null
+    : (city ? (venue ? `${city} · ${venue}` : city) : (input.location?.trim() ?? null));
+
   const row: Record<string, unknown> = {
     organization_id: input.organizationId,
     name: input.name,
     chapter_id: input.chapterId ?? null,
     type: input.type,
     description: input.description ?? null,
-    location: input.location ?? null,
-    is_online: input.isOnline ?? false,
+    location,
+    city,
+    venue,
+    is_online: isOnline,
     application_open_at: input.applicationOpenAt ?? null,
     application_deadline: input.applicationDeadline ?? null,
     activity_start_at: input.activityStartAt ?? null,
