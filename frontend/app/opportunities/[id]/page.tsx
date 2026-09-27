@@ -212,10 +212,10 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               <>
                 <dt>City</dt>
                 <dd>{opp.city || opp.location?.split(" · ")[0] || "Lahore"}</dd>
-                {(opp.venue || opp.location?.includes(" · ")) && (
+                {Boolean(opp.venue?.trim() || (opp.location?.includes(" · ") && opp.location.split(" · ").slice(1).join(" · ").trim())) && (
                   <>
                     <dt>Venue</dt>
-                    <dd>{opp.venue || opp.location?.split(" · ").slice(1).join(" · ")}</dd>
+                    <dd>{opp.venue?.trim() || opp.location?.split(" · ").slice(1).join(" · ").trim()}</dd>
                   </>
                 )}
               </>
