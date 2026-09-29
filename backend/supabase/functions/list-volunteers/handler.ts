@@ -56,7 +56,7 @@ export async function listVolunteers(
   if (input.status) query = query.eq("status", input.status);
   if (input.search) {
     const term = `%${input.search}%`;
-    query = query.or(`full_name.ilike.${term},email.ilike.${term},phone.ilike.${term}`);
+    query = query.or(`full_name.ilike.${term},email.ilike.${term},phone.ilike.${term},volunteer_code.ilike.${term}`);
   }
 
   const { data, error, count } = await query.order("full_name", { ascending: true }).range(offset, offset + limit - 1);
