@@ -13,6 +13,7 @@ export interface ListApplicationsInput {
 export interface ApplicationListRow {
   id: string;
   volunteerId: string;
+  volunteerCode?: string | null;
   volunteerName: string;
   opportunityId: string;
   opportunityName: string;
@@ -67,7 +68,7 @@ export async function listApplications(
   let query = supabase
     .from("applications")
     .select(
-      "id, status, applied_at, volunteer_id, opportunity_id, applicant_name, applicant_email, applicant_phone, answers, form_snapshot, volunteers(full_name), opportunities(name)",
+      "id, status, applied_at, volunteer_id, opportunity_id, applicant_name, applicant_email, applicant_phone, answers, form_snapshot, volunteers(full_name, volunteer_code), opportunities(name)",
       { count: "exact" },
     )
     .eq("organization_id", input.organizationId)
@@ -92,10 +93,12 @@ export async function listApplications(
   return {
     applications: (data ?? []).map((r) => {
       const answers = (r.answers && typeof r.answers === "object" ? r.answers : {}) as Record<string, unknown>;
+      const vol = r.volunteers as unknown as { full_name?: string; volunteer_code?: string } | null;
       return {
         id: r.id as string,
         volunteerId: r.volunteer_id as string,
-        volunteerName: (r.volunteers as unknown as { full_name: string })?.full_name ?? "",
+        volunteerCode: vol?.volunteer_code ?? null,
+        volunteerName: vol?.full_name ?? "",
         opportunityId: r.opportunity_id as string,
         opportunityName: (r.opportunities as unknown as { name: string })?.name ?? "",
         status: r.status as string,

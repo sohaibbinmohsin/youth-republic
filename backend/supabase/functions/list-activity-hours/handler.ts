@@ -12,6 +12,7 @@ export interface ListActivityHoursInput {
 
 export interface ActivityListRow {
   id: string;
+  volunteerCode?: string | null;
   volunteerName: string;
   opportunityName: string;
   activityType: string;
@@ -82,7 +83,7 @@ export async function listActivityHours(
   let query = supabase
     .from("activity_hours")
     .select(
-      "id, role, activity_date, hours_submitted, hours_verified, verification_status, admin_notes, volunteers(full_name), opportunities(name, type)",
+      "id, role, activity_date, hours_submitted, hours_verified, verification_status, admin_notes, volunteers(full_name, volunteer_code), opportunities(name, type)",
       { count: "exact" },
     )
     .eq("organization_id", input.organizationId);
@@ -93,10 +94,13 @@ export async function listActivityHours(
   if (error) throw error;
 
   return {
-    activity: (data ?? []).map((r) => ({
-      id: r.id as string,
-      volunteerName: (r.volunteers as unknown as { full_name: string })?.full_name ?? "",
-      opportunityName: (r.opportunities as unknown as { name: string })?.name ?? "",
+    activity: (data ?? []).map((r) => {
+      const vol = r.volunteers as unknown as { full_name?: string; volunteer_code?: string } | null;
+      return {
+        id: r.id as string,
+        volunteerCode: vol?.volunteer_code ?? null,
+        volunteerName: vol?.full_name ?? "",
+        opportunityName: (r.opportunities as unknown as { name: string })?.name ?? "",
       activityType: (r.opportunities as unknown as { type: string })?.type ?? "",
       role: r.role as string | null,
       activityDate: r.activity_date as string,
@@ -104,7 +108,8 @@ export async function listActivityHours(
       hoursVerified: r.hours_verified as number | null,
       verificationStatus: r.verification_status as string,
       adminNotes: r.admin_notes as string | null,
-    })),
+    };
+  }),
     total: count ?? 0,
   };
 }
