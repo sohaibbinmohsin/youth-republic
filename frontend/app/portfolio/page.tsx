@@ -12,9 +12,9 @@ import { CITIES, INSTITUTIONS } from "@/lib/formDatasets";
 import { isValidCnic } from "@/lib/cnicUtils";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
-import { getAvatarInitials } from "@/lib/coolNames";
 import { PROTOTYPE_SEED_OPPORTUNITIES } from "@/lib/opportunityData";
 import { OrgAvatar } from "@/components/OrgAvatar";
+import { AvatarUpload } from "@/components/AvatarUpload";
 import PortfolioLoading from "./loading";
 
 interface VolunteerProfile {
@@ -36,6 +36,7 @@ interface VolunteerProfile {
   created_at: string;
   emergency_contact?: { name: string; phone: string } | null;
   is_unregistered?: boolean;
+  profile_picture_url?: string | null;
 }
 
 interface ApplicationItem {
@@ -288,7 +289,7 @@ export default function PortfolioPage() {
     try {
       const query = supabase
         .from("volunteers")
-        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, status, created_at, emergency_contact")
+        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, status, created_at, emergency_contact, profile_picture_url")
         .eq("auth_user_id", authUserId);
       const result = typeof (query as any).maybeSingle === "function"
         ? await (query as any).maybeSingle()
@@ -581,7 +582,6 @@ export default function PortfolioPage() {
     return <PortfolioLoading />;
   }
 
-  const avatarInitials = getAvatarInitials(volunteer.full_name);
   const isVerified = volunteer.status === "active" || (!volunteer.is_unregistered && volunteer.status === "verified");
   const isPending = !isVerified || volunteer.is_unregistered;
 
@@ -597,7 +597,13 @@ export default function PortfolioPage() {
     <div className="w-full space-y-6 font-['Jost']">
       {/* Header Profile Identity */}
       <div className="pf-id">
-        <div className="avatar">{avatarInitials}</div>
+        <AvatarUpload
+          profilePictureUrl={volunteer.profile_picture_url}
+          fullName={volunteer.full_name}
+          accessToken={accessToken}
+          onSuccess={(url) => setVolunteer((prev) => (prev ? { ...prev, profile_picture_url: url } : null))}
+          onAvatarChange={(url) => setVolunteer((prev) => (prev ? { ...prev, profile_picture_url: url } : null))}
+        />
         <div className="pf-id__who">
           <h1>
             <span>{volunteer.full_name}</span>

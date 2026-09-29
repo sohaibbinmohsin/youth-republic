@@ -11,6 +11,7 @@ import {
   getVolunteerPortfolio,
   getOpportunityDetail,
   listOpportunities,
+  uploadPublicAsset,
   ValidationError,
 } from "./edgeFunctions";
 
@@ -365,5 +366,24 @@ describe("listOpportunities", () => {
       limit: 10,
       offset: 0,
     });
+  });
+});
+
+describe("uploadPublicAsset", () => {
+  it("serialises domain and contentType and returns presigned uploadUrl and publicUrl", async () => {
+    const response = {
+      uploadUrl: "https://r2.cloudflarestorage.com/youth-republic/avatars/u1/abc.png?token=xyz",
+      publicUrl: "https://assets.youthrepublic.org/avatars/u1/abc.png",
+      objectKey: "avatars/u1/abc.png",
+    };
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+
+    const result = await uploadPublicAsset({ domain: "avatar", contentType: "image/png" }, "session-token");
+
+    expect(result).toEqual(response);
+    const [url, init] = lastCall();
+    expect(url).toBe(`${FUNCTIONS_URL}/upload-public-asset`);
+    expect(init.headers.Authorization).toBe("Bearer session-token");
+    expect(JSON.parse(init.body)).toEqual({ domain: "avatar", contentType: "image/png" });
   });
 });

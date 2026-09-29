@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
-export type ProfileFieldName = "city" | "institution" | "graduation_year" | "availability" | "skills" | "interests";
+export type ProfileFieldName = "city" | "institution" | "graduation_year" | "availability" | "skills" | "interests" | "profile_picture_url";
 
 export interface UpdateProfileFieldInput {
   fieldName: ProfileFieldName;
@@ -22,6 +22,7 @@ const ALLOWED_FIELDS: readonly ProfileFieldName[] = [
   "availability",
   "skills",
   "interests",
+  "profile_picture_url",
 ];
 
 export async function updateProfileField(

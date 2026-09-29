@@ -50,6 +50,18 @@ Deno.test("updateProfileField updates an array field (skills)", async () => {
   assertEquals(data!.skills, ["First Aid", "Public Speaking"]);
 });
 
+Deno.test("updateProfileField updates profile_picture_url", async () => {
+  const supabase = testClient();
+  const volunteerId = await makeVolunteer(supabase);
+  const testUrl = "https://assets.youthrepublic.org/avatars/test-volunteer/avatar.png";
+
+  const result = await updateProfileField(supabase, volunteerId, { fieldName: "profile_picture_url", newValue: testUrl });
+
+  assertEquals(result.volunteerId, volunteerId);
+  const { data } = await supabase.from("volunteers").select("profile_picture_url").eq("id", volunteerId).single();
+  assertEquals(data!.profile_picture_url, testUrl);
+});
+
 Deno.test("updateProfileField never writes profile_field_changes — this endpoint is deliberately unaudited", async () => {
   const supabase = testClient();
   const volunteerId = await makeVolunteer(supabase);
