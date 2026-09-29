@@ -74,10 +74,12 @@ function staffClaims(orgId: string): StaffClaims {
 Deno.test("lookupYouthRepublicMember single lookup by youthRepublicId (backward compatibility)", async () => {
   const supabase = testClient();
   const orgId = await makeOrg(supabase);
+  const randomSuffix = crypto.randomUUID().slice(0, 6);
+  const email = `tariq-${randomSuffix}@example.com`;
   const vol = await makeVolunteer(supabase, {
-    volunteer_code: `YR-TEST-${crypto.randomUUID().slice(0, 6)}`,
+    volunteer_code: `YR-TEST-${randomSuffix}`,
     full_name: "Tariq Mahmood",
-    email: "tariq@example.com",
+    email,
     profile_picture_url: "https://assets.youthrepublic.org/avatars/tariq.jpg",
     status: "active",
   });
@@ -95,7 +97,7 @@ Deno.test("lookupYouthRepublicMember single lookup by youthRepublicId (backward 
 
   assertEquals(result.volunteerCode, vol.volunteer_code);
   assertEquals(result.fullName, "Tariq Mahmood");
-  assertEquals(result.email, "tariq@example.com");
+  assertEquals(result.email, email);
   assertEquals(result.avatarUrl, "https://assets.youthrepublic.org/avatars/tariq.jpg");
 });
 

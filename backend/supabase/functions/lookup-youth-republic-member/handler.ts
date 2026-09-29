@@ -39,7 +39,7 @@ export async function lookupYouthRepublicMember(
   }
 
   if (input.query !== undefined) {
-    const q = input.query.trim().replace(/[%,\\]/g, "");
+    const q = input.query.trim().replace(/[%,\(\)\\]/g, "");
     if (!q) {
       return { members: [] };
     }
