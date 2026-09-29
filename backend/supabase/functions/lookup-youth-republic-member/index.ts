@@ -49,6 +49,8 @@ export async function handler(req: Request): Promise<Response> {
         ? 403
         : message === "volunteer_not_found"
         ? 404
+        : message === "volunteer_pending_verification"
+        ? 422
         : 400;
     return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });
   }

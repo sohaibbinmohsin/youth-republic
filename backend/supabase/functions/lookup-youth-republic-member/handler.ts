@@ -37,11 +37,19 @@ export async function lookupYouthRepublicMember(
   // Query Youth Republic volunteers table case-insensitively
   const { data: volunteer, error } = await supabase
     .from("volunteers")
-    .select("volunteer_code, full_name, email, profile_picture_url")
+    .select("volunteer_code, full_name, email, profile_picture_url, status")
     .ilike("volunteer_code", queryCode)
     .maybeSingle();
 
   if (error || !volunteer) {
+    throw new Error("volunteer_not_found");
+  }
+
+  if (volunteer.status === "pending_verification") {
+    throw new Error("volunteer_pending_verification");
+  }
+
+  if (volunteer.status !== "active") {
     throw new Error("volunteer_not_found");
   }
 
