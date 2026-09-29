@@ -3,7 +3,9 @@ import type { StaffClaims } from "../_shared/verifyStaffToken.ts";
 
 export interface LookupYouthRepublicMemberInput {
   organizationId: string;
-  youthRepublicId: string;
+  youthRepublicId?: string;
+  query?: string;
+  limit?: number;
 }
 
 export interface YouthRepublicMemberResult {
@@ -13,12 +15,16 @@ export interface YouthRepublicMemberResult {
   avatarUrl: string | null;
 }
 
+export interface YouthRepublicMemberSearchResult {
+  members: YouthRepublicMemberResult[];
+}
+
 export async function lookupYouthRepublicMember(
   supabase: SupabaseClient,
   staffClaims: StaffClaims,
   input: LookupYouthRepublicMemberInput,
-): Promise<YouthRepublicMemberResult> {
-  if (!input.organizationId || !input.youthRepublicId?.trim()) {
+): Promise<YouthRepublicMemberResult | YouthRepublicMemberSearchResult> {
+  if (!input.organizationId) {
     throw new Error("volunteer_not_found");
   }
 
@@ -30,6 +36,37 @@ export async function lookupYouthRepublicMember(
     if (!hasOrgAccess) {
       throw new Error("forbidden");
     }
+  }
+
+  if (input.query !== undefined) {
+    const q = input.query.trim().replace(/[%,\\]/g, "");
+    if (!q) {
+      return { members: [] };
+    }
+    const limit = Math.min(Math.max(Number(input.limit) || 8, 1), 20);
+    const { data, error } = await supabase
+      .from("volunteers")
+      .select("volunteer_code, full_name, email, profile_picture_url, status")
+      .eq("status", "active")
+      .or(`volunteer_code.ilike.%${q}%,full_name.ilike.%${q}%,email.ilike.%${q}%`)
+      .limit(limit);
+
+    if (error) {
+      throw error;
+    }
+
+    const members: YouthRepublicMemberResult[] = (data || []).map((row) => ({
+      volunteerCode: row.volunteer_code,
+      fullName: row.full_name,
+      email: row.email ?? null,
+      avatarUrl: row.profile_picture_url ?? null,
+    }));
+
+    return { members };
+  }
+
+  if (!input.youthRepublicId?.trim()) {
+    throw new Error("volunteer_not_found");
   }
 
   const queryCode = input.youthRepublicId.trim();
