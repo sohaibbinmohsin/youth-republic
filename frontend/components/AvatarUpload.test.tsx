@@ -1,5 +1,4 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AvatarUpload } from "./AvatarUpload";
 import * as edgeFunctions from "@/lib/edgeFunctions";
@@ -13,13 +12,24 @@ describe("AvatarUpload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", vi.fn());
+    if (!window.URL.createObjectURL) {
+      window.URL.createObjectURL = vi.fn(() => "blob:http://localhost/mock-preview");
+    }
+    if (!window.URL.revokeObjectURL) {
+      window.URL.revokeObjectURL = vi.fn();
+    }
+    if (!HTMLCanvasElement.prototype.toBlob) {
+      HTMLCanvasElement.prototype.toBlob = function (callback) {
+        callback(new Blob(["mock-image-bytes"], { type: "image/jpeg" }));
+      };
+    }
   });
 
   it("renders fallback initials when profilePictureUrl is not provided", () => {
     render(<AvatarUpload fullName="Hamza Ali" accessToken="tok-1" />);
 
     expect(screen.getByText("HA")).toBeInTheDocument();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Volunteer avatar" })).not.toBeInTheDocument();
   });
 
   it("renders profile image when profilePictureUrl is provided", () => {
@@ -31,7 +41,7 @@ describe("AvatarUpload", () => {
       />,
     );
 
-    const img = screen.getByRole("img");
+    const img = screen.getByRole("img", { name: "Hamza Ali's avatar" });
     expect(img).toHaveAttribute("src", "https://assets.youthrepublic.org/avatars/u1/pic.png");
     expect(img).toHaveAttribute("alt", "Hamza Ali's avatar");
   });
@@ -42,16 +52,17 @@ describe("AvatarUpload", () => {
     expect(screen.getByRole("button", { name: "Upload profile picture" })).toBeInTheDocument();
   });
 
-  it("rejects files larger than 5MB with an error message", async () => {
+  it("rejects files larger than 10MB with an error message", async () => {
     render(<AvatarUpload fullName="Hamza Ali" accessToken="tok-1" />);
 
     const input = screen.getByTestId("avatar-file-input") as HTMLInputElement;
-    const largeFile = new File([new ArrayBuffer(6 * 1024 * 1024)], "large.png", { type: "image/png" });
+    const largeFile = new File([new ArrayBuffer(11 * 1024 * 1024)], "large.png", { type: "image/png" });
 
     fireEvent.change(input, { target: { files: [largeFile] } });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("File size exceeds 5MB limit");
+    expect(await screen.findByRole("alert")).toHaveTextContent("File size exceeds 10MB limit");
     expect(edgeFunctions.uploadPublicAsset).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Position & Crop Profile Picture/i)).not.toBeInTheDocument();
   });
 
   it("rejects disallowed MIME types", async () => {
@@ -64,16 +75,17 @@ describe("AvatarUpload", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Allowed image formats: JPG, PNG, WebP");
     expect(edgeFunctions.uploadPublicAsset).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Position & Crop Profile Picture/i)).not.toBeInTheDocument();
   });
 
-  it("performs full upload pipeline: presigned URL request -> R2 PUT -> profile update -> onSuccess", async () => {
+  it("opens crop modal when file is selected and performs upload upon saving", async () => {
     const onSuccess = vi.fn();
     const onAvatarChange = vi.fn();
 
     vi.mocked(edgeFunctions.uploadPublicAsset).mockResolvedValue({
-      uploadUrl: "https://r2.cloudflarestorage.com/youth-republic/avatars/u1/pic.png?signature=xyz",
-      publicUrl: "https://assets.youthrepublic.org/avatars/u1/pic.png",
-      objectKey: "avatars/u1/pic.png",
+      uploadUrl: "https://r2.cloudflarestorage.com/youth-republic/avatars/u1/pic.jpg?signature=xyz",
+      publicUrl: "https://assets.youthrepublic.org/avatars/u1/pic.jpg",
+      objectKey: "avatars/u1/pic.jpg",
     });
 
     vi.mocked(edgeFunctions.updateProfileField).mockResolvedValue({
@@ -98,21 +110,28 @@ describe("AvatarUpload", () => {
 
     fireEvent.change(input, { target: { files: [validFile] } });
 
+    // Crop modal should be visible
+    expect(await screen.findByText(/Position & Crop Profile Picture/i)).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: /Zoom/i })).toBeInTheDocument();
+
+    // Click Save & Upload inside the modal
+    const saveBtn = screen.getByRole("button", { name: /Save & Upload/i });
+    fireEvent.click(saveBtn);
+
     await waitFor(() => {
       expect(edgeFunctions.uploadPublicAsset).toHaveBeenCalledWith(
-        { domain: "avatar", contentType: "image/png" },
+        { domain: "avatar", contentType: "image/jpeg" },
         "tok-test",
       );
     });
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        "https://r2.cloudflarestorage.com/youth-republic/avatars/u1/pic.png?signature=xyz",
-        {
+        "https://r2.cloudflarestorage.com/youth-republic/avatars/u1/pic.jpg?signature=xyz",
+        expect.objectContaining({
           method: "PUT",
-          body: validFile,
-          headers: { "Content-Type": "image/png" },
-        },
+          headers: { "Content-Type": "image/jpeg" },
+        }),
       );
     });
 
@@ -120,21 +139,26 @@ describe("AvatarUpload", () => {
       expect(edgeFunctions.updateProfileField).toHaveBeenCalledWith(
         {
           fieldName: "profile_picture_url",
-          newValue: "https://assets.youthrepublic.org/avatars/u1/pic.png",
+          newValue: "https://assets.youthrepublic.org/avatars/u1/pic.jpg",
         },
         "tok-test",
       );
     });
 
-    expect(onSuccess).toHaveBeenCalledWith("https://assets.youthrepublic.org/avatars/u1/pic.png");
-    expect(onAvatarChange).toHaveBeenCalledWith("https://assets.youthrepublic.org/avatars/u1/pic.png");
+    expect(onSuccess).toHaveBeenCalledWith("https://assets.youthrepublic.org/avatars/u1/pic.jpg");
+    expect(onAvatarChange).toHaveBeenCalledWith("https://assets.youthrepublic.org/avatars/u1/pic.jpg");
+
+    // Modal should close on completion
+    await waitFor(() => {
+      expect(screen.queryByText(/Position & Crop Profile Picture/i)).not.toBeInTheDocument();
+    });
   });
 
   it("handles storage upload failure gracefully", async () => {
     vi.mocked(edgeFunctions.uploadPublicAsset).mockResolvedValue({
-      uploadUrl: "https://r2.cloudflarestorage.com/youth-republic/avatars/u1/pic.png?signature=xyz",
-      publicUrl: "https://assets.youthrepublic.org/avatars/u1/pic.png",
-      objectKey: "avatars/u1/pic.png",
+      uploadUrl: "https://r2.cloudflarestorage.com/youth-republic/avatars/u1/pic.jpg?signature=xyz",
+      publicUrl: "https://assets.youthrepublic.org/avatars/u1/pic.jpg",
+      objectKey: "avatars/u1/pic.jpg",
     });
 
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -147,6 +171,11 @@ describe("AvatarUpload", () => {
     const validFile = new File(["valid image"], "photo.png", { type: "image/png" });
 
     fireEvent.change(input, { target: { files: [validFile] } });
+
+    expect(await screen.findByText(/Position & Crop Profile Picture/i)).toBeInTheDocument();
+
+    const saveBtn = screen.getByRole("button", { name: /Save & Upload/i });
+    fireEvent.click(saveBtn);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Failed to upload image to storage (500)");
     expect(edgeFunctions.updateProfileField).not.toHaveBeenCalled();
