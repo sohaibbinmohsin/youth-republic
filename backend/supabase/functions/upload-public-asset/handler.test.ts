@@ -109,6 +109,8 @@ Deno.test("supports all allowed MIME types with correct extensions", async () =>
 });
 
 Deno.test("fallback to yr-assets.themohsinproject.org when R2_PUBLIC_URL is not set", async () => {
+  safeDeleteEnv("R2_PUBLIC_URL");
+  safeDeleteEnv("R2_PUBLIC_BUCKET_URL");
   const client = createMockR2Client();
   const result = await uploadPublicAsset(client, "user-1", { domain: "avatar", contentType: "image/png" });
   assertEquals(result.publicUrl, `https://yr-assets.themohsinproject.org/${result.objectKey}`);
@@ -161,3 +163,41 @@ Deno.test("rejects empty callerId with unauthorized", async () => {
     "unauthorized",
   );
 });
+
+Deno.test("opportunity_cover domain stores in opportunity_covers/{callerId}/{uuid}.webp", async () => {
+  const envSet = safeSetEnv("R2_PUBLIC_URL", "https://assets.youthrepublic.org");
+  const options = envSet ? undefined : { publicBaseUrl: "https://assets.youthrepublic.org" };
+  const calls: { key: string; expiresInSeconds?: number }[] = [];
+  const client = createMockR2Client(calls);
+
+  const result = await uploadPublicAsset(
+    client,
+    "staff-abc-123",
+    { domain: "opportunity_cover", contentType: "image/webp" },
+    options,
+  );
+
+  assertMatch(result.objectKey, /^opportunity_covers\/staff-abc-123\/[0-9a-fA-F-]{36}\.webp$/);
+  assertEquals(result.publicUrl, `https://assets.youthrepublic.org/${result.objectKey}`);
+});
+
+Deno.test("opportunity_cover domain rejects non-webp content type", async () => {
+  const client = createMockR2Client();
+  await assertRejects(
+    // deno-lint-ignore no-explicit-any
+    () => uploadPublicAsset(client, "staff-1", { domain: "opportunity_cover", contentType: "image/jpeg" as any }),
+    Error,
+    "invalid_content_type",
+  );
+});
+
+Deno.test("invalid_domain still thrown for unrecognised domain including empty string", async () => {
+  const client = createMockR2Client();
+  await assertRejects(
+    // deno-lint-ignore no-explicit-any
+    () => uploadPublicAsset(client, "caller-1", { domain: "unknown_domain" as any, contentType: "image/webp" }),
+    Error,
+    "invalid_domain",
+  );
+});
+
