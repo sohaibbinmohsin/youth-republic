@@ -26,6 +26,7 @@ export interface UpdateOpportunityInput {
   statusOverride?: string;
   deactivatedAt?: string | null;
   hardDelete?: boolean;
+  coverImageUrl?: string | null;
 }
 
 export async function updateOpportunity(
@@ -94,7 +95,8 @@ export async function updateOpportunity(
     || input.whatToBring !== undefined
     || input.applicationForm !== undefined
     || input.capacity !== undefined
-    || input.statusOverride !== undefined;
+    || input.statusOverride !== undefined
+    || input.coverImageUrl !== undefined;
 
   if (touchesOtherFields && !staffHasPermission(staffClaims, opportunity.organization_id, "youth-republic", "opportunities:update", opportunity.chapter_id ?? null)) {
     throw new Error("forbidden");
@@ -153,6 +155,9 @@ export async function updateOpportunity(
   if (input.capacity !== undefined) patch.capacity = input.capacity;
   if (input.statusOverride !== undefined) patch.status_override = input.statusOverride;
   if (input.deactivatedAt !== undefined) patch.deactivated_at = input.deactivatedAt;
+  if (input.coverImageUrl !== undefined) {
+    patch.cover_image_url = input.coverImageUrl?.trim() || null;
+  }
 
   const { error } = await supabase
     .from("opportunities")

@@ -323,3 +323,88 @@ Deno.test("updateOpportunity: a chapter-scoped updater can only touch its own ch
     Error, "forbidden",
   );
 });
+
+Deno.test("coverImageUrl is written to cover_image_url patch when provided", async () => {
+  const patches: Record<string, unknown>[] = [];
+  const mockSupabase = {
+    from: (_table: string) => ({
+      select: (_: string) => ({
+        eq: (_k: string, _v: string) => ({
+          single: async () => ({
+            data: {
+              id: "opp-1",
+              organization_id: "org-1",
+              name: "Test Drive",
+              chapter_id: null,
+              is_online: false,
+              city: "Lahore",
+              venue: null,
+              location: "Lahore",
+            },
+            error: null,
+          }),
+        }),
+      }),
+      update: (patch: Record<string, unknown>) => {
+        patches.push(patch);
+        return {
+          eq: (_k: string, _v: string) => ({
+            eq: (_k2: string, _v2: string) => ({ error: null }),
+          }),
+        };
+      },
+      insert: (_: unknown) => ({ error: null }),
+    }),
+  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+
+  await updateOpportunity(mockSupabase, staffClaims("org-1", "opportunities:update"), {
+    opportunityId: "opp-1",
+    organizationId: "org-1",
+    coverImageUrl: "https://yr-assets.themohsinproject.org/opportunity_covers/staff-1/abc.webp",
+  });
+
+  assertEquals(patches.length, 1);
+  assertEquals(
+    patches[0].cover_image_url,
+    "https://yr-assets.themohsinproject.org/opportunity_covers/staff-1/abc.webp",
+  );
+});
+
+Deno.test("coverImageUrl null clears cover_image_url to null", async () => {
+  const patches: Record<string, unknown>[] = [];
+  const mockSupabase = {
+    from: (_table: string) => ({
+      select: (_: string) => ({
+        eq: (_k: string, _v: string) => ({
+          single: async () => ({
+            data: {
+              id: "opp-2",
+              organization_id: "org-1",
+              name: "Drive",
+              chapter_id: null,
+              is_online: false,
+              city: "Karachi",
+              venue: null,
+              location: "Karachi",
+            },
+            error: null,
+          }),
+        }),
+      }),
+      update: (patch: Record<string, unknown>) => {
+        patches.push(patch);
+        return { eq: () => ({ eq: () => ({ error: null }) }) };
+      },
+      insert: () => ({ error: null }),
+    }),
+  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+
+  await updateOpportunity(mockSupabase, staffClaims("org-1", "opportunities:update"), {
+    opportunityId: "opp-2",
+    organizationId: "org-1",
+    coverImageUrl: null,
+  });
+
+  assertEquals(patches[0].cover_image_url, null);
+});
+
