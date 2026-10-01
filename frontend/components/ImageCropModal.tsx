@@ -201,67 +201,21 @@ export function ImageCropModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="crop-modal-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(12, 13, 14, 0.72)",
-        backdropFilter: "blur(6px)",
-        padding: "1rem",
-      }}
+      className="fixed inset-0 z-[9999] flex flex-col sm:items-center sm:justify-center bg-black/75 sm:backdrop-blur-sm p-0 sm:p-4"
     >
       <div
-        style={{
-          backgroundColor: "#ffffff",
-          borderRadius: "16px",
-          border: "1px solid var(--line, #e6e6e8)",
-          width: "100%",
-          maxWidth: "380px",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          animation: "fadeIn 0.2s ease-out",
-        }}
+        className="w-full h-full min-h-[100dvh] sm:min-h-0 sm:h-auto sm:max-w-[400px] bg-white sm:rounded-2xl sm:shadow-2xl flex flex-col justify-between sm:justify-start overflow-y-auto p-5 sm:p-6 text-left"
       >
-        {/* Header - Styled with Youth Republic Design System */}
-        <div
-          style={{
-            padding: "1.1rem 1.25rem",
-            borderBottom: "1px solid var(--line, #e6e6e8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "0.75rem",
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Header - Left-aligned with NO horizontal divider lines */}
+        <div className="flex items-start justify-between gap-3 text-left w-full">
+          <div className="flex-1 min-w-0 text-left">
             <h2
               id="crop-modal-title"
-              style={{
-                fontFamily: "'Oswald', sans-serif",
-                fontSize: "1.15rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "-.005em",
-                color: "var(--ink, #141416)",
-                margin: 0,
-                lineHeight: 1.15,
-              }}
+              className="font-['Oswald'] text-xl font-bold uppercase tracking-tight text-[var(--ink)] m-0 leading-tight text-left"
             >
               Position & Crop Profile Picture
             </h2>
-            <p
-              style={{
-                fontFamily: "var(--font-body, 'Jost', sans-serif)",
-                fontSize: "0.82rem",
-                color: "var(--ink-2, #68686e)",
-                margin: "0.25rem 0 0 0",
-              }}
-            >
+            <p className="font-['Jost'] text-sm text-[var(--ink-2)] mt-1 m-0 text-left">
               Drag to frame your face in the circle. Use the slider to zoom.
             </p>
           </div>
@@ -270,20 +224,7 @@ export function ImageCropModal({
             aria-label="Close crop modal"
             onClick={onClose}
             disabled={isUploading}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--ink-2, #68686e)",
-              cursor: isUploading ? "not-allowed" : "pointer",
-              padding: "6px",
-              borderRadius: "999px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "background 0.15s ease",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-2, #f3f3f5)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            className="text-[var(--ink-2)] hover:bg-[var(--bg-2)] p-2 rounded-full transition-colors flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -292,16 +233,8 @@ export function ImageCropModal({
           </button>
         </div>
 
-        {/* Viewport Frame with Circular Aperture Mask */}
-        <div
-          style={{
-            padding: "1.25rem",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            backgroundColor: "var(--bg, #fbfbfd)",
-          }}
-        >
+        {/* Viewport Frame & Zoom Controls - Clean seamless surface without divider lines */}
+        <div className="flex flex-col items-center my-auto py-5 sm:py-4 w-full">
           <div
             ref={containerRef}
             onMouseDown={handleMouseDown}
@@ -314,12 +247,11 @@ export function ImageCropModal({
               height: `${VIEWPORT_SIZE}px`,
               position: "relative",
               overflow: "hidden",
-              borderRadius: "14px",
+              borderRadius: "16px",
               backgroundColor: "#0d0f12",
               cursor: isUploading ? "not-allowed" : isDragging ? "grabbing" : "grab",
               userSelect: "none",
               touchAction: "none",
-              border: "1px solid var(--line, #e6e6e8)",
             }}
           >
             {/* Prominent Uploading State Overlay */}
@@ -423,7 +355,7 @@ export function ImageCropModal({
             style={{
               width: "100%",
               maxWidth: `${VIEWPORT_SIZE}px`,
-              marginTop: "1rem",
+              marginTop: "1.25rem",
               display: "flex",
               alignItems: "center",
               gap: "0.6rem",
@@ -503,34 +435,17 @@ export function ImageCropModal({
           </div>
         </div>
 
-        {/* Footer Actions - Youth Republic Buttons */}
-        <div
-          style={{
-            padding: "0.9rem 1.25rem",
-            borderTop: "1px solid var(--line, #e6e6e8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: "0.6rem",
-            backgroundColor: "#ffffff",
-          }}
-        >
+        {/* Footer Actions - Full-length buttons on mobile, clean side-by-side on desktop, NO divider line */}
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:justify-end sm:w-auto mt-2 sm:mt-4">
           <button
             type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={onClose}
-            disabled={isUploading}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary btn--sm"
+            className="btn btn--primary w-full sm:w-auto order-1 sm:order-2"
             onClick={handleCrop}
             disabled={isUploading}
             style={{
               display: "inline-flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: "0.45rem",
             }}
           >
@@ -552,6 +467,14 @@ export function ImageCropModal({
             ) : (
               "Save & Upload"
             )}
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost w-full sm:w-auto order-2 sm:order-1"
+            onClick={onClose}
+            disabled={isUploading}
+          >
+            Cancel
           </button>
         </div>
       </div>
