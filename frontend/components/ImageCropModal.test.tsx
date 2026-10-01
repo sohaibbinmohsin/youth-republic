@@ -115,5 +115,46 @@ describe("ImageCropModal", () => {
 
     expect(screen.getByRole("button", { name: /Cancel/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Uploading/i })).toBeDisabled();
+    expect(screen.getByText(/Uploading Photo…/i)).toBeInTheDocument();
+    expect(screen.getByText(/Saving to verified cloud storage/i)).toBeInTheDocument();
+  });
+
+  it("scales portrait image to fit circular aperture on image load", () => {
+    render(
+      <ImageCropModal
+        isOpen={true}
+        imageSrc="blob:http://localhost/test-image"
+        onClose={vi.fn()}
+        onCropComplete={vi.fn()}
+      />,
+    );
+
+    const img = screen.getByRole("img", { name: /Crop preview/i });
+    // Simulate loading a high-resolution 3000x4000 portrait photo
+    Object.defineProperty(img, "naturalWidth", { value: 3000, configurable: true });
+    Object.defineProperty(img, "naturalHeight", { value: 4000, configurable: true });
+    fireEvent.load(img);
+
+    // With portrait 3:4 aspect ratio, base width should be 240px and base height should be 320px
+    expect(img.style.width).toBe("240px");
+    expect(img.style.height).toBe("320px");
+  });
+
+  it("supports zooming out down to 0.5 for wider framing", () => {
+    render(
+      <ImageCropModal
+        isOpen={true}
+        imageSrc="blob:http://localhost/test-image"
+        onClose={vi.fn()}
+        onCropComplete={vi.fn()}
+      />,
+    );
+
+    const slider = screen.getByRole("slider", { name: /Zoom/i }) as HTMLInputElement;
+    expect(slider.min).toBe("0.5");
+    expect(slider.max).toBe("3");
+
+    fireEvent.change(slider, { target: { value: "0.6" } });
+    expect(slider.value).toBe("0.6");
   });
 });

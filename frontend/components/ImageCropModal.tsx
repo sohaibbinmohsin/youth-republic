@@ -10,8 +10,8 @@ export interface ImageCropModalProps {
   isUploading?: boolean;
 }
 
-const CROP_SIZE = 240; // Diameter of the circle crop in pixels
-const VIEWPORT_SIZE = 300; // Size of the square viewport container
+const CROP_SIZE = 240; // Diameter of the circular aperture in pixels
+const VIEWPORT_SIZE = 300; // Square container size
 const OUTPUT_SIZE = 400; // Resolution of the exported cropped image
 
 export function ImageCropModal({
@@ -24,6 +24,8 @@ export function ImageCropModal({
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [naturalDims, setNaturalDims] = useState<{ width: number; height: number } | null>(null);
+
   const dragStartRef = useRef({ x: 0, y: 0 });
   const positionStartRef = useRef({ x: 0, y: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
@@ -35,6 +37,7 @@ export function ImageCropModal({
       setZoom(1);
       setPosition({ x: 0, y: 0 });
       setIsDragging(false);
+      setNaturalDims(null);
     }
   }, [isOpen, imageSrc]);
 
@@ -49,6 +52,22 @@ export function ImageCropModal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, isUploading, onClose]);
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth && img.naturalHeight) {
+      setNaturalDims({ width: img.naturalWidth, height: img.naturalHeight });
+    }
+  };
+
+  // Base display scale: shorter side of image fits CROP_SIZE (240px)
+  // This guarantees the face/head fits inside the circle on load, rather than blowing up to 4000px raw unconstrained size
+  const aspectRatio = naturalDims && naturalDims.height > 0
+    ? naturalDims.width / naturalDims.height
+    : 1;
+  const isPortrait = aspectRatio < 1;
+  const baseWidth = isPortrait ? CROP_SIZE : CROP_SIZE * aspectRatio;
+  const baseHeight = isPortrait ? CROP_SIZE / aspectRatio : CROP_SIZE;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isUploading) return;
@@ -86,7 +105,7 @@ export function ImageCropModal({
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // Touch event handlers for mobile devices
+  // Touch event handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isUploading || e.touches.length !== 1) return;
     setIsDragging(true);
@@ -112,7 +131,7 @@ export function ImageCropModal({
     e.preventDefault();
     if (isUploading) return;
     const delta = e.deltaY * -0.002;
-    setZoom((prev) => Math.min(3, Math.max(1, parseFloat((prev + delta).toFixed(2)))));
+    setZoom((prev) => Math.min(3, Math.max(0.5, parseFloat((prev + delta).toFixed(2)))));
   };
 
   const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,7 +139,7 @@ export function ImageCropModal({
   };
 
   const handleZoomStep = (step: number) => {
-    setZoom((prev) => Math.min(3, Math.max(1, parseFloat((prev + step).toFixed(2)))));
+    setZoom((prev) => Math.min(3, Math.max(0.5, parseFloat((prev + step).toFixed(2)))));
   };
 
   const handleCrop = () => {
@@ -138,45 +157,22 @@ export function ImageCropModal({
       return;
     }
 
-    // In the viewport (VIEWPORT_SIZE x VIEWPORT_SIZE), the crop circle is centered:
-    const cropCenter = VIEWPORT_SIZE / 2;
-    const cropRadius = CROP_SIZE / 2;
+    // Map viewport coordinates to canvas output
+    const multiplier = OUTPUT_SIZE / CROP_SIZE;
+    const canvasCenterX = OUTPUT_SIZE / 2;
+    const canvasCenterY = OUTPUT_SIZE / 2;
 
-    // Image natural vs displayed scale
-    const displayedWidth = img.offsetWidth * zoom;
-    const displayedHeight = img.offsetHeight * zoom;
-
-    // The top-left of the image inside viewport:
-    const imgDisplayedX = (VIEWPORT_SIZE - img.offsetWidth) / 2 + position.x - (img.offsetWidth * (zoom - 1)) / 2;
-    const imgDisplayedY = (VIEWPORT_SIZE - img.offsetHeight) / 2 + position.y - (img.offsetHeight * (zoom - 1)) / 2;
-
-    // Crop box in viewport coordinates
-    const cropLeft = cropCenter - cropRadius;
-    const cropTop = cropCenter - cropRadius;
-
-    // Map crop box back to source image natural coordinates
-    const naturalScaleX = img.naturalWidth / (displayedWidth || 1);
-    const naturalScaleY = img.naturalHeight / (displayedHeight || 1);
-
-    const sourceX = (cropLeft - imgDisplayedX) * naturalScaleX;
-    const sourceY = (cropTop - imgDisplayedY) * naturalScaleY;
-    const sourceW = CROP_SIZE * naturalScaleX;
-    const sourceH = CROP_SIZE * naturalScaleY;
+    const destW = baseWidth * zoom * multiplier;
+    const destH = baseHeight * zoom * multiplier;
+    const destX = (canvasCenterX + position.x * multiplier) - destW / 2;
+    const destY = (canvasCenterY + position.y * multiplier) - destH / 2;
 
     try {
-      ctx.drawImage(
-        img,
-        Math.max(0, sourceX),
-        Math.max(0, sourceY),
-        Math.max(1, sourceW),
-        Math.max(1, sourceH),
-        0,
-        0,
-        OUTPUT_SIZE,
-        OUTPUT_SIZE,
-      );
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+      ctx.drawImage(img, destX, destY, destW, destH);
     } catch {
-      // Fallback if drawImage fails (e.g. cross-origin image mock in tests)
+      // Fallback if drawImage fails in test mocks
       ctx.fillStyle = "#e5e7eb";
       ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
     }
@@ -191,7 +187,7 @@ export function ImageCropModal({
           }
         },
         "image/jpeg",
-        0.9,
+        0.92,
       );
     } else {
       onCropComplete(new Blob(["mock-image"], { type: "image/jpeg" }));
@@ -212,18 +208,18 @@ export function ImageCropModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "rgba(15, 23, 42, 0.75)",
-        backdropFilter: "blur(4px)",
+        backgroundColor: "rgba(12, 13, 14, 0.72)",
+        backdropFilter: "blur(6px)",
         padding: "1rem",
-        fontFamily: "var(--font-jost, 'Jost', sans-serif)",
       }}
     >
       <div
         style={{
           backgroundColor: "#ffffff",
           borderRadius: "16px",
+          border: "1px solid var(--line, #e6e6e8)",
           width: "100%",
-          maxWidth: "420px",
+          maxWidth: "380px",
           boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           overflow: "hidden",
           display: "flex",
@@ -231,37 +227,42 @@ export function ImageCropModal({
           animation: "fadeIn 0.2s ease-out",
         }}
       >
-        {/* Header */}
+        {/* Header - Styled with Youth Republic Design System */}
         <div
           style={{
-            padding: "1.25rem 1.5rem",
-            borderBottom: "1px solid #f1f5f9",
+            padding: "1.1rem 1.25rem",
+            borderBottom: "1px solid var(--line, #e6e6e8)",
             display: "flex",
             alignItems: "center",
-            justifyContent: "between",
+            justifyContent: "space-between",
+            gap: "0.75rem",
           }}
         >
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h2
               id="crop-modal-title"
               style={{
-                fontSize: "1.125rem",
-                fontWeight: 600,
-                color: "#1e293b",
+                fontFamily: "'Oswald', sans-serif",
+                fontSize: "1.15rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "-.005em",
+                color: "var(--ink, #141416)",
                 margin: 0,
-                lineHeight: 1.3,
+                lineHeight: 1.15,
               }}
             >
               Position & Crop Profile Picture
             </h2>
             <p
               style={{
-                fontSize: "0.8125rem",
-                color: "#64748b",
-                margin: "4px 0 0 0",
+                fontFamily: "var(--font-body, 'Jost', sans-serif)",
+                fontSize: "0.82rem",
+                color: "var(--ink-2, #68686e)",
+                margin: "0.25rem 0 0 0",
               }}
             >
-              Drag to reposition your photo and use the zoom slider.
+              Drag to frame your face in the circle. Use the slider to zoom.
             </p>
           </div>
           <button
@@ -272,30 +273,33 @@ export function ImageCropModal({
             style={{
               background: "transparent",
               border: "none",
-              color: "#94a3b8",
+              color: "var(--ink-2, #68686e)",
               cursor: isUploading ? "not-allowed" : "pointer",
-              padding: "4px",
-              borderRadius: "6px",
-              display: "flex",
+              padding: "6px",
+              borderRadius: "999px",
+              display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
+              transition: "background 0.15s ease",
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-2, #f3f3f5)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
 
-        {/* Viewport with Circular Mask */}
+        {/* Viewport Frame with Circular Aperture Mask */}
         <div
           style={{
-            padding: "1.5rem",
+            padding: "1.25rem",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            backgroundColor: "#f8fafc",
+            backgroundColor: "var(--bg, #fbfbfd)",
           }}
         >
           <div
@@ -310,24 +314,82 @@ export function ImageCropModal({
               height: `${VIEWPORT_SIZE}px`,
               position: "relative",
               overflow: "hidden",
-              borderRadius: "12px",
-              backgroundColor: "#0f172a",
-              cursor: isDragging ? "grabbing" : "grab",
+              borderRadius: "14px",
+              backgroundColor: "#0d0f12",
+              cursor: isUploading ? "not-allowed" : isDragging ? "grabbing" : "grab",
               userSelect: "none",
               touchAction: "none",
+              border: "1px solid var(--line, #e6e6e8)",
             }}
           >
-            {/* The Image being positioned */}
+            {/* Prominent Uploading State Overlay */}
+            {isUploading && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 20,
+                  backgroundColor: "rgba(13, 15, 18, 0.85)",
+                  backdropFilter: "blur(4px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.85rem",
+                  color: "#ffffff",
+                }}
+              >
+                <div
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "999px",
+                    border: "3px solid rgba(255, 255, 255, 0.2)",
+                    borderTopColor: "var(--blue-strong, #941A80)",
+                    animation: "spin 0.8s linear infinite",
+                  }}
+                />
+                <div style={{ textAlign: "center", padding: "0 1rem" }}>
+                  <div
+                    style={{
+                      fontFamily: "'Oswald', sans-serif",
+                      fontSize: "1rem",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                      color: "#ffffff",
+                    }}
+                  >
+                    Uploading Photo…
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-body, 'Jost', sans-serif)",
+                      fontSize: "0.78rem",
+                      color: "rgba(255, 255, 255, 0.7)",
+                      marginTop: "3px",
+                    }}
+                  >
+                    Saving to verified cloud storage
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* The Image being positioned - fitted to base dimensions */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               ref={imgRef}
               src={imageSrc}
               alt="Crop preview"
               draggable={false}
+              onLoad={handleImageLoad}
               style={{
                 position: "absolute",
                 top: "50%",
                 left: "50%",
+                width: `${baseWidth}px`,
+                height: `${baseHeight}px`,
                 maxWidth: "none",
                 maxHeight: "none",
                 transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px) scale(${zoom})`,
@@ -335,10 +397,11 @@ export function ImageCropModal({
                 pointerEvents: "none",
                 willChange: "transform",
                 display: "block",
+                userSelect: "none",
               }}
             />
 
-            {/* Circular Crop Overlay Mask */}
+            {/* Circular Crop Aperture Mask with Clean White Ring */}
             <div
               aria-hidden="true"
               style={{
@@ -348,60 +411,67 @@ export function ImageCropModal({
                 width: `${CROP_SIZE}px`,
                 height: `${CROP_SIZE}px`,
                 borderRadius: "50%",
-                border: "2px solid rgba(255, 255, 255, 0.9)",
-                boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.65)",
+                border: "2px solid rgba(255, 255, 255, 0.95)",
+                boxShadow: "0 0 0 9999px rgba(13, 15, 18, 0.72)",
                 pointerEvents: "none",
               }}
             />
           </div>
 
-          {/* Zoom Controls */}
+          {/* Zoom Controls Pill Bar */}
           <div
             style={{
               width: "100%",
               maxWidth: `${VIEWPORT_SIZE}px`,
-              marginTop: "1.25rem",
+              marginTop: "1rem",
               display: "flex",
               alignItems: "center",
-              gap: "0.75rem",
+              gap: "0.6rem",
+              background: "var(--bg-2, #f3f3f5)",
+              border: "1px solid var(--line, #e6e6e8)",
+              borderRadius: "999px",
+              padding: "0.35rem 0.75rem",
             }}
           >
             <button
               type="button"
               aria-label="Zoom out"
               onClick={() => handleZoomStep(-0.2)}
-              disabled={isUploading || zoom <= 1}
+              disabled={isUploading || zoom <= 0.5}
               style={{
-                width: "28px",
-                height: "28px",
-                borderRadius: "6px",
-                border: "1px solid #cbd5e1",
-                background: "#ffffff",
-                color: "#475569",
+                width: "26px",
+                height: "26px",
+                borderRadius: "999px",
+                border: "none",
+                background: "transparent",
+                color: "var(--ink, #141416)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: zoom <= 1 || isUploading ? "not-allowed" : "pointer",
-                fontWeight: "bold",
-                fontSize: "14px",
+                cursor: zoom <= 0.5 || isUploading ? "not-allowed" : "pointer",
+                opacity: zoom <= 0.5 || isUploading ? 0.4 : 1,
+                padding: 0,
               }}
             >
-              −
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
             </button>
 
             <input
               type="range"
               aria-label="Zoom"
-              min="1"
+              min="0.5"
               max="3"
-              step="0.05"
+              step="0.02"
               value={zoom}
               onChange={handleZoomChange}
               disabled={isUploading}
               style={{
                 flex: 1,
                 cursor: isUploading ? "not-allowed" : "pointer",
-                accentColor: "#8B265C",
+                accentColor: "var(--blue-strong, #941A80)",
+                height: "4px",
               }}
             />
 
@@ -411,90 +481,77 @@ export function ImageCropModal({
               onClick={() => handleZoomStep(0.2)}
               disabled={isUploading || zoom >= 3}
               style={{
-                width: "28px",
-                height: "28px",
-                borderRadius: "6px",
-                border: "1px solid #cbd5e1",
-                background: "#ffffff",
-                color: "#475569",
+                width: "26px",
+                height: "26px",
+                borderRadius: "999px",
+                border: "none",
+                background: "transparent",
+                color: "var(--ink, #141416)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: zoom >= 3 || isUploading ? "not-allowed" : "pointer",
-                fontWeight: "bold",
-                fontSize: "14px",
+                opacity: zoom >= 3 || isUploading ? 0.4 : 1,
+                padding: 0,
               }}
             >
-              +
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
             </button>
           </div>
         </div>
 
-        {/* Footer Actions */}
+        {/* Footer Actions - Youth Republic Buttons */}
         <div
           style={{
-            padding: "1rem 1.5rem",
-            borderTop: "1px solid #f1f5f9",
+            padding: "0.9rem 1.25rem",
+            borderTop: "1px solid var(--line, #e6e6e8)",
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
-            gap: "0.75rem",
+            gap: "0.6rem",
             backgroundColor: "#ffffff",
           }}
         >
           <button
             type="button"
+            className="btn btn--ghost btn--sm"
             onClick={onClose}
             disabled={isUploading}
-            style={{
-              padding: "0.5rem 1rem",
-              borderRadius: "8px",
-              border: "1px solid #cbd5e1",
-              backgroundColor: "#ffffff",
-              color: "#475569",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              cursor: isUploading ? "not-allowed" : "pointer",
-            }}
           >
             Cancel
           </button>
           <button
             type="button"
+            className="btn btn--primary btn--sm"
             onClick={handleCrop}
             disabled={isUploading}
             style={{
-              padding: "0.5rem 1.25rem",
-              borderRadius: "8px",
-              border: "none",
-              backgroundColor: isUploading ? "#9ca3af" : "#8B265C",
-              color: "#ffffff",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              cursor: isUploading ? "not-allowed" : "pointer",
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
-              gap: "0.5rem",
-              boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+              gap: "0.45rem",
             }}
           >
-            {isUploading && (
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ animation: "spin 1s linear infinite" }}
-              >
-                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
-                <path d="M12 2a10 10 0 0 1 10 10" />
-              </svg>
+            {isUploading ? (
+              <>
+                <span
+                  style={{
+                    width: "14px",
+                    height: "14px",
+                    borderRadius: "999px",
+                    border: "2px solid rgba(255, 255, 255, 0.3)",
+                    borderTopColor: "#ffffff",
+                    animation: "spin 0.8s linear infinite",
+                    display: "inline-block",
+                  }}
+                />
+                Uploading…
+              </>
+            ) : (
+              "Save & Upload"
             )}
-            {isUploading ? "Uploading…" : "Save & Upload"}
           </button>
         </div>
       </div>

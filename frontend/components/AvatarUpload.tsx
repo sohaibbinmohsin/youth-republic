@@ -47,7 +47,7 @@ function SpinnerIcon({ size = 18 }: { size?: number }) {
       strokeWidth="2.5"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ animation: "spin 1s linear infinite" }}
+      style={{ animation: "spin 0.8s linear infinite" }}
       aria-hidden="true"
     >
       <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
@@ -65,6 +65,7 @@ export function AvatarUpload({
   className,
 }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [optimisticPreviewUrl, setOptimisticPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -113,6 +114,16 @@ export function AvatarUpload({
 
   const handleCropComplete = async (croppedBlob: Blob) => {
     setError(null);
+
+    // Create optimistic local preview so the user immediately sees their cropped photo in the avatar circle
+    let preview: string | null = null;
+    try {
+      preview = URL.createObjectURL(croppedBlob);
+      setOptimisticPreviewUrl(preview);
+    } catch {
+      // Ignore if objectURL creation is not supported in test environment
+    }
+
     setUploading(true);
 
     try {
@@ -145,14 +156,22 @@ export function AvatarUpload({
       onSuccess?.(publicUrl);
       onAvatarChange?.(publicUrl);
 
+      // Clean up optimistic preview
+      if (preview) URL.revokeObjectURL(preview);
+      setOptimisticPreviewUrl(null);
+
       // Close modal on successful upload
       handleCloseCropModal();
     } catch (err) {
+      if (preview) URL.revokeObjectURL(preview);
+      setOptimisticPreviewUrl(null);
       setError(err instanceof Error ? err.message : "Failed to upload avatar");
     } finally {
       setUploading(false);
     }
   };
+
+  const currentDisplayUrl = optimisticPreviewUrl || profilePictureUrl;
 
   return (
     <>
@@ -176,10 +195,10 @@ export function AvatarUpload({
             overflow: "hidden",
           }}
         >
-          {profilePictureUrl ? (
+          {currentDisplayUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={profilePictureUrl}
+              src={currentDisplayUrl}
               alt={fullName ? `${fullName}'s avatar` : "Volunteer avatar"}
               style={{
                 width: "100%",
@@ -193,6 +212,28 @@ export function AvatarUpload({
             <span>{initials}</span>
           )}
 
+          {/* Active upload loader with brand violet glow */}
+          {uploading && (
+            <div
+              aria-label="Uploading avatar"
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "999px",
+                backgroundColor: "rgba(148, 26, 128, 0.5)",
+                backdropFilter: "blur(2px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                zIndex: 3,
+              }}
+            >
+              <SpinnerIcon size={20} />
+            </div>
+          )}
+
+          {/* Hover / trigger button */}
           <button
             type="button"
             aria-label="Upload profile picture"
@@ -210,15 +251,16 @@ export function AvatarUpload({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: uploading ? "rgba(0, 0, 0, 0.65)" : "rgba(0, 0, 0, 0.45)",
+              background: "rgba(0, 0, 0, 0.4)",
               color: "#ffffff",
               border: "none",
               cursor: uploading ? "not-allowed" : "pointer",
-              opacity: uploading || isHovered ? 1 : 0,
+              opacity: !uploading && isHovered ? 1 : 0,
               transition: "opacity 0.2s ease-in-out",
+              zIndex: 2,
             }}
           >
-            {uploading ? <SpinnerIcon size={20} /> : <CameraIcon size={20} />}
+            <CameraIcon size={20} />
           </button>
         </div>
 
