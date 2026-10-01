@@ -12,9 +12,9 @@ import { CITIES, INSTITUTIONS } from "@/lib/formDatasets";
 import { isValidCnic } from "@/lib/cnicUtils";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
-import { getAvatarInitials } from "@/lib/coolNames";
 import { PROTOTYPE_SEED_OPPORTUNITIES } from "@/lib/opportunityData";
 import { OrgAvatar } from "@/components/OrgAvatar";
+import { AvatarUpload } from "@/components/AvatarUpload";
 import PortfolioLoading from "./loading";
 
 interface VolunteerProfile {
@@ -36,6 +36,7 @@ interface VolunteerProfile {
   created_at: string;
   emergency_contact?: { name: string; phone: string } | null;
   is_unregistered?: boolean;
+  profile_picture_url?: string | null;
 }
 
 interface ApplicationItem {
@@ -262,6 +263,7 @@ export default function PortfolioPage() {
   const [totalVerifiedHours, setTotalVerifiedHours] = useState<number | null>(null);
   const [volunteer, setVolunteer] = useState<VolunteerProfile | null>(null);
   const [currentChapterName, setCurrentChapterName] = useState<string | null>(null);
+  const [currentChapterRole, setCurrentChapterRole] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [programmes, setProgrammes] = useState<ProgrammeItem[]>([]);
@@ -288,7 +290,7 @@ export default function PortfolioPage() {
     try {
       const query = supabase
         .from("volunteers")
-        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, status, created_at, emergency_contact")
+        .select("id, full_name, email, phone, volunteer_code, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, status, created_at, emergency_contact, profile_picture_url")
         .eq("auth_user_id", authUserId);
       const result = typeof (query as any).maybeSingle === "function"
         ? await (query as any).maybeSingle()
@@ -414,9 +416,29 @@ export default function PortfolioPage() {
           .order("linked_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        setCurrentChapterName(
-          (chapterLink as unknown as { chapters: { name: string } } | null)?.chapters.name ?? null,
-        );
+        const chName = (chapterLink as unknown as { chapters: { name: string } } | null)?.chapters?.name ?? null;
+        if (chName) {
+          setCurrentChapterName(chName);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const { data: teamMember } = await supabase
+          .from("chapter_team_members")
+          .select("designation, chapters(name)")
+          .eq("volunteer_code", volunteerRow.volunteer_code)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+
+        if (teamMember) {
+          const chName = (teamMember as any).chapters?.name ?? null;
+          const desig = (teamMember as any).designation ?? null;
+          if (chName) setCurrentChapterName(chName);
+          if (desig) setCurrentChapterRole(desig);
+        }
       } catch {
         // ignore
       }
@@ -581,7 +603,6 @@ export default function PortfolioPage() {
     return <PortfolioLoading />;
   }
 
-  const avatarInitials = getAvatarInitials(volunteer.full_name);
   const isVerified = volunteer.status === "active" || (!volunteer.is_unregistered && volunteer.status === "verified");
   const isPending = !isVerified || volunteer.is_unregistered;
 
@@ -597,7 +618,13 @@ export default function PortfolioPage() {
     <div className="w-full space-y-6 font-['Jost']">
       {/* Header Profile Identity */}
       <div className="pf-id">
-        <div className="avatar">{avatarInitials}</div>
+        <AvatarUpload
+          profilePictureUrl={volunteer.profile_picture_url}
+          fullName={volunteer.full_name}
+          accessToken={accessToken}
+          onSuccess={(url) => setVolunteer((prev) => (prev ? { ...prev, profile_picture_url: url } : null))}
+          onAvatarChange={(url) => setVolunteer((prev) => (prev ? { ...prev, profile_picture_url: url } : null))}
+        />
         <div className="pf-id__who">
           <h1>
             <span>{volunteer.full_name}</span>
@@ -608,8 +635,15 @@ export default function PortfolioPage() {
             )}
           </h1>
           <div className="sub">
-            {volunteer.volunteer_code} · {volunteer.city} · {volunteer.institution}
-            {currentChapterName && ` · Chapter: ${currentChapterName}`} · Member since {formatDateDisplay(volunteer.created_at)}
+            {[
+              volunteer.volunteer_code,
+              volunteer.city,
+              volunteer.institution,
+              currentChapterRole || (currentChapterName ? `Chapter: ${currentChapterName}` : null),
+              volunteer.created_at ? `Member since ${formatDateDisplay(volunteer.created_at)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </div>
         </div>
       </div>

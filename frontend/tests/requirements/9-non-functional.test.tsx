@@ -31,6 +31,7 @@ describe("§9 Clean internal APIs — every write goes through a named function 
         "getVolunteerPortfolio",
         "updateSensitiveField",
         "updateProfileField",
+        "uploadPublicAsset",
       ]),
     );
   });

@@ -19,7 +19,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [userSession, setUserSession] = useState<{ id: string; email?: string | null; name: string; initials: string } | null>(null);
+  const [userSession, setUserSession] = useState<{
+    id: string;
+    email?: string | null;
+    name: string;
+    initials: string;
+    profilePictureUrl?: string | null;
+  } | null>(null);
+  const [avatarImgError, setAvatarImgError] = useState(false);
   const pathname = usePathname() ?? "";
 
   useEffect(() => {
@@ -32,12 +39,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
 
       let fullName: string | null = null;
+      let profilePictureUrl: string | null = null;
       try {
-        const q = supabase.from("volunteers").select("full_name").eq("auth_user_id", user.id);
+        const q = supabase.from("volunteers").select("full_name, profile_picture_url").eq("auth_user_id", user.id);
         const res = typeof (q as any).maybeSingle === "function" ? await (q as any).maybeSingle() : await (q as any).single();
         fullName = res?.data?.full_name ?? null;
+        profilePictureUrl = res?.data?.profile_picture_url ?? null;
       } catch {
         fullName = null;
+        profilePictureUrl = null;
       }
 
       const email = user.email ?? null;
@@ -45,7 +55,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const name = fullName || metaName || (email ? email.split("@")[0] : "Volunteer");
       const initials = getAvatarInitials(name || email || "YR");
 
-      setUserSession({ id: user.id, email, name, initials });
+      setUserSession({ id: user.id, email, name, initials, profilePictureUrl });
+      setAvatarImgError(false);
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -60,6 +71,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, [pathname]);
+
+  useEffect(() => {
+    function handleAvatarUpdated(e: Event) {
+      const customEvent = e as CustomEvent<{ profilePictureUrl?: string | null }>;
+      if (customEvent.detail?.profilePictureUrl) {
+        setUserSession((prev) =>
+          prev ? { ...prev, profilePictureUrl: customEvent.detail.profilePictureUrl } : null
+        );
+        setAvatarImgError(false);
+      }
+    }
+    window.addEventListener("volunteer-avatar-updated", handleAvatarUpdated);
+    return () => window.removeEventListener("volunteer-avatar-updated", handleAvatarUpdated);
+  }, []);
 
   useEffect(() => {
     if (pathname && isValidReturnUrl(pathname)) {
@@ -149,7 +174,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="nav-actions" id="navActions">
             {userSession ? (
               <div className="usermenu" ref={menuRef}>
-                {pathname.startsWith("/portfolio") ? (
+                {userSession.profilePictureUrl && !avatarImgError ? (
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className="avatar-photo-btn"
+                    aria-label="User menu"
+                    title={userSession.name}
+                  >
+                    <img
+                      src={userSession.profilePictureUrl}
+                      alt={userSession.name}
+                      onError={() => setAvatarImgError(true)}
+                    />
+                  </button>
+                ) : pathname.startsWith("/portfolio") ? (
                   <button
                     type="button"
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}

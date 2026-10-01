@@ -7,10 +7,10 @@ export interface R2Client {
   headObject(key: string): Promise<{ size: number } | null>;
 }
 
-export function buildR2Client(): R2Client {
+export function buildR2Client(customBucketUrl?: string): R2Client {
   const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID") || "";
   const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY") || "";
-  const bucketUrl = (Deno.env.get("R2_BUCKET_URL") || "").replace(/\/$/, "");
+  const bucketUrl = (customBucketUrl || Deno.env.get("R2_BUCKET_URL") || "").replace(/\/$/, "");
 
   const client = new AwsClient({
     accessKeyId,

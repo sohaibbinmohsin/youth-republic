@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AppShell } from "./AppShell";
@@ -19,14 +19,32 @@ describe("AppShell", () => {
   const mockOnAuthStateChange = vi.fn().mockReturnValue({
     data: { subscription: { unsubscribe: vi.fn() } },
   });
+  const mockFrom = vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+        single: vi.fn().mockResolvedValue({ data: null }),
+      }),
+    }),
+  });
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    mockFrom.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null }),
+          single: vi.fn().mockResolvedValue({ data: null }),
+        }),
+      }),
+    });
     vi.spyOn(browserClient, "getBrowserSupabaseClient").mockReturnValue({
       auth: {
         getSession: mockGetSession,
         onAuthStateChange: mockOnAuthStateChange,
         signOut: mockSignOut,
       },
+      from: mockFrom,
     } as unknown as ReturnType<typeof browserClient.getBrowserSupabaseClient>);
   });
 
@@ -176,6 +194,138 @@ describe("AppShell", () => {
     expect(oppLinks.some((l) => l.getAttribute("href") === "/")).toBe(true);
 
     // reset pathname
+    mockPathname = "/opportunities";
+  });
+
+  it("renders header profile picture bubble with brand ring when user has profile_picture_url", async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: {
+        session: {
+          user: { id: "user-456", email: "hamza@example.com" },
+        },
+      },
+    });
+    mockFrom.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: {
+              full_name: "Hamza Ahmed",
+              profile_picture_url: "https://yr-assets.themohsinproject.org/avatars/avatar-456.jpg",
+            },
+          }),
+        }),
+      }),
+    });
+
+    render(
+      <AppShell>
+        <p>content</p>
+      </AppShell>,
+    );
+
+    const photoBtn = await screen.findByRole("button", { name: "User menu" });
+    expect(photoBtn).toHaveClass("avatar-photo-btn");
+    const img = photoBtn.querySelector("img");
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute("src", "https://yr-assets.themohsinproject.org/avatars/avatar-456.jpg");
+    expect(img).toHaveAttribute("alt", "Hamza Ahmed");
+  });
+
+  it("updates header bubble dynamically when volunteer-avatar-updated window event fires", async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: {
+        session: {
+          user: { id: "user-789", email: "zain@example.com" },
+        },
+      },
+    });
+
+    render(
+      <AppShell>
+        <p>content</p>
+      </AppShell>,
+    );
+
+    const initialBtn = await screen.findByRole("button", { name: "User menu" });
+    expect(initialBtn).toHaveClass("avatar-btn");
+
+    // Dispatch custom event as fired by AvatarUpload after successful upload
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("volunteer-avatar-updated", {
+          detail: { profilePictureUrl: "https://yr-assets.themohsinproject.org/avatars/zain.jpg" },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      const updatedBtn = screen.getByRole("button", { name: "User menu" });
+      expect(updatedBtn).toHaveClass("avatar-photo-btn");
+      const img = updatedBtn.querySelector("img");
+      expect(img).toHaveAttribute("src", "https://yr-assets.themohsinproject.org/avatars/zain.jpg");
+    });
+  });
+
+  it("falls back to initials button if header profile image fails to load", async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: {
+        session: {
+          user: { id: "user-broken", email: "broken@example.com" },
+        },
+      },
+    });
+    mockFrom.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: {
+              full_name: "Broken Photo",
+              profile_picture_url: "https://broken.example.com/bad.jpg",
+            },
+          }),
+        }),
+      }),
+    });
+
+    render(
+      <AppShell>
+        <p>content</p>
+      </AppShell>,
+    );
+
+    const photoBtn = await screen.findByRole("button", { name: "User menu" });
+    expect(photoBtn).toHaveClass("avatar-photo-btn");
+    const img = photoBtn.querySelector("img")!;
+
+    // Fire error on image
+    fireEvent.error(img);
+
+    await waitFor(() => {
+      const fallbackBtn = screen.getByRole("button", { name: "User menu" });
+      expect(fallbackBtn).toHaveClass("avatar-btn");
+      expect(fallbackBtn.textContent).toBe("BP");
+    });
+  });
+
+  it("renders dots-menu-btn on /portfolio when user has no profile picture", async () => {
+    mockPathname = "/portfolio";
+    mockGetSession.mockResolvedValueOnce({
+      data: {
+        session: {
+          user: { id: "user-123", email: "volunteer@example.com" },
+        },
+      },
+    });
+
+    render(
+      <AppShell>
+        <p>portfolio page content</p>
+      </AppShell>,
+    );
+
+    const dotsBtn = await screen.findByRole("button", { name: "User menu" });
+    expect(dotsBtn).toHaveClass("dots-menu-btn");
     mockPathname = "/opportunities";
   });
 });

@@ -117,7 +117,7 @@ export function updateSensitiveField(payload: UpdateSensitiveFieldPayload, acces
 }
 
 export interface UpdateProfileFieldPayload {
-  fieldName: "city" | "institution" | "graduation_year" | "availability" | "skills" | "interests";
+  fieldName: "city" | "institution" | "graduation_year" | "availability" | "skills" | "interests" | "profile_picture_url";
   newValue: string | number | string[];
 }
 export interface UpdateProfileFieldResponse {
@@ -125,6 +125,19 @@ export interface UpdateProfileFieldResponse {
 }
 export function updateProfileField(payload: UpdateProfileFieldPayload, accessToken: string) {
   return callFunction<UpdateProfileFieldResponse>("update-profile-field", payload, accessToken);
+}
+
+export interface UploadPublicAssetPayload {
+  domain: "avatar" | "logo";
+  contentType: string;
+}
+export interface UploadPublicAssetResponse {
+  uploadUrl: string;
+  publicUrl: string;
+  objectKey: string;
+}
+export function uploadPublicAsset(payload: UploadPublicAssetPayload, accessToken: string) {
+  return callFunction<UploadPublicAssetResponse>("upload-public-asset", payload, accessToken);
 }
 
 // Mirrors `AttachmentDomain` in backend/supabase/functions/_shared/attachmentPolicy.ts.

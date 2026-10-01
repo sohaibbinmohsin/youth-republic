@@ -7,7 +7,7 @@ import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 vi.mock("@/lib/supabase/browserClient");
 
 interface Fixtures {
-  volunteer: { id: string; full_name: string; city: string; institution: string; created_at: string };
+  volunteer: { id: string; full_name: string; city: string; institution?: string | null; created_at: string; profile_picture_url?: string | null; volunteer_code?: string };
   totalVerifiedHours: number;
   chapterLink?: { chapters: { name: string } } | null;
   applications?: Array<{ id: string; opportunity_id?: string; status: string; opportunities: { id?: string; name: string; type?: string; location?: string } | null; organizations?: { name: string } | null }>;
@@ -46,6 +46,19 @@ function mockSupabase(f: Fixtures) {
               order: () => ({
                 limit: () => ({
                   maybeSingle: () => Promise.resolve({ data: f.chapterLink ?? null, error: null }),
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "chapter_team_members") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                limit: () => ({
+                  maybeSingle: () => Promise.resolve({ data: null, error: null }),
                 }),
               }),
             }),
@@ -102,6 +115,55 @@ describe("PortfolioPage", () => {
     expect(screen.getByText(/Lahore/)).toBeInTheDocument();
     expect(screen.getByText(/LUMS/)).toBeInTheDocument();
     expect(screen.getByText(/North Chapter/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload profile picture" })).toBeInTheDocument();
+  });
+
+  it("renders profile picture in AvatarUpload if profile_picture_url is present", async () => {
+    vi.mocked(getBrowserSupabaseClient).mockReturnValue(
+      mockSupabase({
+        volunteer: {
+          id: "vol-1",
+          full_name: "Aisha Khan",
+          city: "Lahore",
+          institution: "LUMS",
+          created_at: "2026-01-15T00:00:00Z",
+          profile_picture_url: "https://assets.youthrepublic.org/avatars/vol-1/avatar.png",
+        },
+        totalVerifiedHours: 10,
+      }) as never,
+    );
+
+    render(<PortfolioPage />);
+
+    expect(await screen.findByText("Aisha Khan")).toBeInTheDocument();
+    const avatarImg = screen.getByAltText("Aisha Khan's avatar");
+    expect(avatarImg).toHaveAttribute("src", "https://assets.youthrepublic.org/avatars/vol-1/avatar.png");
+    expect(screen.getByRole("button", { name: "Upload profile picture" })).toBeInTheDocument();
+  });
+
+  it("omits extra dot after city when institution and chapter role are not assigned", async () => {
+    vi.mocked(getBrowserSupabaseClient).mockReturnValue(
+      mockSupabase({
+        volunteer: {
+          id: "vol-2",
+          full_name: "Sohaib Bin Mohsin",
+          volunteer_code: "YR-2026-000053",
+          city: "Lahore",
+          institution: null,
+          created_at: "2026-09-01T00:00:00Z",
+        },
+        totalVerifiedHours: 5,
+        chapterLink: null,
+      }) as never,
+    );
+
+    render(<PortfolioPage />);
+
+    expect(await screen.findByText("Sohaib Bin Mohsin")).toBeInTheDocument();
+    const subElement = screen.getByText(/Lahore · Member since/);
+    expect(subElement).toBeInTheDocument();
+    expect(subElement.textContent).toContain("YR-2026-000053 · Lahore · Member since");
+    expect(subElement.textContent).not.toContain(" · · ");
   });
 
   it("[5B] shows current and past applications with their statuses when clicking Applications tab", async () => {
