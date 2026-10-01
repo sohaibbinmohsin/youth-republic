@@ -9,14 +9,20 @@ export interface OpportunityItem {
   name: string;
   type: string;
   location: string | null;
+  city?: string | null;
+  venue?: string | null;
   isOnline?: boolean;
   description?: string | null;
   organizationId: string;
   organizationName: string;
   organizationLogoUrl?: string | null;
   organizationBrandColor?: string | null;
+  coverImageUrl?: string | null;
   computedStatus: string;
+  applicationOpenAt?: string | null;
   applicationDeadline?: string | null;
+  activityStartAt?: string | null;
+  activityEndAt?: string | null;
   createdAt?: string | null;
 }
 

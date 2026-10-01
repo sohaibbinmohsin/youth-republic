@@ -333,6 +333,16 @@ select {
   overflow: hidden;
   background: #E8E5DD;
 }
+.oc-cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-top-left-radius: calc(var(--radius-card) - 1px);
+  border-top-right-radius: calc(var(--radius-card) - 1px);
+  display: block;
+}
 
 /* Category Tag (Top Left - Normal Case) */
 .oc-card__overlay-top {
@@ -651,6 +661,14 @@ select {
   overflow: hidden;
   background: #E8E5DD;
   box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.detail-cover__frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .detail-cover__frame .duotone-poster {
   padding: 2rem;
