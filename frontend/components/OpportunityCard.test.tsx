@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { OpportunityCard } from "./OpportunityCard";
 
@@ -253,6 +253,49 @@ describe("OpportunityCard", () => {
     expect(img.getAttribute("decoding")).toBe("async");
     expect(img.getAttribute("src")).toContain("uuid.webp");
     expect(container.querySelector(".duotone-poster")).toBeNull();
+  });
+
+  it("shows image shimmer placeholder while cover image is loading, and hides it once loaded", () => {
+    const { container } = render(
+      <OpportunityCard
+        opportunity={{
+          id: "opp-shimmer",
+          name: "Tree Planting",
+          type: "environment",
+          organizationName: "Rizq",
+          computedStatus: "open",
+          coverImageUrl: "https://assets.yr.org/opportunity_covers/x/uuid.webp",
+        }}
+      />,
+    );
+    expect(container.querySelector(".oc-cover-shimmer")).toBeInTheDocument();
+    const img = container.querySelector("img.oc-cover-img") as HTMLImageElement;
+    expect(img).toBeInTheDocument();
+
+    fireEvent.load(img);
+    expect(container.querySelector(".oc-cover-shimmer")).toBeNull();
+  });
+
+  it("reverts gracefully to DuotoneArt when cover image fails to load", () => {
+    const { container } = render(
+      <OpportunityCard
+        opportunity={{
+          id: "opp-error-fallback",
+          name: "Tree Planting",
+          type: "environment",
+          organizationName: "Rizq",
+          computedStatus: "open",
+          coverImageUrl: "https://assets.yr.org/opportunity_covers/x/invalid.webp",
+        }}
+      />,
+    );
+    const img = container.querySelector("img.oc-cover-img") as HTMLImageElement;
+    expect(img).toBeInTheDocument();
+    expect(container.querySelector(".duotone-poster")).toBeNull();
+
+    fireEvent.error(img);
+    expect(container.querySelector("img.oc-cover-img")).toBeNull();
+    expect(container.querySelector(".duotone-poster")).toBeInTheDocument();
   });
 
   it("renders organization logo image when organizationLogoUrl is present", () => {

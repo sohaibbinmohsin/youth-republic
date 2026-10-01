@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import {
   getOpportunityBadgeConfig,
@@ -29,6 +32,9 @@ import { DuotoneArt, getOrgConfig } from "./DuotoneArt";
 import { isDisplayableLogo } from "@/lib/orgLogo";
 
 export function OpportunityCard({ opportunity }: { opportunity: OpportunitySummary }) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
   const orgConf = getOrgConfig(opportunity.organizationName);
 
   const status = opportunity.computedStatus ?? "open";
@@ -69,15 +75,26 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
       {/* 16:9 Media Frame with Locked Duo-Tone Poster */}
       <div className="oc-card__media">
         <div className="oc-card__media-inner">
-          {opportunity.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={opportunity.coverImageUrl}
-              alt={opportunity.name}
-              loading="lazy"
-              decoding="async"
-              className="oc-cover-img"
-            />
+          {opportunity.coverImageUrl && !imgError ? (
+            <>
+              {!imgLoaded && (
+                <div
+                  className="oc-cover-shimmer animate-pulse"
+                  aria-hidden="true"
+                />
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={opportunity.coverImageUrl}
+                alt={opportunity.name}
+                loading="lazy"
+                decoding="async"
+                className="oc-cover-img"
+                style={{ opacity: imgLoaded ? 1 : 0, transition: "opacity 0.2s ease" }}
+                onLoad={() => setImgLoaded(true)}
+                onError={() => setImgError(true)}
+              />
+            </>
           ) : (
             <DuotoneArt type={opportunity.type} monogram={orgConf.monogram} />
           )}
