@@ -36,6 +36,7 @@ export interface OpportunityCard {
   activityEndAt: string | null;
   deactivatedAt: string | null;
   createdAt: string | null;
+  coverImageUrl?: string | null;
 }
 
 export interface ListOpportunitiesResult {
@@ -72,7 +73,7 @@ export function computeOpportunityStatus(o: OpportunityStatusInputs): string {
 }
 
 const CARD_SELECT =
-  "id, name, type, description, location, city, venue, is_online, status_override, capacity, chapter_id, impact_stats, " +
+  "id, name, type, description, location, city, venue, is_online, status_override, capacity, chapter_id, impact_stats, cover_image_url, " +
   "application_open_at, application_deadline, activity_start_at, activity_end_at, " +
   "deactivated_at, created_at, organization_id, organizations(name, logo_url)";
 
@@ -109,6 +110,7 @@ function toCard(o: Record<string, unknown>, filledCount: number): OpportunityCar
     activityEndAt: (o.activity_end_at ?? null) as string | null,
     deactivatedAt: (o.deactivated_at ?? null) as string | null,
     createdAt: (o.created_at ?? null) as string | null,
+    coverImageUrl: (o.cover_image_url ?? null) as string | null,
     computedStatus: computeOpportunityStatus({
       statusOverride: (o.status_override ?? null) as string | null,
       applicationOpenAt: (o.application_open_at ?? null) as string | null,

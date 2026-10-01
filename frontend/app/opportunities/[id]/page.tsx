@@ -4,10 +4,10 @@ import Link from "next/link";
 import { computeOpportunityStatus, getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { OrgAvatar } from "@/components/OrgAvatar";
+import { isDisplayableLogo } from "@/lib/orgLogo";
+import { DuotoneArt, getOrgConfig } from "@/components/DuotoneArt";
 import {
   type OpportunityDetailRow,
-  TYPE_CONFIG,
-  formatOrgInitials,
 } from "@/lib/opportunityData";
 import { fetchOpportunityServer as fetchOpportunity } from "@/lib/opportunityDataServer";
 import { ApplyHint } from "@/components/ApplyHint";
@@ -57,66 +57,94 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     status === "open" || (status === "in_progress" && !isDeadlinePassed);
 
   const org = opp.organizations ?? { name: "Youth Republic Partner", brand_color: "#8A7A10", about: null, logo_url: null };
-  const orgColor = org.brand_color ?? "#8A7A10";
+  const orgConf = getOrgConfig(org.name);
+  const orgColor = org.brand_color ?? orgConf.color;
+  const orgMonogram = orgConf.monogram;
 
-  const typeConf = TYPE_CONFIG[opp.type.toLowerCase()] ?? {
-    label: opp.type ? opp.type.charAt(0).toUpperCase() + opp.type.slice(1) : "Opportunity",
-    color: "#941A80",
-  };
+  const causeKey = (opp.type || "").toLowerCase();
+  const tagClass =
+    causeKey === "environment" ? "tag--env" :
+    causeKey === "health" ? "tag--hea" :
+    causeKey === "education" ? "tag--edu" :
+    causeKey === "community" ? "tag--com" : "";
 
-  const badge = getOpportunityBadgeConfig(status, isAcceptingApplications);
+  const typeLabel = opp.type
+    ? opp.type.charAt(0).toUpperCase() + opp.type.slice(1).toLowerCase()
+    : "";
+
+  const badge = getOpportunityBadgeConfig(status, isAcceptingApplications, {
+    applicationDeadline: opp.application_deadline,
+  });
   const isLive = isOpportunityLive(status);
 
   const locationDisplay = opp.is_online
     ? "Online"
     : (opp.location ?? "Lahore");
 
-  const words = opp.name.trim().split(/\s+/);
-  const prefix = words.length > 1 ? words.slice(0, -1).join(" ") + " " : "";
-  const lastWord = words.length > 0 ? words[words.length - 1] : "";
-
-  const badgeLabel =
-    status === "in_progress" && isAcceptingApplications
-      ? "Applications open"
-      : badge.label === "Closed"
-      ? "Applications closed"
-      : badge.label;
-
   return (
     <section data-route="opportunity" className="pb-12">
       {/* Breadcrumb */}
       <Link className="crumb" href="/">
-        ← All opportunities
+        ← Back to all opportunities
       </Link>
+
+      {/* Clean Top Cover Banner with Logo Layover */}
+      <div className="detail-cover">
+        <div className="detail-cover__frame">
+          {opp.cover_image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={opp.cover_image_url}
+              alt={opp.name}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <DuotoneArt type={opp.type} monogram={orgMonogram} isDetail={true} />
+          )}
+        </div>
+
+        {/* Category Tag on the image (Top-Left) */}
+        {typeLabel && (
+          <div className="detail-cover__top-tag">
+            <span className={`tag-category ${tagClass}`}>{typeLabel}</span>
+          </div>
+        )}
+
+        {/* ONLY LOGO AS LAYOVER (Straddling bottom edge of cover banner) */}
+        <div className="detail-cover__logo-layover">
+          {isDisplayableLogo(org.logo_url) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={org.logo_url}
+              alt={org.name ? `${org.name} logo` : "Organization logo"}
+              className="detail-cover__avatar"
+              style={{ background: "#FFFFFF", objectFit: "contain", padding: "2px" }}
+            />
+          ) : (
+            <span
+              className="detail-cover__avatar"
+              style={{ background: orgColor }}
+            >
+              {orgMonogram}
+            </span>
+          )}
+          <span className="detail-cover__org-badge">{org.name}</span>
+        </div>
+      </div>
 
       <div className="pane">
         {/* Left Column: Detail */}
         <div className="detail">
-          <p className="detail__org">
-            <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="sm" />
-            <span>{org.name}</span>
-          </p>
-
-          <h1 className="display">
-            {isLive ? (
-              <>
-                {prefix}
-                <span className="title-with-live">
-                  {lastWord}{" "}
-                  <LiveIndicator />
-                </span>
-              </>
-            ) : (
-              opp.name
-            )}
-          </h1>
+          <div className="detail-title-row">
+            <h1 className="display">{opp.name}</h1>
+            {isLive && <LiveIndicator />}
+          </div>
 
           <div className="detail__meta">
-            <span style={{ color: typeConf.color, fontWeight: 600 }}>{typeConf.label}</span>
-            <span className="dot">·</span>
             <span>{locationDisplay}</span>
             <span className="dot">·</span>
-            <span className={`pill ${badge.pillClass}`}>{badgeLabel}</span>
+            <span className={`pill ${badge.pillClass}`}>{badge.label}</span>
           </div>
 
           {opp.description && (
@@ -177,7 +205,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             <OrgAvatar name={org.name} logoUrl={org.logo_url} color={orgColor} size="md" className="shadow-xs" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="font-['Oswald'] font-bold text-[15px] leading-tight text-[#24262D] truncate">
+                <span className="font-['Oswald'] font-bold text-[17px] leading-tight text-[#24262D] truncate">
                   {org.name}
                 </span>
                 {/* Purple Verified Circular Rosette Badge */}

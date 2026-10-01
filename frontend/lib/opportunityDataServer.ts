@@ -18,7 +18,7 @@ export const fetchOpportunityServer = cache(async (id: string): Promise<Opportun
     const { data, error } = await supabase
       .from("opportunities")
       .select(
-        "id, name, type, description, about, duties, eligibility, what_to_bring, location, city, venue, is_online, application_open_at, application_deadline, activity_start_at, activity_end_at, capacity, status_override, deactivated_at, organization_id, application_form, organizations(id, name, about, logo_url, brand_color)"
+        "id, name, type, description, about, duties, eligibility, what_to_bring, location, city, venue, is_online, application_open_at, application_deadline, activity_start_at, activity_end_at, capacity, status_override, deactivated_at, organization_id, cover_image_url, application_form, organizations(id, name, about, logo_url, brand_color)"
       )
       .eq("id", id)
       .single();

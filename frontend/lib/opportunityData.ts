@@ -31,6 +31,7 @@ export interface OpportunityDetailRow {
   status_override: string | null;
   deactivated_at: string | null;
   organization_id: string;
+  cover_image_url?: string | null;
   application_form?: FormDefinition | null;
   organizations?: OpportunityOrganization | null;
 }

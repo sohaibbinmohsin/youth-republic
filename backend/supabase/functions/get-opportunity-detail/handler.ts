@@ -27,6 +27,7 @@ export interface OpportunityDetail {
   capacity: number | null;
   computedStatus: string;
   impactStats?: Record<string, unknown> | null;
+  coverImageUrl?: string | null;
   orgId: string;
   orgName: string;
   orgAbout: string | null;
@@ -43,7 +44,7 @@ export async function getOpportunityDetail(
     .select(
       "id, name, description, about, duties, eligibility, what_to_bring, type, location, city, venue, is_online, " +
         "application_open_at, application_deadline, activity_start_at, activity_end_at, capacity, " +
-        "status_override, deactivated_at, organization_id, chapter_id, impact_stats, application_form, " +
+        "status_override, deactivated_at, organization_id, chapter_id, impact_stats, application_form, cover_image_url, " +
         "organizations(name, about, logo_url)",
     )
     .eq("id", input.opportunityId)
@@ -85,6 +86,7 @@ export async function getOpportunityDetail(
       deactivatedAt: (row.deactivated_at ?? null) as string | null,
     }),
     impactStats: (row.impact_stats ?? null) as Record<string, unknown> | null,
+    coverImageUrl: (row.cover_image_url ?? null) as string | null,
     orgId: row.organization_id as string,
     orgName: (org.name ?? "") as string,
     orgAbout: (org.about ?? null) as string | null,

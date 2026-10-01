@@ -285,7 +285,7 @@ export function ImageCropModal({
             aria-label="Close crop modal"
             onClick={onClose}
             disabled={isUploading}
-            className="text-[var(--ink-2)] hover:bg-[var(--bg-2)] p-2 rounded-full transition-colors flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+            className="text-[var(--ink-2)] hover:text-[var(--ink)] bg-white hover:bg-[var(--bg-2)] border border-[var(--line,#e2dfd7)] p-2 rounded-full shadow-xs transition-colors flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" />

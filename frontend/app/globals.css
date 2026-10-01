@@ -333,6 +333,24 @@ select {
   overflow: hidden;
   background: #E8E5DD;
 }
+.oc-cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-top-left-radius: calc(var(--radius-card) - 1px);
+  border-top-right-radius: calc(var(--radius-card) - 1px);
+  display: block;
+}
+.oc-cover-shimmer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--line, #e2dfd7);
+  z-index: 1;
+}
 
 /* Category Tag (Top Left - Normal Case) */
 .oc-card__overlay-top {
@@ -411,29 +429,38 @@ select {
   flex-direction: column;
   justify-content: flex-end;
   padding: 12px 14px;
-  color: #fff;
   overflow: hidden;
   z-index: 1;
 }
 .duotone-poster.com {
-  background: radial-gradient(circle at 85% 15%, rgba(243, 145, 4, 0.7) 0%, transparent 60%),
-              linear-gradient(135deg, #4A0E3C 0%, #20051B 50%, #7E3E04 100%);
+  --duotone-stroke: #C2410C;
+  color: #C2410C;
+  background: radial-gradient(circle at 85% 15%, rgba(243, 145, 4, 0.28) 0%, transparent 60%),
+              linear-gradient(135deg, #FFF9F0 0%, #FEEBD4 45%, #FED7AA 100%);
 }
 .duotone-poster.env {
-  background: radial-gradient(circle at 85% 15%, rgba(7, 149, 65, 0.7) 0%, transparent 60%),
-              linear-gradient(135deg, #072614 0%, #03150A 50%, #08612B 100%);
+  --duotone-stroke: #14532D;
+  color: #14532D;
+  background: radial-gradient(circle at 85% 15%, rgba(34, 197, 94, 0.25) 0%, transparent 60%),
+              linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 45%, #BBF7D0 100%);
 }
 .duotone-poster.hea {
-  background: radial-gradient(circle at 85% 15%, rgba(227, 9, 18, 0.65) 0%, transparent 60%),
-              linear-gradient(135deg, #380309 0%, #1A0104 50%, #820810 100%);
+  --duotone-stroke: #881337;
+  color: #881337;
+  background: radial-gradient(circle at 85% 15%, rgba(239, 68, 68, 0.22) 0%, transparent 60%),
+              linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 45%, #FECDD3 100%);
 }
 .duotone-poster.edu {
-  background: radial-gradient(circle at 85% 15%, rgba(9, 158, 226, 0.7) 0%, transparent 60%),
-              linear-gradient(135deg, #0A1B3A 0%, #040D1D 50%, #064E77 100%);
+  --duotone-stroke: #1E3A8A;
+  color: #1E3A8A;
+  background: radial-gradient(circle at 85% 15%, rgba(59, 130, 246, 0.25) 0%, transparent 60%),
+              linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 45%, #BAE6FD 100%);
 }
 .duotone-poster.default {
-  background: radial-gradient(circle at 85% 15%, rgba(148, 26, 128, 0.6) 0%, transparent 60%),
-              linear-gradient(135deg, #240523 0%, #120212 50%, #540D4A 100%);
+  --duotone-stroke: #C2410C;
+  color: #C2410C;
+  background: radial-gradient(circle at 85% 15%, rgba(243, 145, 4, 0.28) 0%, transparent 60%),
+              linear-gradient(135deg, #FFF9F0 0%, #FEEBD4 45%, #FED7AA 100%);
 }
 .duotone-deco {
   position: absolute;
@@ -441,7 +468,7 @@ select {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.22;
+  opacity: 0.85;
 }
 .duotone-deco--desktop {
   display: block;
@@ -457,8 +484,8 @@ select {
   font-family: var(--font-heading, "Oswald", sans-serif);
   font-size: 54px;
   font-weight: 700;
-  color: #FFFFFF;
-  opacity: 0.18;
+  color: currentColor;
+  opacity: 0.14;
   line-height: 1;
   letter-spacing: -0.03em;
   user-select: none;
@@ -651,6 +678,14 @@ select {
   overflow: hidden;
   background: #E8E5DD;
   box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.detail-cover__frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .detail-cover__frame .duotone-poster {
   padding: 2rem;

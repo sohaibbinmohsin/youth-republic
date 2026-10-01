@@ -1,3 +1,5 @@
+import { OpportunityCardSkeleton } from "@/components/OpportunityCardSkeleton";
+
 export default function RootLoading() {
   return (
     <section data-route="hub" className="animate-pulse w-full" aria-busy="true" aria-label="Loading content">
@@ -23,20 +25,7 @@ export default function RootLoading() {
         <div>
           <div className="cards">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="oc" style={{ background: "var(--bg)", border: "1px solid var(--line)" }}>
-                <div className="oc__org" style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
-                  <div style={{ width: "22px", height: "22px", borderRadius: "6px", background: "var(--line)" }}></div>
-                  <div style={{ width: "80px", height: "12px", borderRadius: "4px", background: "var(--line)" }}></div>
-                </div>
-                <div style={{ width: "85%", height: "20px", borderRadius: "4px", background: "var(--line)", margin: ".3rem 0" }}></div>
-                <div style={{ width: "50%", height: "14px", borderRadius: "4px", background: "var(--line)" }}></div>
-                <div style={{ width: "100%", height: "12px", borderRadius: "4px", background: "var(--line)", marginTop: ".4rem" }}></div>
-                <div style={{ width: "70%", height: "12px", borderRadius: "4px", background: "var(--line)" }}></div>
-                <div className="foot" style={{ marginTop: "1rem", paddingTop: ".5rem", display: "flex", justifyContent: "space-between" }}>
-                  <div style={{ width: "65px", height: "16px", borderRadius: "999px", background: "var(--line)" }}></div>
-                  <div style={{ width: "45px", height: "16px", borderRadius: "999px", background: "var(--line)" }}></div>
-                </div>
-              </div>
+              <OpportunityCardSkeleton key={i} />
             ))}
           </div>
         </div>

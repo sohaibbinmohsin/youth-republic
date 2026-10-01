@@ -4,6 +4,7 @@ import {
   getProgramStatusLabel,
   getApplicationStatusLabel,
   getOpportunityBadgeConfig,
+  formatOpportunityDate,
   isOpportunityLive,
   getOpportunityTier,
   isClosingSoon,
@@ -52,51 +53,104 @@ describe("isOpportunityLive", () => {
 });
 
 describe("getOpportunityBadgeConfig", () => {
-  it("returns 'Open' with positive pill style for open status", () => {
+  it("returns 'Applications Open' with positive pill style for open status", () => {
     expect(getOpportunityBadgeConfig("open")).toEqual({
-      label: "Open",
+      label: "Applications Open",
       pillClass: "pill--pos",
     });
   });
 
-  it("returns 'Coming soon' with pending pill style for coming_soon status", () => {
+  it("returns 'Coming Soon' with pending pill style for coming_soon status", () => {
     expect(getOpportunityBadgeConfig("coming_soon")).toEqual({
-      label: "Coming soon",
+      label: "Coming Soon",
       pillClass: "pill--pend",
     });
   });
 
-  it("returns 'Drive completed' with completed pill style for completed status", () => {
+  it("returns 'Drive Completed' with completed pill style for completed status", () => {
     expect(getOpportunityBadgeConfig("completed")).toEqual({
-      label: "Drive completed",
+      label: "Drive Completed",
       pillClass: "pill--comp",
     });
   });
 
-  it("returns 'Closed' with neutral pill style for in_progress and closed status", () => {
+  it("returns 'Closing Soon' for closing_soon status or near deadline", () => {
+    expect(getOpportunityBadgeConfig("closing_soon")).toEqual({
+      label: "Closing Soon",
+      pillClass: "pill--pend",
+    });
+    expect(getOpportunityBadgeConfig("open", true, true)).toEqual({
+      label: "Closing Soon",
+      pillClass: "pill--pend",
+    });
+  });
+
+  it("returns 'Applications Closed' with neutral pill style for in_progress and closed status", () => {
     expect(getOpportunityBadgeConfig("in_progress")).toEqual({
-      label: "Closed",
+      label: "Applications Closed",
       pillClass: "pill--neu",
     });
     expect(getOpportunityBadgeConfig("in_progress", false)).toEqual({
-      label: "Closed",
+      label: "Applications Closed",
       pillClass: "pill--neu",
     });
     expect(getOpportunityBadgeConfig("closed")).toEqual({
-      label: "Closed",
+      label: "Applications Closed",
       pillClass: "pill--neu",
     });
     expect(getOpportunityBadgeConfig(null)).toEqual({
-      label: "Closed",
+      label: "Applications Closed",
       pillClass: "pill--neu",
     });
   });
 
-  it("returns 'Open' with positive pill style for in_progress when accepting applications", () => {
+  it("returns 'Applications Open' with positive pill style for in_progress when accepting applications", () => {
     expect(getOpportunityBadgeConfig("in_progress", true)).toEqual({
-      label: "Open",
+      label: "Applications Open",
       pillClass: "pill--pos",
     });
+  });
+});
+
+describe("formatOpportunityDate", () => {
+  const BASE_TIME = new Date("2026-10-01T12:00:00Z").getTime();
+
+  it("formats relative 'Tomorrow' when deadline is within 24-36h", () => {
+    const tomorrowDeadline = new Date("2026-10-02T18:00:00Z").toISOString();
+    expect(formatOpportunityDate({
+      computedStatus: "open",
+      applicationDeadline: tomorrowDeadline,
+    }, BASE_TIME)).toBe("Tomorrow");
+  });
+
+  it("formats 'Closes in 3 days' when deadline is 3 days away", () => {
+    const threeDaysDeadline = new Date("2026-10-04T12:00:00Z").toISOString();
+    expect(formatOpportunityDate({
+      computedStatus: "open",
+      applicationDeadline: threeDaysDeadline,
+    }, BASE_TIME)).toBe("Closes in 3 days");
+  });
+
+  it("formats 'Opens in 3 days' when coming soon and opening in 3 days", () => {
+    const threeDaysOpen = new Date("2026-10-04T12:00:00Z").toISOString();
+    expect(formatOpportunityDate({
+      computedStatus: "coming_soon",
+      applicationOpenAt: threeDaysOpen,
+    }, BASE_TIME)).toBe("Opens in 3 days");
+  });
+
+  it("formats full date with year when deadline is further out", () => {
+    expect(formatOpportunityDate({
+      computedStatus: "open",
+      applicationDeadline: "2026-10-12T18:00:00Z",
+    }, BASE_TIME)).toBe("Oct 12, 2026");
+  });
+
+  it("formats past date with year for closed status", () => {
+    expect(formatOpportunityDate({
+      computedStatus: "closed",
+      applicationDeadline: "2026-09-09T18:00:00Z",
+    }, BASE_TIME)).toBe("Sep 9, 2026");
   });
 });
 

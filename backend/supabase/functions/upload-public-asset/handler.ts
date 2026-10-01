@@ -2,7 +2,8 @@
 import type { R2Client } from "../_shared/r2.ts";
 
 export interface UploadPublicAssetInput {
-  domain: "avatar" | "logo";
+  domain: "avatar" | "logo" | "opportunity_cover";
+  // opportunity_cover only accepts image/webp; avatar and logo accept all four MIME types below.
   contentType: "image/jpeg" | "image/png" | "image/webp" | "image/svg+xml";
   fileName?: string;
 }
@@ -20,6 +21,8 @@ export const ALLOWED_MIME_TYPES = [
   "image/svg+xml",
 ] as const;
 
+const ALLOWED_DOMAINS = ["avatar", "logo", "opportunity_cover"] as const;
+
 export const EXTENSION_MAP: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -33,11 +36,9 @@ export async function uploadPublicAsset(
   input: UploadPublicAssetInput,
   options?: { publicBaseUrl?: string },
 ): Promise<UploadPublicAssetResult> {
-  if (!callerId) {
-    throw new Error("unauthorized");
-  }
+  if (!callerId) throw new Error("unauthorized");
 
-  if (!input || (input.domain !== "avatar" && input.domain !== "logo")) {
+  if (!input || !(ALLOWED_DOMAINS as readonly string[]).includes(input.domain)) {
     throw new Error("invalid_domain");
   }
 
@@ -45,8 +46,16 @@ export async function uploadPublicAsset(
     throw new Error("invalid_content_type");
   }
 
+  // opportunity_cover must be WebP (we enforce this after browser-side canvas crop).
+  if (input.domain === "opportunity_cover" && input.contentType !== "image/webp") {
+    throw new Error("invalid_content_type");
+  }
+
   const ext = EXTENSION_MAP[input.contentType];
-  const folder = input.domain === "avatar" ? "avatars" : "logos";
+  const folder =
+    input.domain === "avatar" ? "avatars"
+    : input.domain === "logo" ? "logos"
+    : "opportunity_covers";
   const objectKey = `${folder}/${callerId}/${crypto.randomUUID()}.${ext}`;
 
   const uploadUrl = await r2Client.putSignedUrl(objectKey, 900);
@@ -66,9 +75,5 @@ export async function uploadPublicAsset(
   const baseUrl = (rawBaseUrl || "").replace(/\/+$/, "");
   const publicUrl = baseUrl ? `${baseUrl}/${objectKey}` : `/${objectKey}`;
 
-  return {
-    uploadUrl,
-    publicUrl,
-    objectKey,
-  };
+  return { uploadUrl, publicUrl, objectKey };
 }
