@@ -161,9 +161,15 @@ export function AvatarUpload({
         accessToken,
       );
 
-      // 4. Notify parent state
+      // 4. Notify parent state and dispatch window event for header bubble sync
       onSuccess?.(publicUrl);
       onAvatarChange?.(publicUrl);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("volunteer-avatar-updated", { detail: { profilePictureUrl: publicUrl } })
+        );
+      }
 
       // Clean up optimistic preview
       if (preview) URL.revokeObjectURL(preview);
