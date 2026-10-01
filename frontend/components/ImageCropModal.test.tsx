@@ -38,11 +38,11 @@ describe("ImageCropModal", () => {
 
     expect(screen.getByText(/Position & Crop Profile Picture/i)).toBeInTheDocument();
     expect(screen.getByRole("slider", { name: /Zoom/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Cancel/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Change photo/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Save & Upload/i })).toBeInTheDocument();
   });
 
-  it("calls onClose when Cancel button or close icon is clicked", () => {
+  it("calls onClose when close cross icon is clicked", () => {
     const onClose = vi.fn();
     render(
       <ImageCropModal
@@ -53,11 +53,8 @@ describe("ImageCropModal", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-
     fireEvent.click(screen.getByRole("button", { name: /Close crop modal/i }));
-    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("updates zoom when slider is adjusted or zoom buttons are clicked", () => {
@@ -113,7 +110,8 @@ describe("ImageCropModal", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Cancel/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Close crop modal/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Change photo/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Uploading/i })).toBeDisabled();
     expect(screen.getByText(/Uploading Photo…/i)).toBeInTheDocument();
     expect(screen.getByText(/Saving to verified cloud storage/i)).toBeInTheDocument();

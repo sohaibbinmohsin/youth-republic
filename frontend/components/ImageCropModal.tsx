@@ -562,18 +562,19 @@ export function ImageCropModal({
           </div>
         </div>
 
-        {/* Footer Actions - Full-length buttons on mobile, clean side-by-side on desktop, NO divider line */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full mt-2 sm:mt-4">
+        {/* Footer Actions - Full row buttons inside the card: Change photo above Save & Upload */}
+        <div className="flex flex-col items-center gap-2.5 w-full mt-3 sm:mt-4">
           <button
             type="button"
-            className="btn btn--ghost w-full sm:w-auto order-2 sm:order-1"
+            className="btn btn--ghost w-full"
             onClick={handleChangePhotoClick}
             disabled={isUploading || isImageLoading}
             style={{
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "0.45rem",
+              gap: "0.5rem",
+              width: "100%",
             }}
           >
             <svg
@@ -593,47 +594,38 @@ export function ImageCropModal({
             Change photo
           </button>
 
-          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto order-1 sm:order-2">
-            <button
-              type="button"
-              className="btn btn--primary w-full sm:w-auto order-1 sm:order-2"
-              onClick={handleCrop}
-              disabled={isUploading || isImageLoading}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.45rem",
-              }}
-            >
-              {isUploading ? (
-                <>
-                  <span
-                    style={{
-                      width: "14px",
-                      height: "14px",
-                      borderRadius: "999px",
-                      border: "2px solid rgba(255, 255, 255, 0.3)",
-                      borderTopColor: "#ffffff",
-                      animation: "spin 0.8s linear infinite",
-                      display: "inline-block",
-                    }}
-                  />
-                  Uploading…
-                </>
-              ) : (
-                "Save & Upload"
-              )}
-            </button>
-            <button
-              type="button"
-              className="btn btn--ghost w-full sm:w-auto order-3"
-              onClick={onClose}
-              disabled={isUploading}
-            >
-              Cancel
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn--primary w-full"
+            onClick={handleCrop}
+            disabled={isUploading || isImageLoading}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              width: "100%",
+            }}
+          >
+            {isUploading ? (
+              <>
+                <span
+                  style={{
+                    width: "14px",
+                    height: "14px",
+                    borderRadius: "999px",
+                    border: "2px solid rgba(255, 255, 255, 0.3)",
+                    borderTopColor: "#ffffff",
+                    animation: "spin 0.8s linear infinite",
+                    display: "inline-block",
+                  }}
+                />
+                Uploading…
+              </>
+            ) : (
+              "Save & Upload"
+            )}
+          </button>
         </div>
       </div>
     </div>
