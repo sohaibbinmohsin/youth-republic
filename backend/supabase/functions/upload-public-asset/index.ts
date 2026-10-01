@@ -93,7 +93,10 @@ export async function handler(
       });
     }
 
-    const r2Client = customR2Client ?? buildR2Client();
+    const publicBucketUrl =
+      Deno.env.get("R2_PUBLIC_BUCKET_URL") ||
+      "https://eb71e0aec72697fdd177f9a67bea3c1c.r2.cloudflarestorage.com/youth-republic-public";
+    const r2Client = customR2Client ?? buildR2Client(publicBucketUrl);
     const result = await uploadPublicAsset(r2Client, callerId, input);
 
     return new Response(JSON.stringify(result), {

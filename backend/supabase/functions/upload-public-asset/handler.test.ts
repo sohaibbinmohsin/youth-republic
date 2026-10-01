@@ -108,22 +108,10 @@ Deno.test("supports all allowed MIME types with correct extensions", async () =>
   }
 });
 
-Deno.test("fallback to R2_BUCKET_URL when R2_PUBLIC_URL is not set", async () => {
-  if (safeDeleteEnv("R2_PUBLIC_URL") && safeSetEnv("R2_BUCKET_URL", "https://pub-r2-bucket.cf.r2.dev")) {
-    const client = createMockR2Client();
-    const result = await uploadPublicAsset(client, "user-1", { domain: "avatar", contentType: "image/png" });
-    assertEquals(result.publicUrl, `https://pub-r2-bucket.cf.r2.dev/${result.objectKey}`);
-  } else {
-    // When env permissions are not granted, options.publicBaseUrl simulates fallback URL
-    const client = createMockR2Client();
-    const result = await uploadPublicAsset(
-      client,
-      "user-1",
-      { domain: "avatar", contentType: "image/png" },
-      { publicBaseUrl: "https://pub-r2-bucket.cf.r2.dev" },
-    );
-    assertEquals(result.publicUrl, `https://pub-r2-bucket.cf.r2.dev/${result.objectKey}`);
-  }
+Deno.test("fallback to yr-assets.themohsinproject.org when R2_PUBLIC_URL is not set", async () => {
+  const client = createMockR2Client();
+  const result = await uploadPublicAsset(client, "user-1", { domain: "avatar", contentType: "image/png" });
+  assertEquals(result.publicUrl, `https://yr-assets.themohsinproject.org/${result.objectKey}`);
 });
 
 Deno.test("rejects invalid MIME types with invalid_content_type", async () => {

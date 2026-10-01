@@ -54,9 +54,12 @@ export async function uploadPublicAsset(
   let rawBaseUrl = options?.publicBaseUrl;
   if (!rawBaseUrl) {
     try {
-      rawBaseUrl = Deno.env.get("R2_PUBLIC_URL") || Deno.env.get("R2_BUCKET_URL") || "";
+      rawBaseUrl =
+        Deno.env.get("R2_PUBLIC_URL") ||
+        Deno.env.get("R2_PUBLIC_BUCKET_URL") ||
+        "https://yr-assets.themohsinproject.org";
     } catch {
-      rawBaseUrl = "";
+      rawBaseUrl = "https://yr-assets.themohsinproject.org";
     }
   }
 

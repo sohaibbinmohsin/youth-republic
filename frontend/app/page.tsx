@@ -16,7 +16,7 @@ export default function Home() {
       try {
         const { data: opps } = await supabase
           .from("opportunities")
-          .select("id, name, type, location, is_online, description, organization_id, status_override, application_open_at, application_deadline, activity_start_at, activity_end_at, deactivated_at, created_at, organizations(id, name, logo_url, brand_color)")
+          .select("id, name, type, location, city, venue, is_online, description, organization_id, status_override, application_open_at, application_deadline, activity_start_at, activity_end_at, deactivated_at, created_at, organizations(id, name, logo_url, brand_color)")
           .is("deactivated_at", null)
           // Drafts are admin-only until published.
           .or("status_override.is.null,status_override.neq.draft")
@@ -30,6 +30,8 @@ export default function Home() {
               name: row.name,
               type: row.type,
               location: row.location,
+              city: row.city ?? row.location ?? "Lahore",
+              venue: row.venue ?? null,
               isOnline: Boolean(row.is_online),
               description: row.description,
               organizationId: row.organization_id,
