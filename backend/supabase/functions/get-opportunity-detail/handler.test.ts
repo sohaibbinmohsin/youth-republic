@@ -101,3 +101,18 @@ Deno.test("getOpportunityDetail throws not_found for an unknown id", async () =>
     "not_found",
   );
 });
+
+Deno.test("getOpportunityDetail returns coverImageUrl when set", async () => {
+  const result = await getOpportunityDetail(
+    sbWith({ ...seededRow, cover_image_url: "https://assets.example.com/cover.webp" }),
+    { opportunityId: "opp-1" },
+  );
+  assertEquals(result.coverImageUrl, "https://assets.example.com/cover.webp");
+});
+
+Deno.test("getOpportunityDetail returns null coverImageUrl when not set", async () => {
+  const result = await getOpportunityDetail(sbWith(seededRow), { opportunityId: "opp-1" });
+  assertEquals(result.coverImageUrl, null);
+});
+
+
