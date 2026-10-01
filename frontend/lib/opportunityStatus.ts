@@ -57,24 +57,145 @@ export interface OpportunityBadgeConfig {
 
 export function getOpportunityBadgeConfig(
   status?: string | null,
-  isAcceptingApplications?: boolean
+  isAcceptingApplications?: boolean,
+  deadlineOrOptions?: {
+    applicationDeadline?: string | null;
+    isClosingSoon?: boolean;
+  } | boolean,
+  now = Date.now(),
 ): OpportunityBadgeConfig {
+  let isClosing = false;
+  if (typeof deadlineOrOptions === "boolean") {
+    isClosing = deadlineOrOptions;
+  } else if (deadlineOrOptions && typeof deadlineOrOptions === "object") {
+    if (deadlineOrOptions.isClosingSoon) {
+      isClosing = true;
+    } else if (deadlineOrOptions.applicationDeadline) {
+      const diffMs = new Date(deadlineOrOptions.applicationDeadline).getTime() - now;
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      if (diffMs > 0 && diffDays <= 1) {
+        isClosing = true;
+      }
+    }
+  }
+
+  if (status === "closing_soon" || isClosing) {
+    return { label: "Closing Soon", pillClass: "pill--pend" };
+  }
+
   switch (status) {
     case "open":
-      return { label: "Open", pillClass: "pill--pos" };
+      return { label: "Applications Open", pillClass: "pill--pos" };
     case "coming_soon":
-      return { label: "Coming soon", pillClass: "pill--pend" };
+      return { label: "Coming Soon", pillClass: "pill--pend" };
     case "completed":
-      return { label: "Drive completed", pillClass: "pill--comp" };
+      return { label: "Drive Completed", pillClass: "pill--comp" };
     case "in_progress":
       if (isAcceptingApplications) {
-        return { label: "Open", pillClass: "pill--pos" };
+        return { label: "Applications Open", pillClass: "pill--pos" };
       }
-      return { label: "Closed", pillClass: "pill--neu" };
+      return { label: "Applications Closed", pillClass: "pill--neu" };
     case "closed":
     default:
-      return { label: "Closed", pillClass: "pill--neu" };
+      return { label: "Applications Closed", pillClass: "pill--neu" };
   }
+}
+
+export function formatOpportunityDate(
+  opp: {
+    computedStatus?: string | null;
+    applicationDeadline?: string | null;
+    applicationOpenAt?: string | null;
+    activityStartAt?: string | null;
+    activityEndAt?: string | null;
+  },
+  now = Date.now(),
+): string | null {
+  const status = opp.computedStatus ?? "open";
+
+  const formatDateWithYear = (dateStr: string): string => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const checkRelativeDate = (targetDateStr: string, prefix: "Closes" | "Opens"): string | null => {
+    const target = new Date(targetDateStr);
+    const targetTime = target.getTime();
+    if (isNaN(targetTime)) return null;
+
+    const diffMs = targetTime - now;
+    if (diffMs <= 0) {
+      return formatDateWithYear(targetDateStr);
+    }
+
+    const nowDate = new Date(now);
+    const isNextCalendarDay =
+      target.getFullYear() === nowDate.getFullYear() &&
+      target.getMonth() === nowDate.getMonth() &&
+      target.getDate() === nowDate.getDate() + 1;
+
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 1 || isNextCalendarDay) {
+      return "Tomorrow";
+    }
+
+    if (diffDays <= 5) {
+      return `${prefix} in ${diffDays} days`;
+    }
+
+    return formatDateWithYear(targetDateStr);
+  };
+
+  // Case 1: Coming Soon
+  if (status === "coming_soon") {
+    if (opp.applicationOpenAt) {
+      return checkRelativeDate(opp.applicationOpenAt, "Opens");
+    }
+    if (opp.activityStartAt) {
+      return formatDateWithYear(opp.activityStartAt);
+    }
+    return null;
+  }
+
+  // Case 2: Open / In Progress (accepting applications) / Closing Soon
+  if (status === "open" || status === "in_progress" || status === "closing_soon") {
+    if (opp.applicationDeadline) {
+      return checkRelativeDate(opp.applicationDeadline, "Closes");
+    }
+    return null;
+  }
+
+  // Case 3: Closed
+  if (status === "closed") {
+    if (opp.applicationDeadline) {
+      return formatDateWithYear(opp.applicationDeadline);
+    }
+    return null;
+  }
+
+  // Case 4: Completed
+  if (status === "completed") {
+    if (opp.activityEndAt) {
+      return formatDateWithYear(opp.activityEndAt);
+    }
+    if (opp.applicationDeadline) {
+      return formatDateWithYear(opp.applicationDeadline);
+    }
+    return null;
+  }
+
+  // Fallback
+  if (opp.applicationDeadline) {
+    return formatDateWithYear(opp.applicationDeadline);
+  }
+
+  return null;
 }
 
 export function getOpportunityTier(
