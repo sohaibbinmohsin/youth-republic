@@ -208,6 +208,8 @@ export function AvatarUpload({
           style={{
             position: "relative",
             overflow: "hidden",
+            border: "2px solid var(--blue-strong, #941A80)",
+            boxSizing: "border-box",
           }}
         >
           {currentDisplayUrl ? (

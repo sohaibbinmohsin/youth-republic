@@ -263,6 +263,7 @@ export default function PortfolioPage() {
   const [totalVerifiedHours, setTotalVerifiedHours] = useState<number | null>(null);
   const [volunteer, setVolunteer] = useState<VolunteerProfile | null>(null);
   const [currentChapterName, setCurrentChapterName] = useState<string | null>(null);
+  const [currentChapterRole, setCurrentChapterRole] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [programmes, setProgrammes] = useState<ProgrammeItem[]>([]);
@@ -415,9 +416,29 @@ export default function PortfolioPage() {
           .order("linked_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        setCurrentChapterName(
-          (chapterLink as unknown as { chapters: { name: string } } | null)?.chapters.name ?? null,
-        );
+        const chName = (chapterLink as unknown as { chapters: { name: string } } | null)?.chapters?.name ?? null;
+        if (chName) {
+          setCurrentChapterName(chName);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const { data: teamMember } = await supabase
+          .from("chapter_team_members")
+          .select("designation, chapters(name)")
+          .eq("volunteer_code", volunteerRow.volunteer_code)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+
+        if (teamMember) {
+          const chName = (teamMember as any).chapters?.name ?? null;
+          const desig = (teamMember as any).designation ?? null;
+          if (chName) setCurrentChapterName(chName);
+          if (desig) setCurrentChapterRole(desig);
+        }
       } catch {
         // ignore
       }
@@ -614,8 +635,15 @@ export default function PortfolioPage() {
             )}
           </h1>
           <div className="sub">
-            {volunteer.volunteer_code} · {volunteer.city} · {volunteer.institution}
-            {currentChapterName && ` · Chapter: ${currentChapterName}`} · Member since {formatDateDisplay(volunteer.created_at)}
+            {[
+              volunteer.volunteer_code,
+              volunteer.city,
+              volunteer.institution,
+              currentChapterRole || (currentChapterName ? `Chapter: ${currentChapterName}` : null),
+              volunteer.created_at ? `Member since ${formatDateDisplay(volunteer.created_at)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </div>
         </div>
       </div>
