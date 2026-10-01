@@ -113,7 +113,7 @@ describe("NoticeboardHub", () => {
     expect(titles[2]).toBe("Blood Drive Closing in 2 Days");
     expect(titles[3]).toBe("Health Camp Older (Open)");
     expect(titles[4]).toBe("Winter Blanket Drive (Coming Soon)");
-    expect(titles[5]).toBe("Flood Relief Kitchen (In Progress - Closed) Live");
+    expect(titles[5]).toBe("Flood Relief Kitchen (In Progress - Closed)");
     expect(titles[6]).toBe("Completed Beach Cleanup");
   });
 
