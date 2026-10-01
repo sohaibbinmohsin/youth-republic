@@ -254,4 +254,42 @@ describe("OpportunityCard", () => {
     expect(img.getAttribute("src")).toContain("uuid.webp");
     expect(container.querySelector(".duotone-poster")).toBeNull();
   });
+
+  it("renders organization logo image when organizationLogoUrl is present", () => {
+    const { container } = render(
+      <OpportunityCard
+        opportunity={{
+          id: "opp-logo",
+          name: "Food Drive",
+          type: "community",
+          organizationName: "Rizq Trust",
+          organizationLogoUrl: "https://assets.yr.org/logos/rizq.png",
+          computedStatus: "open",
+        }}
+      />,
+    );
+    const logoImg = container.querySelector("img.org-avatar-overlap") as HTMLImageElement;
+    expect(logoImg).toBeInTheDocument();
+    expect(logoImg.getAttribute("src")).toBe("https://assets.yr.org/logos/rizq.png");
+    expect(container.querySelector("span.org-avatar-overlap")).toBeNull();
+  });
+
+  it("falls back to monogram initials chip when organizationLogoUrl is not a displayable logo", () => {
+    const { container } = render(
+      <OpportunityCard
+        opportunity={{
+          id: "opp-nologo",
+          name: "Math Tutoring",
+          type: "education",
+          organizationName: "Read Foundation",
+          organizationLogoUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+          computedStatus: "open",
+        }}
+      />,
+    );
+    const monogramSpan = container.querySelector("span.org-avatar-overlap");
+    expect(monogramSpan).toBeInTheDocument();
+    expect(monogramSpan).toHaveTextContent("RF");
+    expect(container.querySelector("img.org-avatar-overlap")).toBeNull();
+  });
 });

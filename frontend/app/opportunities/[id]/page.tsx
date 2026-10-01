@@ -4,6 +4,7 @@ import Link from "next/link";
 import { computeOpportunityStatus, getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { OrgAvatar } from "@/components/OrgAvatar";
+import { isDisplayableLogo } from "@/lib/orgLogo";
 import { DuotoneArt, getOrgConfig } from "@/components/DuotoneArt";
 import {
   type OpportunityDetailRow,
@@ -112,12 +113,22 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
 
         {/* ONLY LOGO AS LAYOVER (Straddling bottom edge of cover banner) */}
         <div className="detail-cover__logo-layover">
-          <span
-            className="detail-cover__avatar"
-            style={{ background: orgColor }}
-          >
-            {orgMonogram}
-          </span>
+          {isDisplayableLogo(org.logo_url) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={org.logo_url}
+              alt={org.name ? `${org.name} logo` : "Organization logo"}
+              className="detail-cover__avatar"
+              style={{ background: "#FFFFFF", objectFit: "contain", padding: "2px" }}
+            />
+          ) : (
+            <span
+              className="detail-cover__avatar"
+              style={{ background: orgColor }}
+            >
+              {orgMonogram}
+            </span>
+          )}
           <span className="detail-cover__org-badge">{org.name}</span>
         </div>
       </div>

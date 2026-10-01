@@ -26,6 +26,7 @@ export interface OpportunitySummary {
 }
 
 import { DuotoneArt, getOrgConfig } from "./DuotoneArt";
+import { isDisplayableLogo } from "@/lib/orgLogo";
 
 export function OpportunityCard({ opportunity }: { opportunity: OpportunitySummary }) {
   const orgConf = getOrgConfig(opportunity.organizationName);
@@ -91,12 +92,22 @@ export function OpportunityCard({ opportunity }: { opportunity: OpportunitySumma
 
         {/* Unclipped Square Squircle Avatar + Organization Name Badge */}
         <div className="media-org-overlap">
-          <span
-            className="org-avatar-overlap"
-            style={{ background: opportunity.organizationBrandColor ?? orgConf.color }}
-          >
-            {orgConf.monogram}
-          </span>
+          {isDisplayableLogo(opportunity.organizationLogoUrl) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={opportunity.organizationLogoUrl}
+              alt={opportunity.organizationName ? `${opportunity.organizationName} logo` : "Organization logo"}
+              className="org-avatar-overlap"
+              style={{ background: "#FFFFFF", objectFit: "contain", padding: "2px" }}
+            />
+          ) : (
+            <span
+              className="org-avatar-overlap"
+              style={{ background: opportunity.organizationBrandColor ?? orgConf.color }}
+            >
+              {orgConf.monogram}
+            </span>
+          )}
           <span className="org-name-overlap-badge">{opportunity.organizationName}</span>
         </div>
       </div>
