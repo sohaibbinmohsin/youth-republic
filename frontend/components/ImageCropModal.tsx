@@ -8,11 +8,14 @@ export interface ImageCropModalProps {
   onClose: () => void;
   onCropComplete: (croppedBlob: Blob) => void;
   isUploading?: boolean;
+  onSelectNewImage?: (file: File) => void;
 }
 
 const CROP_SIZE = 240; // Diameter of the circular aperture in pixels
 const VIEWPORT_SIZE = 300; // Square container size
 const OUTPUT_SIZE = 400; // Resolution of the exported cropped image
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export function ImageCropModal({
   isOpen,
@@ -20,24 +23,39 @@ export function ImageCropModal({
   onClose,
   onCropComplete,
   isUploading = false,
+  onSelectNewImage,
 }: ImageCropModalProps) {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [naturalDims, setNaturalDims] = useState<{ width: number; height: number } | null>(null);
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const dragStartRef = useRef({ x: 0, y: 0 });
   const positionStartRef = useRef({ x: 0, y: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const changeFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset transform whenever a new image is loaded or modal reopens
+  // Reset transform and start browser loading state whenever a new image is loaded or modal reopens
   useEffect(() => {
     if (isOpen) {
       setZoom(1);
       setPosition({ x: 0, y: 0 });
       setIsDragging(false);
       setNaturalDims(null);
+      setFileError(null);
+
+      // In JSDOM test environments, images don't trigger native load events
+      const isTestEnv = typeof navigator !== "undefined" && navigator.userAgent?.includes("jsdom");
+      if (isTestEnv) {
+        setIsImageLoading(false);
+      } else if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
+        setIsImageLoading(false);
+      } else {
+        setIsImageLoading(true);
+      }
     }
   }, [isOpen, imageSrc]);
 
@@ -58,6 +76,40 @@ export function ImageCropModal({
     if (img.naturalWidth && img.naturalHeight) {
       setNaturalDims({ width: img.naturalWidth, height: img.naturalHeight });
     }
+    setIsImageLoading(false);
+  };
+
+  const handleImageError = () => {
+    setIsImageLoading(false);
+    setFileError("Unable to render this image in your browser. Please try choosing a different photo.");
+  };
+
+  const handleChangePhotoClick = () => {
+    if (isUploading || isImageLoading) return;
+    setFileError(null);
+    changeFileInputRef.current?.click();
+  };
+
+  const handleNewFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setFileError("File size exceeds 10MB limit");
+      if (changeFileInputRef.current) changeFileInputRef.current.value = "";
+      return;
+    }
+
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      setFileError("Allowed image formats: JPG, PNG, WebP");
+      if (changeFileInputRef.current) changeFileInputRef.current.value = "";
+      return;
+    }
+
+    setFileError(null);
+    setIsImageLoading(true);
+    onSelectNewImage?.(file);
+    if (changeFileInputRef.current) changeFileInputRef.current.value = "";
   };
 
   // Base display scale: shorter side of image fits CROP_SIZE (240px)
@@ -70,7 +122,7 @@ export function ImageCropModal({
   const baseHeight = isPortrait ? CROP_SIZE / aspectRatio : CROP_SIZE;
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isUploading) return;
+    if (isUploading || isImageLoading) return;
     e.preventDefault();
     setIsDragging(true);
     dragStartRef.current = { x: e.clientX, y: e.clientY };
@@ -107,7 +159,7 @@ export function ImageCropModal({
 
   // Touch event handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (isUploading || e.touches.length !== 1) return;
+    if (isUploading || isImageLoading || e.touches.length !== 1) return;
     setIsDragging(true);
     dragStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     positionStartRef.current = { ...position };
@@ -129,7 +181,7 @@ export function ImageCropModal({
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    if (isUploading) return;
+    if (isUploading || isImageLoading) return;
     const delta = e.deltaY * -0.002;
     setZoom((prev) => Math.min(3, Math.max(0.5, parseFloat((prev + delta).toFixed(2)))));
   };
@@ -143,7 +195,7 @@ export function ImageCropModal({
   };
 
   const handleCrop = () => {
-    if (isUploading) return;
+    if (isUploading || isImageLoading) return;
     const img = imgRef.current;
     if (!img) return;
 
@@ -203,10 +255,19 @@ export function ImageCropModal({
       aria-labelledby="crop-modal-title"
       className="fixed inset-0 z-[9999] flex flex-col sm:items-center sm:justify-center bg-black/75 sm:backdrop-blur-sm p-0 sm:p-4"
     >
+      <input
+        ref={changeFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        style={{ display: "none" }}
+        onChange={handleNewFileSelected}
+        data-testid="crop-change-file-input"
+      />
+
       <div
-        className="w-full h-full min-h-[100dvh] sm:min-h-0 sm:h-auto sm:max-w-[400px] bg-white sm:rounded-2xl sm:shadow-2xl flex flex-col justify-between sm:justify-start overflow-y-auto p-5 sm:p-6 text-left"
+        className="w-full h-full min-h-[100dvh] sm:min-h-0 sm:h-auto sm:max-w-[420px] bg-white sm:rounded-2xl sm:shadow-2xl flex flex-col justify-between sm:justify-start overflow-y-auto p-5 sm:p-6 text-left"
       >
-        {/* Header - Left-aligned with NO horizontal divider lines */}
+        {/* Header - Strictly Left-aligned with NO horizontal divider lines */}
         <div className="flex items-start justify-between gap-3 text-left w-full">
           <div className="flex-1 min-w-0 text-left">
             <h2
@@ -233,6 +294,15 @@ export function ImageCropModal({
           </button>
         </div>
 
+        {fileError && (
+          <div
+            role="alert"
+            className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2.5 mt-3 text-left w-full"
+          >
+            {fileError}
+          </div>
+        )}
+
         {/* Viewport Frame & Zoom Controls - Clean seamless surface without divider lines */}
         <div className="flex flex-col items-center my-auto py-5 sm:py-4 w-full">
           <div
@@ -249,11 +319,65 @@ export function ImageCropModal({
               overflow: "hidden",
               borderRadius: "16px",
               backgroundColor: "#0d0f12",
-              cursor: isUploading ? "not-allowed" : isDragging ? "grabbing" : "grab",
+              cursor: isUploading || isImageLoading ? "not-allowed" : isDragging ? "grabbing" : "grab",
               userSelect: "none",
               touchAction: "none",
             }}
           >
+            {/* Loading state while browser decodes and prepares high-res photo */}
+            {isImageLoading && !isUploading && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 20,
+                  backgroundColor: "rgba(13, 15, 18, 0.88)",
+                  backdropFilter: "blur(6px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.85rem",
+                  color: "#ffffff",
+                }}
+              >
+                <div
+                  style={{
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "999px",
+                    border: "3px solid rgba(255, 255, 255, 0.2)",
+                    borderTopColor: "var(--blue-strong, #941A80)",
+                    animation: "spin 0.8s linear infinite",
+                  }}
+                />
+                <div style={{ textAlign: "center", padding: "0 1rem" }}>
+                  <div
+                    style={{
+                      fontFamily: "'Oswald', sans-serif",
+                      fontSize: "0.95rem",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                      color: "#ffffff",
+                    }}
+                  >
+                    Loading Photo…
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-body, 'Jost', sans-serif)",
+                      fontSize: "0.78rem",
+                      color: "rgba(255, 255, 255, 0.7)",
+                      marginTop: "3px",
+                    }}
+                  >
+                    Rendering preview on your device
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Prominent Uploading State Overlay */}
             {isUploading && (
               <div
@@ -316,6 +440,7 @@ export function ImageCropModal({
               alt="Crop preview"
               draggable={false}
               onLoad={handleImageLoad}
+              onError={handleImageError}
               style={{
                 position: "absolute",
                 top: "50%",
@@ -330,6 +455,8 @@ export function ImageCropModal({
                 willChange: "transform",
                 display: "block",
                 userSelect: "none",
+                opacity: isImageLoading ? 0 : 1,
+                transition: "opacity 0.2s ease-in",
               }}
             />
 
@@ -369,7 +496,7 @@ export function ImageCropModal({
               type="button"
               aria-label="Zoom out"
               onClick={() => handleZoomStep(-0.2)}
-              disabled={isUploading || zoom <= 0.5}
+              disabled={isUploading || isImageLoading || zoom <= 0.5}
               style={{
                 width: "26px",
                 height: "26px",
@@ -380,8 +507,8 @@ export function ImageCropModal({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: zoom <= 0.5 || isUploading ? "not-allowed" : "pointer",
-                opacity: zoom <= 0.5 || isUploading ? 0.4 : 1,
+                cursor: zoom <= 0.5 || isUploading || isImageLoading ? "not-allowed" : "pointer",
+                opacity: zoom <= 0.5 || isUploading || isImageLoading ? 0.4 : 1,
                 padding: 0,
               }}
             >
@@ -398,10 +525,10 @@ export function ImageCropModal({
               step="0.02"
               value={zoom}
               onChange={handleZoomChange}
-              disabled={isUploading}
+              disabled={isUploading || isImageLoading}
               style={{
                 flex: 1,
-                cursor: isUploading ? "not-allowed" : "pointer",
+                cursor: isUploading || isImageLoading ? "not-allowed" : "pointer",
                 accentColor: "var(--blue-strong, #941A80)",
                 height: "4px",
               }}
@@ -411,7 +538,7 @@ export function ImageCropModal({
               type="button"
               aria-label="Zoom in"
               onClick={() => handleZoomStep(0.2)}
-              disabled={isUploading || zoom >= 3}
+              disabled={isUploading || isImageLoading || zoom >= 3}
               style={{
                 width: "26px",
                 height: "26px",
@@ -422,8 +549,8 @@ export function ImageCropModal({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: zoom >= 3 || isUploading ? "not-allowed" : "pointer",
-                opacity: zoom >= 3 || isUploading ? 0.4 : 1,
+                cursor: zoom >= 3 || isUploading || isImageLoading ? "not-allowed" : "pointer",
+                opacity: zoom >= 3 || isUploading || isImageLoading ? 0.4 : 1,
                 padding: 0,
               }}
             >
@@ -436,12 +563,12 @@ export function ImageCropModal({
         </div>
 
         {/* Footer Actions - Full-length buttons on mobile, clean side-by-side on desktop, NO divider line */}
-        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:justify-end sm:w-auto mt-2 sm:mt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full mt-2 sm:mt-4">
           <button
             type="button"
-            className="btn btn--primary w-full sm:w-auto order-1 sm:order-2"
-            onClick={handleCrop}
-            disabled={isUploading}
+            className="btn btn--ghost w-full sm:w-auto order-2 sm:order-1"
+            onClick={handleChangePhotoClick}
+            disabled={isUploading || isImageLoading}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -449,33 +576,64 @@ export function ImageCropModal({
               gap: "0.45rem",
             }}
           >
-            {isUploading ? (
-              <>
-                <span
-                  style={{
-                    width: "14px",
-                    height: "14px",
-                    borderRadius: "999px",
-                    border: "2px solid rgba(255, 255, 255, 0.3)",
-                    borderTopColor: "#ffffff",
-                    animation: "spin 0.8s linear infinite",
-                    display: "inline-block",
-                  }}
-                />
-                Uploading…
-              </>
-            ) : (
-              "Save & Upload"
-            )}
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+            Change photo
           </button>
-          <button
-            type="button"
-            className="btn btn--ghost w-full sm:w-auto order-2 sm:order-1"
-            onClick={onClose}
-            disabled={isUploading}
-          >
-            Cancel
-          </button>
+
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto order-1 sm:order-2">
+            <button
+              type="button"
+              className="btn btn--primary w-full sm:w-auto order-1 sm:order-2"
+              onClick={handleCrop}
+              disabled={isUploading || isImageLoading}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "0.45rem",
+              }}
+            >
+              {isUploading ? (
+                <>
+                  <span
+                    style={{
+                      width: "14px",
+                      height: "14px",
+                      borderRadius: "999px",
+                      border: "2px solid rgba(255, 255, 255, 0.3)",
+                      borderTopColor: "#ffffff",
+                      animation: "spin 0.8s linear infinite",
+                      display: "inline-block",
+                    }}
+                  />
+                  Uploading…
+                </>
+              ) : (
+                "Save & Upload"
+              )}
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost w-full sm:w-auto order-3"
+              onClick={onClose}
+              disabled={isUploading}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>

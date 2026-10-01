@@ -112,6 +112,15 @@ export function AvatarUpload({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleSelectNewImage = (file: File) => {
+    setError(null);
+    if (cropImageSrc) {
+      URL.revokeObjectURL(cropImageSrc);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setCropImageSrc(previewUrl);
+  };
+
   const handleCropComplete = async (croppedBlob: Blob) => {
     setError(null);
 
@@ -318,6 +327,7 @@ export function AvatarUpload({
         onClose={handleCloseCropModal}
         onCropComplete={handleCropComplete}
         isUploading={uploading}
+        onSelectNewImage={handleSelectNewImage}
       />
     </>
   );

@@ -157,4 +157,43 @@ describe("ImageCropModal", () => {
     fireEvent.change(slider, { target: { value: "0.6" } });
     expect(slider.value).toBe("0.6");
   });
+
+  it("renders Change photo button and invokes onSelectNewImage on file change", () => {
+    const onSelectNewImage = vi.fn();
+    render(
+      <ImageCropModal
+        isOpen={true}
+        imageSrc="blob:http://localhost/test-image"
+        onClose={vi.fn()}
+        onCropComplete={vi.fn()}
+        onSelectNewImage={onSelectNewImage}
+      />,
+    );
+
+    const changeBtn = screen.getByRole("button", { name: /Change photo/i });
+    expect(changeBtn).toBeInTheDocument();
+
+    const fileInput = screen.getByTestId("crop-change-file-input") as HTMLInputElement;
+    const newFile = new File(["new-image-data"], "new-avatar.jpg", { type: "image/jpeg" });
+    fireEvent.change(fileInput, { target: { files: [newFile] } });
+
+    expect(onSelectNewImage).toHaveBeenCalledWith(newFile);
+  });
+
+  it("displays error message if selected new file exceeds size limit", () => {
+    render(
+      <ImageCropModal
+        isOpen={true}
+        imageSrc="blob:http://localhost/test-image"
+        onClose={vi.fn()}
+        onCropComplete={vi.fn()}
+      />,
+    );
+
+    const fileInput = screen.getByTestId("crop-change-file-input") as HTMLInputElement;
+    const hugeFile = new File([new ArrayBuffer(12 * 1024 * 1024)], "huge.jpg", { type: "image/jpeg" });
+    fireEvent.change(fileInput, { target: { files: [hugeFile] } });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("File size exceeds 10MB limit");
+  });
 });
