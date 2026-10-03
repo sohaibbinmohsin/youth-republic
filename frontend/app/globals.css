@@ -1877,4 +1877,71 @@ fieldset > legend { font-size: .85rem; font-weight: 500; margin-bottom: .45rem; 
   }
 }
 
+/* Mobile Sticky Action Bar */
+.mobile-action-bar {
+  display: none;
+}
+
+@media (max-width: 879px) {
+  .mobile-action-bar {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 90;
+    background: #FFFFFF;
+    border-top: 1px solid var(--line, #E7E4DC);
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.08);
+    padding: 10px 1.25rem max(10px, env(safe-area-inset-bottom, 10px));
+  }
+  .mobile-action-bar__content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .mobile-action-bar__date {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .mobile-action-bar__label {
+    font-family: var(--font-body, "Jost", sans-serif);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-2, #6F727A);
+    line-height: 1.1;
+    margin-bottom: 2px;
+  }
+  .mobile-action-bar__value {
+    font-family: var(--font-body, "Jost", sans-serif);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink, #24262D);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mobile-action-bar__btn {
+    flex-shrink: 0;
+    padding: 0.6rem 1.6rem;
+    font-size: 0.95rem;
+    font-family: var(--font-heading, "Oswald", sans-serif);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    min-width: 110px;
+    text-align: center;
+  }
+  /* Provide bottom clearance on mobile so footer isn't obscured by fixed bar */
+  [data-route="opportunity"] {
+    padding-bottom: 5.5rem !important;
+  }
+}
+
 
