@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { computeOpportunityStatus, getOpportunityBadgeConfig, isOpportunityLive } from "@/lib/opportunityStatus";
+import {
+  computeOpportunityStatus,
+  getOpportunityBadgeConfig,
+  isOpportunityLive,
+  formatOpportunityDate,
+} from "@/lib/opportunityStatus";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { OrgAvatar } from "@/components/OrgAvatar";
 import { isDisplayableLogo } from "@/lib/orgLogo";
@@ -76,6 +81,13 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     applicationDeadline: opp.application_deadline,
   });
   const isLive = isOpportunityLive(status);
+  const dateHint = formatOpportunityDate({
+    computedStatus: status,
+    applicationDeadline: opp.application_deadline,
+    applicationOpenAt: opp.application_open_at,
+    activityStartAt: opp.activity_start_at,
+    activityEndAt: opp.activity_end_at,
+  });
 
   const locationDisplay = opp.is_online
     ? "Online"
@@ -368,6 +380,26 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
           </div>
         </aside>
       </div>
+
+      {/* Mobile Sticky Action Bar: rendered only when accepting applications */}
+      {isAcceptingApplications && (
+        <div className="mobile-action-bar" aria-label="Quick apply bar">
+          <div className="mobile-action-bar__content">
+            {dateHint && (
+              <div className="mobile-action-bar__date">
+                <span className="mobile-action-bar__label">Deadline</span>
+                <span className="mobile-action-bar__value">{dateHint}</span>
+              </div>
+            )}
+            <Link
+              href={`/apply/${opp.id}`}
+              className="btn btn--primary mobile-action-bar__btn"
+            >
+              Apply
+            </Link>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
