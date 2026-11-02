@@ -1,0 +1,116 @@
+name: Supabase Migrations (Youth Republic)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/supabase/migrations/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'backend/supabase/migrations/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (verify migrations without applying)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: yr-supabase-migrations-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify Migration Files Integrity
+        run: |
+          echo "=== Verifying Youth Republic Migration Files ==="
+          ls -la backend/supabase/migrations/
+          for f in backend/supabase/migrations/*.sql; do
+            echo "Checking: $f"
+            if [ ! -s "$f" ]; then
+              echo "Error: Migration $f is empty!"
+              exit 1
+            fi
+          done
+          echo "All migration files verified."
+
+  deploy:
+    name: Apply Migrations to Production
+    needs: verify
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || 'kbotpktgojpvkotigrjh' }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          if [ -n "$SUPABASE_DB_URL" ]; then
+            echo "Applying migrations via direct database connection URL..."
+            supabase db push --workdir backend --db-url "$SUPABASE_DB_URL" --include-all
+          elif [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_DB_PASSWORD" ]; then
+            echo "Applying migrations via Supabase project link..."
+            supabase link --workdir backend --project-ref "$SUPABASE_PROJECT_REF"
+            supabase db push --workdir backend --password "$SUPABASE_DB_PASSWORD" --include-all
+          else
+            echo "::error::Missing database credentials in GitHub Secrets. Please configure either SUPABASE_DB_URL or both SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD in repository secrets."
+            exit 1
+          fi
+
+  dry-run:
+    name: Dry Run Migrations
+    needs: verify
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dry Run Deploy
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || 'kbotpktgojpvkotigrjh' }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          if [ -n "$SUPABASE_DB_URL" ]; then
+            echo "Running dry-run migration check via direct DB URL..."
+            supabase db push --workdir backend --db-url "$SUPABASE_DB_URL" --dry-run
+          elif [ -n "$SUPABASE_ACCESS_TOKEN" ] && [ -n "$SUPABASE_DB_PASSWORD" ]; then
+            echo "Running dry-run migration check via Supabase project link..."
+            supabase link --workdir backend --project-ref "$SUPABASE_PROJECT_REF"
+            supabase db push --workdir backend --password "$SUPABASE_DB_PASSWORD" --dry-run
+          else
+            echo "::error::Missing database credentials in GitHub Secrets."
+            exit 1
+          fi
