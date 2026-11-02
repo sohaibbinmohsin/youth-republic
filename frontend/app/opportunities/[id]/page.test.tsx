@@ -14,9 +14,12 @@ vi.mock("next/navigation", () => ({
 describe("OpportunityDetailPage - Mobile Sticky Action Bar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it("renders mobile sticky action bar with single deadline date and apply link when accepting applications", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-01T12:00:00Z"));
     vi.mocked(fetchOpportunityServer).mockResolvedValueOnce({
       id: "opp-open",
       name: "Beach Cleanup",
