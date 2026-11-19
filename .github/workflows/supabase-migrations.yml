@@ -71,15 +71,19 @@ jobs:
 
       - name: Deploy Migrations
         env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || 'kbotpktgojpvkotigrjh' }}
+          SUPABASE_POOLER_URL: ${{ secrets.SUPABASE_POOLER_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
             echo "::error::SUPABASE_ACCESS_TOKEN is not set. Add it in repository secrets to apply migrations via the Supabase Management API (no direct database host connection from Actions)."
             exit 1
           fi
-          echo "Applying migrations via Supabase remote (${SUPABASE_PROJECT_REF})..."
-          supabase db push --workdir backend --remote="$SUPABASE_PROJECT_REF" --include-all --yes
+          if [ -z "$SUPABASE_POOLER_URL" ]; then
+            echo "::error::GitHub Actions secret SUPABASE_POOLER_URL is not set. The session pooler connection string is required to apply migrations from GitHub Actions over IPv4."
+            exit 1
+          fi
+          echo "Applying migrations via Supabase session pooler..."
+          supabase db push --workdir backend --remote="$SUPABASE_POOLER_URL" --include-all --yes
 
   dry-run:
     name: Dry Run Migrations
@@ -98,15 +102,19 @@ jobs:
 
       - name: Dry Run Deploy
         env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || 'kbotpktgojpvkotigrjh' }}
+          SUPABASE_POOLER_URL: ${{ secrets.SUPABASE_POOLER_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
             echo "::error::SUPABASE_ACCESS_TOKEN is not set. Add it in repository secrets to verify migrations via the Supabase Management API."
             exit 1
           fi
-          echo "Running dry-run migration check via Supabase remote (${SUPABASE_PROJECT_REF})..."
-          supabase db push --workdir backend --remote="$SUPABASE_PROJECT_REF" --include-all --dry-run
+          if [ -z "$SUPABASE_POOLER_URL" ]; then
+            echo "::error::GitHub Actions secret SUPABASE_POOLER_URL is not set. The session pooler connection string is required to verify migrations from GitHub Actions over IPv4."
+            exit 1
+          fi
+          echo "Running dry-run migration check via Supabase session pooler..."
+          supabase db push --workdir backend --remote="$SUPABASE_POOLER_URL" --include-all --yes --dry-run
 
   deploy-functions:
     name: Deploy Edge Functions to Production
