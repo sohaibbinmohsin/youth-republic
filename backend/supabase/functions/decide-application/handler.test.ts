@@ -124,6 +124,63 @@ Deno.test("decideApplication re-selecting an already-selected application does n
   assertEquals(rows?.length, 1);
 });
 
+Deno.test("decideApplication re-selecting an already-selected application does not send a second status email or re-log", async () => {
+  const supabase = testClient();
+  const orgId = await seedOrg(supabase);
+  const { applicationId } = await makeApplication(supabase, orgId);
+  const emailClient = new FakeEmailClient();
+  const claims = staffClaims(orgId);
+
+  const first = await decideApplication(supabase, claims, {
+    applicationId,
+    decision: "selected",
+  }, emailClient);
+  assertEquals(emailClient.sent.length, 1);
+
+  const second = await decideApplication(supabase, claims, {
+    applicationId,
+    decision: "selected",
+  }, emailClient);
+
+  assertEquals(second.participationId, first.participationId);
+  assertEquals(emailClient.sent.length, 1);
+
+  const { data: logRows } = await supabase
+    .from("admin_action_log")
+    .select("id")
+    .eq("target_id", applicationId)
+    .eq("action", "application_decided");
+  assertEquals(logRows?.length, 1);
+});
+
+Deno.test("decideApplication with waitUntil schedules email without awaiting it before returning", async () => {
+  const supabase = testClient();
+  const orgId = await seedOrg(supabase);
+  const { applicationId } = await makeApplication(supabase, orgId);
+  const emailClient = new FakeEmailClient();
+  let scheduled: Promise<unknown> | null = null;
+
+  const result = await decideApplication(
+    supabase,
+    staffClaims(orgId),
+    { applicationId, decision: "selected" },
+    emailClient,
+    {
+      waitUntil: (promise) => {
+        scheduled = promise;
+      },
+    },
+  );
+
+  // Response-shaped result is ready before the scheduled send settles.
+  assertEquals(result.participationId !== null, true);
+  assertEquals(scheduled !== null, true);
+  // Before the background promise settles, the fake may not have recorded yet;
+  // after awaiting the scheduled work, exactly one email must have been sent.
+  await scheduled;
+  assertEquals(emailClient.sent.length, 1);
+});
+
 Deno.test("decideApplication selects an applicant even when no emergency_contact is on file", async () => {
   const supabase = testClient();
   const orgId = await seedOrg(supabase);
