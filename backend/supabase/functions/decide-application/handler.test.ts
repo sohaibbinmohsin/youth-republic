@@ -124,20 +124,19 @@ Deno.test("decideApplication re-selecting an already-selected application does n
   assertEquals(rows?.length, 1);
 });
 
-Deno.test("decideApplication rejects selecting an applicant with no emergency_contact on file", async () => {
+Deno.test("decideApplication selects an applicant even when no emergency_contact is on file", async () => {
   const supabase = testClient();
   const orgId = await seedOrg(supabase);
   const { applicationId } = await makeApplication(supabase, orgId, { emergency_contact: null });
 
-  await assertRejects(
-    () =>
-      decideApplication(supabase, staffClaims(orgId), {
-        applicationId,
-        decision: "selected",
-      }, new FakeEmailClient()),
-    Error,
-    "emergency_contact_required",
-  );
+  const result = await decideApplication(supabase, staffClaims(orgId), {
+    applicationId,
+    decision: "selected",
+  }, new FakeEmailClient());
+
+  assertEquals(result.participationId !== null, true);
+  const { data: application } = await supabase.from("applications").select("status").eq("id", applicationId).single();
+  assertEquals(application!.status, "selected");
 });
 
 Deno.test("decideApplication accepts waitlisted as a decision without creating participation", async () => {

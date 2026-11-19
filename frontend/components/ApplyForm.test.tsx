@@ -83,7 +83,13 @@ describe("ApplyForm (dynamic)", () => {
     const user = userEvent.setup();
 
     render(
-      <ApplyForm opportunityId="opp1" accessToken="session-token" onSuccess={onSuccess} opportunity={opportunity} />,
+      <ApplyForm
+        opportunityId="opp1"
+        accessToken="session-token"
+        onSuccess={onSuccess}
+        opportunity={opportunity}
+        initialVolunteerProfile={{ emergencyContactName: "Fatima Khan", emergencyContactPhone: "0300-1111111" }}
+      />,
     );
 
     await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "I care about this cause.");
@@ -119,7 +125,13 @@ describe("ApplyForm (dynamic)", () => {
     vi.mocked(edgeFunctions.applyToOpportunity).mockRejectedValue(new Error("opportunity_unavailable"));
     const user = userEvent.setup();
     render(
-      <ApplyForm opportunityId="opp1" accessToken="session-token" onSuccess={vi.fn()} opportunity={opportunity} />,
+      <ApplyForm
+        opportunityId="opp1"
+        accessToken="session-token"
+        onSuccess={vi.fn()}
+        opportunity={opportunity}
+        initialVolunteerProfile={{ emergencyContactName: "Fatima Khan", emergencyContactPhone: "0300-1111111" }}
+      />,
     );
 
     await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "I want to help.");
@@ -218,6 +230,28 @@ describe("ApplyForm (dynamic)", () => {
     await user.click(saveBtn);
 
     expect(await screen.findByText(/Draft saved/i)).toBeInTheDocument();
+    expect(edgeFunctions.applyToOpportunity).not.toHaveBeenCalled();
+  });
+
+  it("blocks submit when the emergency contact is missing", async () => {
+    const user = userEvent.setup();
+    render(
+      <ApplyForm
+        opportunityId="opp1"
+        accessToken="session-token"
+        onSuccess={vi.fn()}
+        opportunity={opportunity}
+        initialVolunteerProfile={{ fullName: "Ayesha Khan", email: "ayesha.k@example.com", phone: "0300 1234567" }}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/Why do you want to volunteer\?/), "I care about this cause.");
+    await user.click(screen.getByLabelText("Evening"));
+    await user.click(screen.getByLabelText("I confirm my details are accurate and I meet the eligibility criteria."));
+    await user.click(screen.getByRole("button", { name: "Submit application" }));
+
+    expect(await screen.findByText("Emergency contact name is required")).toBeInTheDocument();
+    expect(screen.getByText("Emergency contact phone is required")).toBeInTheDocument();
     expect(edgeFunctions.applyToOpportunity).not.toHaveBeenCalled();
   });
 });

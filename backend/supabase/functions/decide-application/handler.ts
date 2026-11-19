@@ -34,18 +34,6 @@ export async function decideApplication(
     throw new Error("forbidden");
   }
 
-  if (input.decision === "selected") {
-    const { data: volunteer, error: volunteerError } = await supabase
-      .from("volunteers")
-      .select("emergency_contact")
-      .eq("id", application.volunteer_id)
-      .single();
-    if (volunteerError) throw volunteerError;
-    if (!volunteer.emergency_contact) {
-      throw new Error("emergency_contact_required");
-    }
-  }
-
   const isReconsider = input.decision === "pending_review";
   const { error: updateError } = await supabase
     .from("applications")
