@@ -157,7 +157,7 @@ jobs:
             echo "Deploying ${name}"
             supabase functions deploy "$name" \
               --workdir backend \
-              --import-map supabase/deno.jsonc \
+              --import-map backend/supabase/deno.jsonc \
               --yes \
               --remote="$SUPABASE_PROJECT_REF"
             deployed=$((deployed + 1))
