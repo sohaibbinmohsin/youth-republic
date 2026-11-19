@@ -16,15 +16,60 @@ export interface DecideApplicationResult {
   participationId: string | null;
 }
 
+/** Optional scheduling hook so the HTTP entrypoint can return before email I/O. */
+export interface DecideApplicationOptions {
+  /**
+   * When provided (EdgeRuntime.waitUntil in production), the status email is
+   * scheduled via this callback and is not awaited. When omitted (unit tests),
+   * the email is awaited so FakeEmailClient still observes the send.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void;
+}
+
+const STATUS_PHRASE: Record<DecideApplicationInput["decision"], string> = {
+  selected: "selected",
+  waitlisted: "waitlisted",
+  rejected: "not selected",
+  pending_review: "back under review",
+};
+
+/**
+ * Send a status email immediately, or schedule it via `waitUntil` so the HTTP
+ * response can return after DB writes. Exported for unit tests of the
+ * waitUntil path without a live Supabase stack.
+ */
+export function scheduleOrAwaitEmail(
+  emailClient: EmailClient,
+  to: string,
+  subject: string,
+  html: string,
+  waitUntil?: (promise: Promise<unknown>) => void,
+): Promise<void> | void {
+  const send = emailClient.send(to, subject, html).catch(() => {
+    // Email delivery failure must not fail a request whose DB state change
+    // already committed — the application status, decided_by, participation
+    // row and admin_action_log entry are all written by this point, and
+    // surfacing a 400 here invites duplicate-producing retries. Swallow it.
+    // (A future task could log this to admin_action_log or a retry queue;
+    // out of scope here.)
+  });
+  if (waitUntil) {
+    waitUntil(send);
+    return;
+  }
+  return send;
+}
+
 export async function decideApplication(
   supabase: SupabaseClient,
   staffClaims: StaffClaims,
   input: DecideApplicationInput,
   emailClient: EmailClient,
+  options?: DecideApplicationOptions,
 ): Promise<DecideApplicationResult> {
   const { data: application, error: fetchError } = await supabase
     .from("applications")
-    .select("id, volunteer_id, opportunity_id, organization_id")
+    .select("id, volunteer_id, opportunity_id, organization_id, status")
     .eq("id", input.applicationId)
     .single();
   if (fetchError) throw fetchError;
@@ -32,6 +77,24 @@ export async function decideApplication(
   const targetChapter = await opportunityChapterId(supabase, application.opportunity_id);
   if (!staffHasPermission(staffClaims, application.organization_id, "youth-republic", "applications:update", targetChapter)) {
     throw new Error("forbidden");
+  }
+
+  const alreadyAtDecision = application.status === input.decision;
+
+  // Same-decision retry / double-click: do not re-log or re-email. For Select,
+  // still return the existing participation id so the client gets a stable result.
+  if (alreadyAtDecision) {
+    let participationId: string | null = null;
+    if (input.decision === "selected") {
+      const { data: existingParticipation, error: existingError } = await supabase
+        .from("participation")
+        .select("id")
+        .eq("application_id", application.id)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      participationId = existingParticipation?.id ?? null;
+    }
+    return { applicationId: input.applicationId, participationId };
   }
 
   const isReconsider = input.decision === "pending_review";
@@ -99,24 +162,15 @@ export async function decideApplication(
     .single();
 
   if (volunteer) {
-    const statusPhrase: Record<DecideApplicationInput["decision"], string> = {
-      selected: "selected",
-      waitlisted: "waitlisted",
-      rejected: "not selected",
-      pending_review: "back under review",
-    };
     const subject = "Your application status has been updated";
-    const html = `<p>Hi ${escapeHtml(volunteer.full_name)},</p><p>Your application is now: <strong>${statusPhrase[input.decision]}</strong>.</p>`;
-    try {
-      await emailClient.send(volunteer.email, subject, html);
-    } catch {
-      // Email delivery failure must not fail a request whose DB state change
-      // already committed — the application status, decided_by, participation
-      // row and admin_action_log entry are all written by this point, and
-      // surfacing a 400 here invites duplicate-producing retries. Swallow it.
-      // (A future task could log this to admin_action_log or a retry queue;
-      // out of scope here.)
-    }
+    const html = `<p>Hi ${escapeHtml(volunteer.full_name)},</p><p>Your application is now: <strong>${STATUS_PHRASE[input.decision]}</strong>.</p>`;
+    await scheduleOrAwaitEmail(
+      emailClient,
+      volunteer.email,
+      subject,
+      html,
+      options?.waitUntil,
+    );
   }
 
   return { applicationId: input.applicationId, participationId };
