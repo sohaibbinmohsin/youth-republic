@@ -12,14 +12,22 @@ export interface ApplyToOpportunityInput {
 }
 export interface ApplyToOpportunityResult { applicationId: string; }
 
+function hasEmergencyContact(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const contact = value as { name?: unknown; phone?: unknown };
+  return typeof contact.name === "string" && contact.name.trim() !== ""
+    && typeof contact.phone === "string" && contact.phone.trim() !== "";
+}
+
 export async function applyToOpportunity(
   supabase: SupabaseClient,
   input: ApplyToOpportunityInput,
 ): Promise<ApplyToOpportunityResult> {
   const { data: volunteer, error: vErr } = await supabase.from("volunteers")
-    .select("id, full_name, email, phone, id_doc_number").eq("id", input.volunteerId).single();
+    .select("id, full_name, email, phone, id_doc_number, emergency_contact").eq("id", input.volunteerId).single();
   if (vErr || !volunteer) throw new Error("not_found");
   if (!volunteer.id_doc_number) throw new Error("id_doc_required");
+  if (!hasEmergencyContact(volunteer.emergency_contact)) throw new Error("emergency_contact_required");
 
   const { data: opp, error: oErr } = await supabase.from("opportunities")
     .select("id, organization_id, deactivated_at, application_form, status_override, application_open_at, application_deadline, activity_start_at, activity_end_at")

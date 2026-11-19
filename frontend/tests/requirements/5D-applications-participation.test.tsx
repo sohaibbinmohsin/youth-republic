@@ -64,7 +64,13 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     vi.mocked(edgeFunctions.applyToOpportunity).mockResolvedValue({ applicationId: "app-1" });
     const user = userEvent.setup();
     render(
-      <ApplyForm opportunityId="opp-1" accessToken={ACCESS_TOKEN} onSuccess={() => {}} opportunity={opportunity} />,
+      <ApplyForm
+        opportunityId="opp-1"
+        accessToken={ACCESS_TOKEN}
+        onSuccess={() => {}}
+        opportunity={opportunity}
+        initialVolunteerProfile={{ emergencyContactName: "Fatima Khan", emergencyContactPhone: "0300-1111111" }}
+      />,
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "I ran a food bank at university.");
@@ -91,7 +97,13 @@ describe("§5D Applying — reuses the stored profile, asks only opportunity-spe
     vi.mocked(edgeFunctions.applyToOpportunity).mockRejectedValue(new Error("id_doc_required"));
     const user = userEvent.setup();
     render(
-      <ApplyForm opportunityId="opp-1" accessToken={ACCESS_TOKEN} onSuccess={() => {}} opportunity={opportunity} />,
+      <ApplyForm
+        opportunityId="opp-1"
+        accessToken={ACCESS_TOKEN}
+        onSuccess={() => {}}
+        opportunity={opportunity}
+        initialVolunteerProfile={{ emergencyContactName: "Fatima Khan", emergencyContactPhone: "0300-1111111" }}
+      />,
     );
 
     await user.type(screen.getByLabelText(/why do you want to volunteer/i), "motivated");

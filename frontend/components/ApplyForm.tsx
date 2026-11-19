@@ -65,6 +65,8 @@ export interface ProfileDraftState {
   guardianName: string;
   guardianContact: string;
   guardianConsent: boolean;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
 }
 
 export interface ApplyFormHandle {
@@ -156,6 +158,8 @@ export const ApplyForm = forwardRef<
       guardianName: profile.guardianName || "",
       guardianContact: profile.guardianContact || "",
       guardianConsent: Boolean(profile.guardianConsent),
+      emergencyContactName: profile.emergencyContactName || "",
+      emergencyContactPhone: profile.emergencyContactPhone || "",
     };
 
     if (initialProfileDraft && typeof initialProfileDraft === "object") {
@@ -432,6 +436,11 @@ export const ApplyForm = forwardRef<
         currentErrors.confirmed = "You must confirm before submitting.";
       }
 
+      const emergencyName = profileDraft.emergencyContactName.trim();
+      const emergencyPhone = profileDraft.emergencyContactPhone.trim();
+      if (!emergencyName) currentErrors.emergencyContactName = "Emergency contact name is required";
+      if (!emergencyPhone) currentErrors.emergencyContactPhone = "Emergency contact phone is required";
+
       if (Object.keys(currentErrors).length > 0) {
         setFieldErrors(currentErrors);
         setError("Please fix the highlighted fields.");
@@ -476,6 +485,16 @@ export const ApplyForm = forwardRef<
             );
           }
         }
+      }
+
+      const contactUnchanged =
+        (profile.emergencyContactName ?? "").trim() === emergencyName &&
+        (profile.emergencyContactPhone ?? "").trim() === emergencyPhone;
+      if (!contactUnchanged) {
+        await updateSensitiveField(
+          { fieldName: "emergency_contact", newValue: { name: emergencyName, phone: emergencyPhone } },
+          accessToken,
+        );
       }
 
       // 5. Submit the application
@@ -781,6 +800,32 @@ export const ApplyForm = forwardRef<
           )}
         </div>
       )}
+
+      <div className="grid-2">
+        <div className={`field ${fieldErrors.emergencyContactName ? "has-error" : ""}`}>
+          <label htmlFor="a-emergency-name">Emergency contact name *</label>
+          <input
+            id="a-emergency-name"
+            value={profileDraft.emergencyContactName}
+            onChange={(e) => setProfileField("emergencyContactName", e.target.value)}
+            placeholder="Contact name"
+            autoComplete="name"
+          />
+          {fieldErrors.emergencyContactName && <p className="field__error">{fieldErrors.emergencyContactName}</p>}
+        </div>
+        <div className={`field ${fieldErrors.emergencyContactPhone ? "has-error" : ""}`}>
+          <label htmlFor="a-emergency-phone">Emergency contact phone *</label>
+          <input
+            id="a-emergency-phone"
+            value={profileDraft.emergencyContactPhone}
+            onChange={(e) => setProfileField("emergencyContactPhone", e.target.value)}
+            placeholder="Contact phone"
+            autoComplete="tel"
+          />
+          {fieldErrors.emergencyContactPhone && <p className="field__error">{fieldErrors.emergencyContactPhone}</p>}
+        </div>
+      </div>
+      <p className="hint">An emergency contact is required before you can submit.</p>
 
       {/* Dynamic Opportunity Form Questions — filter out legacy 'consent' checkbox (handled by fixed checkbox below) */}
       {form.fields.filter((f) => f.id !== "consent").length === 0 && (

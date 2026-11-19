@@ -22,6 +22,8 @@ export interface ApplicationListRow {
   applicantName: string | null;
   applicantEmail: string | null;
   applicantPhone: string | null;
+  volunteerStatus: string | null;
+  idDocType: string | null;
   answers: Record<string, unknown>;
   formSnapshot: unknown;
   attachmentIdsByField: Record<string, string[]>;
@@ -68,7 +70,7 @@ export async function listApplications(
   let query = supabase
     .from("applications")
     .select(
-      "id, status, applied_at, volunteer_id, opportunity_id, applicant_name, applicant_email, applicant_phone, answers, form_snapshot, volunteers(full_name, volunteer_code), opportunities(name)",
+      "id, status, applied_at, volunteer_id, opportunity_id, applicant_name, applicant_email, applicant_phone, answers, form_snapshot, volunteers(full_name, volunteer_code, status, id_doc_type), opportunities(name)",
       { count: "exact" },
     )
     .eq("organization_id", input.organizationId)
@@ -93,7 +95,7 @@ export async function listApplications(
   return {
     applications: (data ?? []).map((r) => {
       const answers = (r.answers && typeof r.answers === "object" ? r.answers : {}) as Record<string, unknown>;
-      const vol = r.volunteers as unknown as { full_name?: string; volunteer_code?: string } | null;
+      const vol = r.volunteers as unknown as { full_name?: string; volunteer_code?: string; status?: string; id_doc_type?: string | null } | null;
       return {
         id: r.id as string,
         volunteerId: r.volunteer_id as string,
@@ -106,6 +108,8 @@ export async function listApplications(
         applicantName: (r.applicant_name as string | null) ?? null,
         applicantEmail: (r.applicant_email as string | null) ?? null,
         applicantPhone: (r.applicant_phone as string | null) ?? null,
+        volunteerStatus: vol?.status ?? null,
+        idDocType: vol?.id_doc_type ?? null,
         answers,
         formSnapshot: r.form_snapshot ?? null,
         attachmentIdsByField: attachmentIdsByField(r.form_snapshot, answers),

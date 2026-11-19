@@ -58,7 +58,7 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
       try {
         const query = supabase
           .from("volunteers")
-          .select("id, auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, guardian_name, guardian_contact, guardian_consent_at, status")
+          .select("id, auth_user_id, full_name, email, phone, dob, gender, city, province, country, institution, degree_program, id_doc_type, id_doc_number, guardian_name, guardian_contact, guardian_consent_at, emergency_contact, status")
           .eq("auth_user_id", authUser.id);
 
         const res = typeof (query as any).maybeSingle === "function"
@@ -67,6 +67,10 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
 
         if (res?.data) {
           const v = res.data;
+          const emergency = v.emergency_contact && typeof v.emergency_contact === "object"
+            ? v.emergency_contact as { name?: string; phone?: string }
+            : null;
+
           const isComplete = Boolean(
             v.full_name?.trim() &&
             v.email?.trim() &&
@@ -99,6 +103,8 @@ export default function ApplyPage({ params }: { params: Promise<{ opportunityId:
             guardianName: v.guardian_name || "",
             guardianContact: v.guardian_contact || "",
             guardianConsent: Boolean(v.guardian_consent_at),
+            emergencyContactName: typeof emergency?.name === "string" ? emergency.name : "",
+            emergencyContactPhone: typeof emergency?.phone === "string" ? emergency.phone : "",
             status: v.status,
             hasPendingDetails: !isComplete,
           };

@@ -22,7 +22,7 @@ interface SbOpts {
 
 function sb(opts: SbOpts = {}) {
   const volunteer = opts.volunteer ??
-    { id: "v1", full_name: "Ayesha", email: "a@b.com", phone: "123", id_doc_number: "35202-1" };
+    { id: "v1", full_name: "Ayesha", email: "a@b.com", phone: "123", id_doc_number: "35202-1", emergency_contact: { name: "Parent", phone: "0300-0000000" } };
   return {
     from(table: string) {
       const api = {
@@ -83,6 +83,27 @@ Deno.test("422 with fieldErrors when a required answer is missing", async () => 
     "validation",
   );
   assertEquals(typeof (err as Error & { fieldErrors: Record<string, string> }).fieldErrors.why, "string");
+});
+
+Deno.test("requires an emergency contact before an application can be submitted", async () => {
+  await assertRejects(
+    () =>
+      applyToOpportunity(
+        sb({
+          volunteer: {
+            id: "v1",
+            full_name: "A",
+            email: "a@b.com",
+            phone: "1",
+            id_doc_number: "35202-1",
+            emergency_contact: null,
+          },
+        }),
+        { volunteerId: "v1", authUserId: "u1", opportunityId: "opp1", answers: { why: "x", consent: true } },
+      ),
+    Error,
+    "emergency_contact_required",
+  );
 });
 
 Deno.test("requires the volunteer to have an id doc on file", async () => {
