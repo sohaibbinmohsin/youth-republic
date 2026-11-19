@@ -330,3 +330,24 @@ Deno.test("staff listOpportunities: a chapter read-scope confines results to tho
   const unrestricted = await listOpportunities(db, claims("org-1"), { organizationId: "org-1" });
   assertEquals(unrestricted.opportunities.length, 3);
 });
+
+Deno.test("listOpportunities rejects a caller who holds create without view", async () => {
+  const writeOnly: StaffClaims = {
+    actorType: "staff",
+    staffId: "s1",
+    platformOwner: false,
+    canVerifyIdentity: false,
+    orgRoles: [],
+    moduleAccess: [{
+      organizationId: "org-1",
+      module: "youth-republic",
+      permissions: ["opportunities:write"],
+      chapterScopes: { "opportunities:write": ["lums"] },
+    }],
+  };
+  await assertRejects(
+    () => listOpportunities(seedDb(), writeOnly, { organizationId: "org-1" }),
+    Error,
+    "forbidden",
+  );
+});
