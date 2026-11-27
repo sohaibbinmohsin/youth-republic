@@ -239,6 +239,20 @@ export function getVolunteerPortfolio(accessToken: string) {
   return callFunction<Portfolio>("get-volunteer-portfolio", {}, accessToken);
 }
 
+export interface IdentityDocumentOnFile {
+  onFile: boolean;
+  filename: string | null;
+}
+export function getIdentityDocumentOnFile(accessToken: string) {
+  // Same edge function as the portfolio. `view` asks only for the ready
+  // identity document so the upload card can tell a retry from a first upload.
+  return callFunction<IdentityDocumentOnFile>(
+    "get-volunteer-portfolio",
+    { view: "identity-document" },
+    accessToken,
+  );
+}
+
 // Mirrors get-opportunity-detail/handler.ts. Public / anon endpoint.
 export interface GetOpportunityDetailPayload {
   opportunityId: string;

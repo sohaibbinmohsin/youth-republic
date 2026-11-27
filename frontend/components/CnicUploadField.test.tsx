@@ -37,7 +37,38 @@ describe("CnicUploadField", () => {
     expect(edgeFunctions.finalizeAttachment).toHaveBeenCalledWith({ attachmentId: "att-123" }, "session-token");
   });
 
-  it("shows an error if the signed URL request fails", async () => {
+  it("uploads a single PDF identity document", async () => {
+    vi.mocked(edgeFunctions.requestAttachmentUpload).mockResolvedValue({
+      attachmentId: "att-pdf",
+      uploadUrl: "https://r2/put/identity/att-pdf",
+      storagePath: "volunteer/v1/att-pdf.pdf",
+    });
+    vi.mocked(edgeFunctions.finalizeAttachment).mockResolvedValue({ ok: true });
+
+    const onUploaded = vi.fn();
+    const user = userEvent.setup();
+    render(<CnicUploadField accessToken="session-token" ownerId="v1" onUploaded={onUploaded} />);
+
+    const file = new File(["%PDF-1.4"], "cnic-page.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText(/identity document/i), file);
+
+    await waitFor(() => expect(onUploaded).toHaveBeenCalledWith("att-pdf"));
+    expect(edgeFunctions.requestAttachmentUpload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: "identity_doc",
+        ownerType: "volunteer",
+        ownerId: "v1",
+        mimeType: "application/pdf",
+        originalFilename: "cnic-page.pdf",
+      }),
+      "session-token",
+    );
+    expect(await screen.findByText("Pending verification")).toBeInTheDocument();
+    expect(screen.getByText("Document on file: cnic-page.pdf")).toBeInTheDocument();
+    expect(screen.queryByText("Required for verification")).not.toBeInTheDocument();
+  });
+
+  it("shows a friendly message when the upload is rejected", async () => {
     vi.mocked(edgeFunctions.requestAttachmentUpload).mockRejectedValue(new Error("unauthorized"));
     const user = userEvent.setup();
     render(<CnicUploadField accessToken="session-token" onUploaded={vi.fn()} />);
@@ -45,7 +76,72 @@ describe("CnicUploadField", () => {
     const file = new File(["fake-image-bytes"], "cnic.jpg", { type: "image/jpeg" });
     await user.upload(screen.getByLabelText(/document/i), file);
 
-    expect(await screen.findByText("unauthorized")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your session has expired. Sign in again, then upload the document.",
+    );
+    expect(screen.queryByText("unauthorized")).not.toBeInTheDocument();
+  });
+
+  it("maps too_many_files to a friendly replace message", async () => {
+    vi.mocked(edgeFunctions.requestAttachmentUpload).mockRejectedValue(new Error("too_many_files"));
+    const user = userEvent.setup();
+    render(<CnicUploadField accessToken="session-token" ownerId="v1" onUploaded={vi.fn()} />);
+
+    const file = new File(["%PDF-1.4"], "cnic.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText(/identity document/i), file);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "An identity document is already on file. Choose the file again to replace it.",
+    );
+    expect(screen.queryByText("too_many_files")).not.toBeInTheDocument();
+  });
+
+  it("says a document is on file and still accepts a replacement", async () => {
+    vi.mocked(edgeFunctions.requestAttachmentUpload).mockResolvedValue({
+      attachmentId: "att-new",
+      uploadUrl: "https://r2/put/identity/att-new",
+      storagePath: "volunteer/v1/att-new.pdf",
+    });
+    vi.mocked(edgeFunctions.finalizeAttachment).mockResolvedValue({ ok: true });
+
+    const user = userEvent.setup();
+    render(
+      <CnicUploadField
+        accessToken="session-token"
+        ownerId="v1"
+        documentOnFile={{ filename: "earlier-scan.pdf" }}
+        verificationStatus="pending_verification"
+        onUploaded={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Pending verification")).toBeInTheDocument();
+    expect(screen.getByText(/already on file and pending verification/i)).toBeInTheDocument();
+    expect(screen.getByText("Document on file: earlier-scan.pdf")).toBeInTheDocument();
+    expect(screen.queryByText("Required for verification")).not.toBeInTheDocument();
+
+    const file = new File(["%PDF-1.4"], "replacement.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText(/identity document/i), file);
+
+    await waitFor(() => expect(edgeFunctions.finalizeAttachment).toHaveBeenCalled());
+    expect(screen.getByText("Document on file: replacement.pdf")).toBeInTheDocument();
+    expect(screen.getByText("Pending verification")).toBeInTheDocument();
+  });
+
+  it("says a verified document is on file and that a new file is reviewed again", () => {
+    render(
+      <CnicUploadField
+        accessToken="session-token"
+        ownerId="v1"
+        documentOnFile={{ filename: "verified.pdf" }}
+        verificationStatus="active"
+        onUploaded={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(screen.getByText(/on file and has been verified/i)).toBeInTheDocument();
+    expect(screen.getByText(/submits the new document for verification/i)).toBeInTheDocument();
   });
 
   it("renders passport-specific label and instructions when docType is passport", () => {

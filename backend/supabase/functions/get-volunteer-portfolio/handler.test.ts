@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { getVolunteerPortfolio } from "./handler.ts";
+import { getIdentityDocumentOnFile, getVolunteerPortfolio } from "./handler.ts";
 
 type Row = Record<string, unknown>;
 
@@ -198,6 +198,44 @@ Deno.test("getVolunteerPortfolio programme carries hours totals and role from se
   assertEquals(p1.hoursVerified, 7); // 4 + 3 verified
   assertEquals(p1.role, "Team Lead");
   assertEquals(p1.startDate, "2025-08-01T00:00:00Z");
+});
+
+Deno.test("getIdentityDocumentOnFile reports the newest ready identity document", async () => {
+  const db = makeDb({
+    attachments: [
+      {
+        id: "old", owner_type: "volunteer", owner_id: "v1", domain: "identity_doc",
+        status: "ready", original_filename: "first.pdf", created_at: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: "pending", owner_type: "volunteer", owner_id: "v1", domain: "identity_doc",
+        status: "pending", original_filename: "unfinished.pdf", created_at: "2026-03-01T00:00:00Z",
+      },
+      {
+        id: "newest", owner_type: "volunteer", owner_id: "v1", domain: "identity_doc",
+        status: "ready", original_filename: "cnic-page.pdf", created_at: "2026-02-01T00:00:00Z",
+      },
+      {
+        id: "other", owner_type: "volunteer", owner_id: "v2", domain: "identity_doc",
+        status: "ready", original_filename: "other.pdf", created_at: "2026-04-01T00:00:00Z",
+      },
+    ],
+  });
+  const doc = await getIdentityDocumentOnFile(db, "v1");
+  assertEquals(doc, { onFile: true, filename: "cnic-page.pdf" });
+});
+
+Deno.test("getIdentityDocumentOnFile is empty when the volunteer has no ready identity document", async () => {
+  const db = makeDb({
+    attachments: [
+      {
+        id: "pending", owner_type: "volunteer", owner_id: "v1", domain: "identity_doc",
+        status: "pending", original_filename: "unfinished.pdf", created_at: "2026-03-01T00:00:00Z",
+      },
+    ],
+  });
+  const doc = await getIdentityDocumentOnFile(db, "v1");
+  assertEquals(doc, { onFile: false, filename: null });
 });
 
 Deno.test("getVolunteerPortfolio throws not_found for an unknown volunteer", async () => {
