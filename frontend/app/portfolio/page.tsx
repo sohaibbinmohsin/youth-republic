@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browserClient";
 import { SubmitHoursForm } from "@/components/SubmitHoursForm";
@@ -12,6 +12,7 @@ import { CITIES, INSTITUTIONS } from "@/lib/formDatasets";
 import { isValidCnic } from "@/lib/cnicUtils";
 import { EmergencyContactEditor } from "@/components/EmergencyContactEditor";
 import { CnicUploadField } from "@/components/CnicUploadField";
+import { getIdentityDocumentOnFile } from "@/lib/edgeFunctions";
 import { PROTOTYPE_SEED_OPPORTUNITIES } from "@/lib/opportunityData";
 import { OrgAvatar } from "@/components/OrgAvatar";
 import { AvatarUpload } from "@/components/AvatarUpload";
@@ -273,6 +274,8 @@ export default function PortfolioPage() {
   // (programmes, applications) load a step later. Show a shimmer in the tab
   // until the whole loadAll() pass finishes rather than a bare empty state.
   const [sectionsLoading, setSectionsLoading] = useState(true);
+  const [identityOnFile, setIdentityOnFile] = useState<{ filename: string | null } | null>(null);
+  const identityRequest = useRef(0);
   const [showLogHoursModal, setShowLogHoursModal] = useState(false);
   const [selectedParticipationForHours, setSelectedParticipationForHours] = useState<string | null>(null);
 
@@ -407,6 +410,21 @@ export default function PortfolioPage() {
         ...volunteerRow,
         volunteer_code: formatYrCode(volunteerRow.volunteer_code, authUserId),
       } as VolunteerProfile);
+
+      // Don't block the rest of the portfolio on this read. A later loadAll
+      // bumps the request id so a slow response cannot overwrite a newer one.
+      const requestId = ++identityRequest.current;
+      void getIdentityDocumentOnFile(sessionData.session.access_token)
+        .then((identityDocument) => {
+          if (identityRequest.current !== requestId) return;
+          setIdentityOnFile(
+            identityDocument.onFile ? { filename: identityDocument.filename } : null,
+          );
+        })
+        .catch(() => {
+          if (identityRequest.current !== requestId) return;
+          setIdentityOnFile(null);
+        });
 
       try {
         const { data: chapterLink } = await supabase
@@ -592,6 +610,8 @@ export default function PortfolioPage() {
 
       // Unregistered volunteers can still have drafts
       setApplications(await loadApplications());
+      identityRequest.current += 1;
+      setIdentityOnFile(null);
     }
   }
 
@@ -1144,7 +1164,13 @@ export default function PortfolioPage() {
               />
 
               {/* Identity document upload sits with the ID number it verifies. */}
-              <CnicUploadField accessToken={accessToken} ownerId={volunteer.id} onUploaded={() => loadAll()} />
+              <CnicUploadField
+                accessToken={accessToken}
+                ownerId={volunteer.id}
+                documentOnFile={identityOnFile}
+                verificationStatus={volunteer.status}
+                onUploaded={() => loadAll()}
+              />
 
               <ProfileFieldEditor
                 fieldName="city"

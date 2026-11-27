@@ -136,3 +136,28 @@ Deno.test("listPendingVolunteers returns only pending_verification rows, newest 
 
   assertEquals(result.volunteers[1].idDocAttachmentId, null);
 });
+
+Deno.test("listPendingVolunteers prefers the ready identity document over a pending replacement", async () => {
+  const db = makeDb({
+    volunteers: [
+      {
+        id: "v1",
+        volunteer_code: "YR-2026-000010",
+        full_name: "Retry Volunteer",
+        dob: "2002-02-02",
+        id_doc_type: "cnic",
+        id_doc_number: "35202-4444444-4",
+        city: "Lahore",
+        institution: "PU",
+        status: "pending_verification",
+        created_at: "2026-04-01T00:00:00Z",
+      },
+    ],
+    attachments: [
+      { id: "att-pending", owner_id: "v1", owner_type: "volunteer", domain: "identity_doc", status: "pending" },
+      { id: "att-ready", owner_id: "v1", owner_type: "volunteer", domain: "identity_doc", status: "ready" },
+    ],
+  });
+  const result = await listPendingVolunteers(db, claims(), {});
+  assertEquals(result.volunteers[0].idDocAttachmentId, "att-ready");
+});

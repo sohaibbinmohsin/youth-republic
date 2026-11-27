@@ -59,6 +59,35 @@ export interface Portfolio {
 
 const ACTIVE_APPLICATION_STATUSES = ["pending_review", "waitlisted", "selected"];
 
+export interface IdentityDocumentOnFile {
+  onFile: boolean;
+  filename: string | null;
+}
+
+// Ready identity document for the portfolio upload card. Pending rows are
+// unfinished uploads and are not reported as on file.
+export async function getIdentityDocumentOnFile(
+  supabase: SupabaseClient,
+  volunteerId: string,
+): Promise<IdentityDocumentOnFile> {
+  const { data, error } = await supabase
+    .from("attachments")
+    .select("id, original_filename, created_at")
+    .eq("owner_type", "volunteer")
+    .eq("owner_id", volunteerId)
+    .eq("domain", "identity_doc")
+    .eq("status", "ready")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const row = ((data ?? [])[0] ?? null) as Record<string, unknown> | null;
+  if (!row) return { onFile: false, filename: null };
+  return {
+    onFile: true,
+    filename: (row.original_filename ?? null) as string | null,
+  };
+}
+
 function num(v: unknown): number {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : 0;

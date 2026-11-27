@@ -76,11 +76,39 @@ export async function requestAttachmentUpload(
 
   // Per-owner file count cap (only meaningful once the row is re-pointed; a soft check).
   // Skip check for pre-registration requesters or placeholder ownerId since the row hasn't been re-pointed yet.
+  // Identity documents stay capped at one ready file. The owning volunteer may
+  // replace that file: a new pending row is allowed, and finalize-attachment
+  // retires the previous ready row so two ready identity documents never remain.
   if (!requester.preRegistration && input.ownerId !== "00000000-0000-0000-0000-000000000000") {
-    const { count } = await supabase.from("attachments")
+    const readyQuery = supabase.from("attachments")
       .select("id", { count: "exact", head: true })
-      .eq("owner_type", input.ownerType).eq("owner_id", input.ownerId).eq("status", "ready");
-    if ((count ?? 0) >= policy.maxFilesPerOwner) throw new Error("too_many_files");
+      .eq("owner_type", input.ownerType)
+      .eq("owner_id", input.ownerId)
+      .eq("status", "ready");
+    // Count this domain only. identity_doc's cap of 1 is one identity document,
+    // not every ready attachment that happens to share the owner.
+    const { count } = input.domain === "identity_doc"
+      ? await readyQuery.eq("domain", "identity_doc")
+      : await readyQuery;
+    const atCap = (count ?? 0) >= policy.maxFilesPerOwner;
+    const replacingOwnIdentityDoc = atCap &&
+      input.domain === "identity_doc" &&
+      isVolunteer &&
+      input.ownerType === "volunteer" &&
+      input.ownerId === requester.volunteerId;
+    if (atCap && !replacingOwnIdentityDoc) throw new Error("too_many_files");
+
+    if (replacingOwnIdentityDoc) {
+      // Drop abandoned pending attempts so retries cannot stack rows. The
+      // current ready document stays until the replacement is finalized.
+      const { error: clearError } = await supabase.from("attachments")
+        .delete()
+        .eq("owner_type", "volunteer")
+        .eq("owner_id", input.ownerId)
+        .eq("domain", "identity_doc")
+        .eq("status", "pending");
+      if (clearError) throw clearError;
+    }
   }
 
   const attachmentId = crypto.randomUUID();

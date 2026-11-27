@@ -29,6 +29,7 @@ describe("§9 Clean internal APIs — every write goes through a named function 
         "getOpportunityDetail",
         "listOpportunities",
         "getVolunteerPortfolio",
+        "getIdentityDocumentOnFile",
         "updateSensitiveField",
         "updateProfileField",
         "uploadPublicAsset",

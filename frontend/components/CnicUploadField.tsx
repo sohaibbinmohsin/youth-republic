@@ -3,18 +3,42 @@
 import { useState } from "react";
 import { requestAttachmentUpload, finalizeAttachment } from "@/lib/edgeFunctions";
 
+const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
+  too_many_files: "An identity document is already on file. Choose the file again to replace it.",
+  mime_not_allowed: "Upload a JPEG, PNG, or PDF.",
+  file_too_large: "That file is over the 10 MB limit. Choose a smaller file.",
+  unauthorized: "Your session has expired. Sign in again, then upload the document.",
+  forbidden: "You can upload an identity document only for your own account.",
+  object_missing: "The upload did not finish. Choose the file and try again.",
+  size_mismatch: "The uploaded file did not match the selected file. Choose it and try again.",
+  upload_url_failed: "The upload could not be started. Try again in a moment.",
+  bad_domain: "This upload could not be started. Try again.",
+  unknown_error: "The upload did not finish. Choose the file and try again.",
+};
+
+function friendlyUploadError(err: unknown): string {
+  const code = err instanceof Error ? err.message : "unknown_error";
+  return UPLOAD_ERROR_MESSAGES[code] ?? "The upload did not finish. Choose the file and try again.";
+}
+
 export function CnicUploadField({
   accessToken,
   ownerId,
   onUploaded,
   onUploadPromise,
   docType,
+  documentOnFile = null,
+  verificationStatus = null,
 }: {
   accessToken: string;
   ownerId?: string;
   onUploaded: (attachmentId: string) => void;
   onUploadPromise?: (promise: Promise<string | null> | null) => void;
   docType?: "cnic" | "b_form" | "passport" | string;
+  /** Ready identity document already stored for this volunteer. */
+  documentOnFile?: { filename?: string | null } | null;
+  /** Volunteer status. `active` means the document on file has been verified. */
+  verificationStatus?: string | null;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -71,8 +95,7 @@ export function CnicUploadField({
         onUploaded(attachmentId);
         return attachmentId;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "unknown_error";
-        setError(msg);
+        setError(friendlyUploadError(err));
         return null;
       } finally {
         setUploading(false);
@@ -82,6 +105,21 @@ export function CnicUploadField({
 
     onUploadPromise?.(uploadTask);
   }
+
+  const replacedThisSession = Boolean(uploadedFileName);
+  const onFile = replacedThisSession || Boolean(documentOnFile);
+  const verifiedOnFile = onFile && !replacedThisSession && verificationStatus === "active";
+  const fileLabel = uploadedFileName || documentOnFile?.filename || null;
+  const badge = replacedThisSession || (onFile && !verifiedOnFile)
+    ? "Pending verification"
+    : verifiedOnFile
+    ? "Verified"
+    : "Required for verification";
+  const onFileNote = verifiedOnFile
+    ? "Your identity document is on file and has been verified. Choosing a new file replaces it and submits the new document for verification."
+    : onFile
+    ? "A document is already on file and pending verification. Choosing a new file replaces it."
+    : "Choosing a new file replaces a document already on file. One identity document stays on file.";
 
   return (
     <div
@@ -98,14 +136,12 @@ export function CnicUploadField({
           <label htmlFor="cnicFile" className="block text-sm font-semibold text-[var(--ink)] mb-0">
             {docLabel}
           </label>
-          {uploadedFileName ? (
-            <span className="pill pill--pos text-[0.7rem] py-0.5 px-2 flex-shrink-0">Uploaded</span>
-          ) : (
-            <span className="pill pill--pend text-[0.7rem] py-0.5 px-2 flex-shrink-0">Required for verification</span>
-          )}
+          <span className={`${verifiedOnFile ? "pill pill--pos" : "pill pill--pend"} text-[0.7rem] py-0.5 px-2 flex-shrink-0`}>
+            {badge}
+          </span>
         </div>
         <p className="text-xs text-[var(--ink-2)] leading-relaxed mb-0">
-          {docHelpText}
+          {docHelpText} {onFileNote}
         </p>
       </div>
 
@@ -121,13 +157,13 @@ export function CnicUploadField({
         {uploading && <span className="text-xs text-[var(--ink-2)] animate-pulse flex-shrink-0">Uploading…</span>}
       </div>
 
-      {uploadedFileName && (
-        <p className="text-xs text-green-700 font-medium mb-0">
-          ✓ Document attached: {uploadedFileName}
+      {onFile && (
+        <p className={`text-xs font-medium mb-0 ${verifiedOnFile ? "text-green-700" : "text-[var(--ink)]"}`}>
+          {fileLabel ? `Document on file: ${fileLabel}` : "A document is already on file."}
         </p>
       )}
 
-      {error && <p className="text-sm text-red-600 font-medium mb-0">{error}</p>}
+      {error && <p className="text-sm text-red-600 font-medium mb-0" role="alert">{error}</p>}
     </div>
   );
 }

@@ -64,14 +64,25 @@ export async function listPendingVolunteers(
   if (ids.length > 0) {
     const { data: attachments, error: attachError } = await supabase
       .from("attachments")
-      .select("id, owner_id")
+      .select("id, owner_id, status")
       .eq("owner_type", "volunteer")
       .in("owner_id", ids)
       .eq("domain", "identity_doc");
     if (attachError) throw attachError;
+    // A replacement upload leaves the previous ready document in place until
+    // the new file is finalized. Prefer that ready document over the pending
+    // replacement so review still opens the file that is actually on file.
+    const chosen: Record<string, { id: string; status: string | null }> = {};
     for (const a of attachments ?? []) {
       const owner = a.owner_id as string;
-      if (!attachmentByOwner[owner]) attachmentByOwner[owner] = a.id as string;
+      const status = (a.status as string | undefined) ?? null;
+      const current = chosen[owner];
+      if (!current || (status === "ready" && current.status !== "ready")) {
+        chosen[owner] = { id: a.id as string, status };
+      }
+    }
+    for (const [owner, attachment] of Object.entries(chosen)) {
+      attachmentByOwner[owner] = attachment.id;
     }
   }
 

@@ -8,6 +8,7 @@ import {
   requestAttachmentUpload,
   finalizeAttachment,
   getAttachment,
+  getIdentityDocumentOnFile,
   getVolunteerPortfolio,
   getOpportunityDetail,
   listOpportunities,
@@ -290,6 +291,22 @@ describe("getVolunteerPortfolio", () => {
     expect(url).toBe(`${FUNCTIONS_URL}/get-volunteer-portfolio`);
     expect(init.headers.Authorization).toBe("Bearer session-token");
     expect(JSON.parse(init.body)).toEqual({});
+  });
+});
+
+describe("getIdentityDocumentOnFile", () => {
+  it("asks the portfolio function for the identity-document view", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(JSON.stringify({ onFile: true, filename: "cnic.pdf" }), { status: 200 }),
+    );
+
+    const result = await getIdentityDocumentOnFile("session-token");
+
+    expect(result).toEqual({ onFile: true, filename: "cnic.pdf" });
+    const [url, init] = lastCall();
+    expect(url).toBe(`${FUNCTIONS_URL}/get-volunteer-portfolio`);
+    expect(JSON.parse(init.body)).toEqual({ view: "identity-document" });
+    expect(init.headers.Authorization).toBe("Bearer session-token");
   });
 });
 

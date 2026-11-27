@@ -161,14 +161,25 @@ Deno.test("volunteer requester with placeholder ownerId adopts requester volunte
   assertEquals(r.storagePath.startsWith("volunteer/v-real/"), true);
 });
 
-Deno.test("volunteer requester throws too_many_files when ready count reaches cap", async () => {
+function countingClient(readyCount: number) {
+  const deleted: Record<string, string>[] = [];
+  let inserted = false;
   const countStub = {
     eq() { return this; },
     then(resolve: (val: unknown) => unknown) {
-      return resolve({ count: 1, error: null });
+      return resolve({ count: readyCount, error: null });
     },
   };
-  const sb = fakeSupabase({
+  const deleteStub = {
+    eq(col: string, val: string) {
+      deleted.push({ [col]: val });
+      return this;
+    },
+    then(resolve: (val: unknown) => unknown) {
+      return resolve({ error: null });
+    },
+  };
+  const client = {
     from() {
       return {
         select(_cols: unknown, opts?: { count?: string; head?: boolean }) {
@@ -177,19 +188,78 @@ Deno.test("volunteer requester throws too_many_files when ready count reaches ca
         },
         eq() { return this; },
         in() { return this; },
-        insert() { return { select() { return { async single() { return { data: { id: "att-new" }, error: null }; } }; } }; },
+        delete() { return deleteStub; },
+        insert() {
+          inserted = true;
+          return { select() { return { async single() { return { data: { id: "att-new" }, error: null }; } }; } };
+        },
       };
     },
-  });
+    storage: {
+      from() {
+        return { async createSignedUploadUrl() { return { data: { signedUrl: "https://upload" }, error: null }; } };
+      },
+    },
+  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+  return { client, deleted, wasInserted: () => inserted };
+}
 
+Deno.test("owning volunteer with no ready identity document can upload a single file", async () => {
+  const { client, deleted, wasInserted } = countingClient(0);
+  const r = await requestAttachmentUpload(
+    client,
+    { authUserId: "u", volunteerId: "v-real" },
+    {
+      domain: "identity_doc",
+      ownerType: "volunteer",
+      ownerId: "v-real",
+      mimeType: "application/pdf",
+      sizeBytes: 100,
+      originalFilename: "cnic.pdf",
+    },
+  );
+  assertEquals(r.attachmentId, "att-new");
+  assertEquals(r.uploadUrl, "https://upload");
+  assertEquals(r.storagePath.startsWith("volunteer/v-real/"), true);
+  assertEquals(wasInserted(), true);
+  assertEquals(deleted.length, 0);
+});
+
+Deno.test("owning volunteer replaces an existing ready identity document instead of too_many_files", async () => {
+  const { client, deleted, wasInserted } = countingClient(1);
+  const r = await requestAttachmentUpload(
+    client,
+    { authUserId: "u", volunteerId: "v-real" },
+    {
+      domain: "identity_doc",
+      ownerType: "volunteer",
+      ownerId: "v-real",
+      mimeType: "application/pdf",
+      sizeBytes: 100,
+      originalFilename: "cnic-page.pdf",
+    },
+  );
+  assertEquals(r.attachmentId, "att-new");
+  assertEquals(r.storagePath.startsWith("volunteer/v-real/"), true);
+  assertEquals(wasInserted(), true);
+  assertEquals(deleted, [
+    { owner_type: "volunteer" },
+    { owner_id: "v-real" },
+    { domain: "identity_doc" },
+    { status: "pending" },
+  ]);
+});
+
+Deno.test("identity document cap still rejects a ready document owned by someone else", async () => {
+  const { client, wasInserted } = countingClient(1);
   await assertRejects(
     () => requestAttachmentUpload(
-      sb,
+      client,
       { authUserId: "u", volunteerId: "v-real" },
       {
         domain: "identity_doc",
         ownerType: "volunteer",
-        ownerId: "v-real",
+        ownerId: "someone-else",
         mimeType: "image/png",
         sizeBytes: 100,
       },
@@ -197,5 +267,26 @@ Deno.test("volunteer requester throws too_many_files when ready count reaches ca
     Error,
     "too_many_files",
   );
+  assertEquals(wasInserted(), false);
+});
+
+Deno.test("session photo cap still throws too_many_files", async () => {
+  const { client, wasInserted } = countingClient(6);
+  await assertRejects(
+    () => requestAttachmentUpload(
+      client,
+      { authUserId: "u", volunteerId: "v-real" },
+      {
+        domain: "session_photo",
+        ownerType: "activity_hours",
+        ownerId: "hours-1",
+        mimeType: "image/png",
+        sizeBytes: 100,
+      },
+    ),
+    Error,
+    "too_many_files",
+  );
+  assertEquals(wasInserted(), false);
 });
 
